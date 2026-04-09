@@ -1,3 +1,4 @@
+import { create } from '@bufbuild/protobuf';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   useGetCurrentSessionQuery,
@@ -5,7 +6,7 @@ import {
   useStopRecordingMutation,
 } from '@/api/recordingApi';
 import { useCompileSetupMutation, useNormalizeSetupMutation } from '@/api/setupApi';
-import type { ApiErrorResponse, EffectiveVideoSource, ProcessLog } from '@/api/types';
+import type { ApiErrorResponse, EffectiveVideoSource } from '@/api/types';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import type { StudioSource } from '@/components/source-card';
 import {
@@ -35,7 +36,7 @@ import {
   setSession,
   selectWsConnected,
 } from '@/features/session/sessionSlice';
-import { getWsClient } from '@/features/session/wsClient';
+import { WsClient } from '@/features/session/wsClient';
 import {
   normalizeFailed,
   normalizeStarted,
@@ -48,6 +49,7 @@ import { MenuBar, SourceGrid, OutputPanel, MicPanel, StatusPanel } from '@/compo
 import { LogPanel } from '@/components/log-panel';
 import { DSLEditor } from '@/components/dsl-editor';
 import { Btn } from '@/components/primitives/Btn';
+import { ProcessLogSchema } from '@/gen/proto/screencast/studio/v1/web_pb';
 
 interface StudioPageProps {
   className?: string;
@@ -132,7 +134,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     session.state === 'starting' ||
     session.state === 'stopping';
   const sources = useMemo(
-    () => normalizedConfig?.video_sources.map(toStudioSource) ?? [],
+    () => normalizedConfig?.videoSources.map(toStudioSource) ?? [],
     [normalizedConfig]
   );
   const armedSources = useMemo(
@@ -155,7 +157,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   }, [currentSessionData, dispatch]);
 
   useEffect(() => {
-    const wsClient = getWsClient(dispatch);
+    const wsClient = new WsClient(dispatch);
     wsClient.connect();
 
     return () => {
@@ -164,7 +166,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   }, [dispatch]);
 
   useEffect(() => {
-    const startedAt = parseTimestamp(session.started_at);
+    const startedAt = parseTimestamp(session.startedAt);
     if (!isRecording || startedAt === null) {
       return;
     }
@@ -174,7 +176,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     }, 1000);
 
     return () => clearInterval(id);
-  }, [isRecording, session.started_at]);
+  }, [isRecording, session.startedAt]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -182,6 +184,10 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
         dispatch(normalizeStarted());
         try {
           const response = await normalizeSetup({ dsl: dslText }).unwrap();
+          if (!response.config) {
+            dispatch(normalizeFailed(['normalize response missing config']));
+            return;
+          }
           dispatch(normalizeSucceeded({
             config: response.config,
             warnings: response.warnings,
@@ -198,15 +204,15 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   }, [dispatch, dslText, normalizeSetup]);
 
   const elapsed = useMemo(() => {
-    const startedAt = parseTimestamp(session.started_at);
+    const startedAt = parseTimestamp(session.startedAt);
     if (startedAt === null) {
       return 0;
     }
 
-    const finishedAt = parseTimestamp(session.finished_at);
+    const finishedAt = parseTimestamp(session.finishedAt);
     const end = finishedAt ?? now;
     return Math.max(0, Math.floor((end - startedAt) / 1000));
-  }, [now, session.finished_at, session.started_at]);
+  }, [now, session.finishedAt, session.startedAt]);
 
   const outputSettings = useAppSelector((state) => ({
     format: state.studioDraft.format,
@@ -227,21 +233,25 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       try {
         if (isRecording) {
           const response = await stopRecording().unwrap();
-          dispatch(setSession(response.session));
+          if (response.session) {
+            dispatch(setSession(response.session));
+          }
           return;
         }
 
         const response = await startRecording({
           dsl: dslText,
         }).unwrap();
-        dispatch(setSession(response.session));
+        if (response.session) {
+          dispatch(setSession(response.session));
+        }
       } catch (error) {
-        dispatch(addLog({
+        dispatch(addLog(create(ProcessLogSchema, {
           timestamp: new Date().toISOString(),
-          process_label: 'ui',
+          processLabel: 'ui',
           stream: 'stderr',
           message: errorMessageFromUnknown(error),
-        } satisfies ProcessLog));
+        })));
       }
     })();
   };

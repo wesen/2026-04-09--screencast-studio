@@ -1,6 +1,8 @@
+import { create } from '@bufbuild/protobuf';
 import type { Meta, StoryObj } from '@storybook/react';
 import { LogPanel } from '../components/log-panel/LogPanel';
 import type { ProcessLog } from '../api/types';
+import { ProcessLogSchema } from '@/gen/proto/screencast/studio/v1/web_pb';
 
 const meta = {
   title: 'Studio/LogPanel',
@@ -16,10 +18,12 @@ const createLog = (
   message: string,
   offsetMs = 0
 ): ProcessLog => ({
-  timestamp: new Date(Date.now() - offsetMs).toISOString(),
-  process_label: 'preview-1',
-  stream,
-  message,
+  ...create(ProcessLogSchema, {
+    timestamp: new Date(Date.now() - offsetMs).toISOString(),
+    processLabel: 'preview-1',
+    stream,
+    message,
+  }),
 });
 
 export const Empty: Story = {

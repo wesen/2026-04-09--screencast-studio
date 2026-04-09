@@ -95,3 +95,19 @@ Added a dedicated protobuf migration design note inside `SCS-0003`, reordered th
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/design-doc/02-protobuf-transport-migration-plan.md — New detailed design and implementation guide for the protobuf migration
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/tasks.md — Task plan now prioritizes protobuf schema, generation, and REST plus websocket migration before further preview cleanup
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/reference/01-diary.md — Diary records why the cleanup plan pivoted away from more handwritten transport work
+
+## 2026-04-09
+
+Implemented the shared protobuf transport contract for both REST and websocket traffic, generated Go and TypeScript code with Buf, removed the old handwritten Go transport file, and switched the frontend API and websocket decode paths to generated protobuf schemas.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/proto/screencast/studio/v1/web.proto — Shared transport schema for REST and websocket messages
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/buf.yaml — Buf module configuration for schema generation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/buf.gen.yaml — Buf code generation configuration for Go and TypeScript outputs
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pb_mapping.go — Explicit domain-to-protobuf mapping helpers for the web boundary
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/protojson.go — Shared `protojson` encode and decode helpers for REST and websocket messages
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go — Websocket stream now emits generated `ServerEvent` messages
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/proto.ts — Frontend protobuf JSON helper boundary
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts — Websocket decode now uses the generated `ServerEvent` schema
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/gen/proto/screencast/studio/v1/web_pb.ts — Generated TypeScript transport types and schemas

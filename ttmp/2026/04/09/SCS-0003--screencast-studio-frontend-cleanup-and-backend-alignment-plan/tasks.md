@@ -48,7 +48,7 @@ Acceptance criteria:
 
 - [x] Audit `ui/src/features/studio-draft/studioDraftSlice.ts` and `ui/src/features/session/sessionSlice.ts`.
 - [x] Decide which state is truly UI-owned and which state should come from backend queries or websocket events.
-- [ ] Create or refactor slices around:
+- [x] Create or refactor slices around:
   - editor DSL text
   - discovery snapshot
   - current recording session
@@ -65,12 +65,12 @@ Acceptance criteria:
 
 ## Phase 5: Introduce Shared Protobuf Transport Schemas
 
-- [ ] Add a new protobuf design note to the ticket and align the implementation order around it.
-- [ ] Create `proto/screencast/studio/v1/web.proto` for the shared REST and websocket contract.
-- [ ] Add `buf.yaml` and `buf.gen.yaml` using Buf v2 remote plugins.
-- [ ] Generate Go code under `gen/go/proto/...`.
-- [ ] Generate TypeScript code under `ui/src/gen/proto/...`.
-- [ ] Add any missing runtime dependencies for generated Go and TypeScript protobuf code.
+- [x] Add a new protobuf design note to the ticket and align the implementation order around it.
+- [x] Create `proto/screencast/studio/v1/web.proto` for the shared REST and websocket contract.
+- [x] Add `buf.yaml` and `buf.gen.yaml` using Buf v2 remote plugins.
+- [x] Generate Go code under `gen/go/proto/...`.
+- [x] Generate TypeScript code under `ui/src/gen/proto/...`.
+- [x] Add any missing runtime dependencies for generated Go and TypeScript protobuf code.
 
 Acceptance criteria:
 
@@ -80,11 +80,11 @@ Acceptance criteria:
 
 ## Phase 6: Migrate Go REST And Websocket Transport To Generated Types
 
-- [ ] Add Go-side `protojson` encode and decode helpers for REST messages.
-- [ ] Replace shared REST request and response structs in `internal/web/api_types.go` with generated protobuf messages or mapping helpers built around them.
-- [ ] Migrate health, discovery, setup, recording, and preview REST handlers to generated protobuf transport messages.
-- [ ] Replace websocket bootstrap and fan-out events with generated protobuf `ServerEvent` messages.
-- [ ] Update Go tests to assert the new lowerCamelCase protobuf JSON contract.
+- [x] Add Go-side `protojson` encode and decode helpers for REST messages.
+- [x] Replace shared REST request and response structs in `internal/web/api_types.go` with generated protobuf messages or mapping helpers built around them.
+- [x] Migrate health, discovery, setup, recording, and preview REST handlers to generated protobuf transport messages.
+- [x] Replace websocket bootstrap and fan-out events with generated protobuf `ServerEvent` messages.
+- [x] Update Go tests to assert the new lowerCamelCase protobuf JSON contract.
 
 Acceptance criteria:
 
@@ -94,12 +94,12 @@ Acceptance criteria:
 
 ## Phase 7: Migrate Frontend Transport And Websocket Decode To Generated Types
 
-- [ ] Replace `ui/src/api/types.ts` as the source of truth for shared REST and websocket payloads.
-- [ ] Add small frontend protobuf JSON helpers for `fromJson(...)` and `toJson(...)`.
-- [ ] Update RTK Query endpoints in `ui/src/api/` to send and decode generated protobuf JSON.
-- [ ] Refactor `ui/src/features/session/wsClient.ts` so websocket lifecycle is explicit and event decoding uses the generated protobuf `ServerEvent` schema.
-- [ ] Ensure one app-level owner starts and stops the websocket connection.
-- [ ] Remove handwritten websocket schema guards and stale singleton assumptions if they are no longer needed.
+- [x] Replace `ui/src/api/types.ts` as the source of truth for shared REST and websocket payloads.
+- [x] Add small frontend protobuf JSON helpers for `fromJson(...)` and `toJson(...)`.
+- [x] Update RTK Query endpoints in `ui/src/api/` to send and decode generated protobuf JSON.
+- [x] Refactor `ui/src/features/session/wsClient.ts` so websocket lifecycle is explicit and event decoding uses the generated protobuf `ServerEvent` schema.
+- [x] Ensure one app-level owner starts and stops the websocket connection.
+- [x] Remove handwritten websocket schema guards and stale singleton assumptions if they are no longer needed.
 
 Acceptance criteria:
 
@@ -171,5 +171,7 @@ Acceptance criteria:
 - [x] `pnpm --dir ui build`
 - [x] `pnpm --dir ui lint`
 - [x] `pnpm --dir ui build-storybook`
+- [x] `go test ./...`
+- [x] `go build ./...`
 - [ ] manual smoke test against the real Go server
 - [ ] review for remaining duplicate shells or stale routes

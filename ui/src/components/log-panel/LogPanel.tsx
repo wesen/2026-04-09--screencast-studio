@@ -84,7 +84,7 @@ export const LogPanel: React.FC<LogPanelProps> = ({
                 {new Date(log.timestamp).toLocaleTimeString()}
               </span>
               <span style={{ color: 'var(--studio-mid)', flexShrink: 0 }}>
-                {log.process_label}
+                {log.processLabel}
               </span>
               <span style={{ flex: 1, wordBreak: 'break-word' }}>
                 {log.message}

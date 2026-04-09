@@ -33,7 +33,7 @@ RelatedFiles:
       Note: Frontend websocket decoder and dispatch path that should stop relying on local schema logic
 ExternalSources: []
 Summary: Detailed analysis and implementation plan for replacing handwritten shared REST and websocket transport types with protobuf-generated Go and TypeScript code.
-LastUpdated: 2026-04-09T17:22:55-04:00
+LastUpdated: 2026-04-09T18:02:00-04:00
 WhatFor: Explain why the transport contract should move to protobuf and give an intern a concrete migration sequence for REST and websocket payloads.
 WhenToUse: Read before implementing the protobuf migration, reviewing transport PRs, or deciding whether to add more handwritten contract code.
 ---
@@ -53,6 +53,29 @@ That is the opposite of the cleanup direction this ticket wants. The project is 
 The proposed solution is to define the shared REST and websocket contract once in protobuf, generate Go and TypeScript code from that schema, and keep JSON as the actual wire format. Go will use `protojson` for request decode, response encode, and websocket event emission. The frontend will use generated protobuf schemas plus `@bufbuild/protobuf` JSON decode helpers instead of handwritten interface declarations and validators.
 
 This plan intentionally does not switch the app to binary protobuf, gRPC, or Connect. It is a contract-consolidation step, not a transport-stack rewrite.
+
+## Implementation Update
+
+The migration described in this document is now the active transport path in the repo.
+
+The schema lives in `proto/screencast/studio/v1/web.proto`. Generated outputs are committed for both languages:
+
+- Go: `gen/go/proto/screencast/studio/v1/web.pb.go`
+- TypeScript: `ui/src/gen/proto/screencast/studio/v1/web_pb.ts`
+
+The backend now uses explicit boundary helpers in `internal/web/`:
+
+- `pb_mapping.go` maps domain values into generated transport messages
+- `protojson.go` provides shared `protojson` request and response helpers
+- `handlers_api.go`, `handlers_preview.go`, and `handlers_ws.go` emit generated protobuf JSON instead of handwritten transport structs
+
+The frontend now uses generated schemas as the transport source of truth:
+
+- `ui/src/api/proto.ts` provides the small `fromJson(...)` / `toJson(...)` adapter boundary
+- `ui/src/api/*.ts` decodes RTK Query responses through generated schemas
+- `ui/src/features/session/wsClient.ts` decodes websocket frames as generated `ServerEvent` messages
+
+The old handwritten shared transport file `internal/web/api_types.go` has been removed. `ui/src/api/types.ts` remains only as a re-export convenience layer around generated message types plus the local API error envelope.
 
 ## Problem Statement
 

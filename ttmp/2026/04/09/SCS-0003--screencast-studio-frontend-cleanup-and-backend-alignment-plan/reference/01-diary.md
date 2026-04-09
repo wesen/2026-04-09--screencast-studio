@@ -29,7 +29,7 @@ RelatedFiles:
       Note: Prior frontend review used as the direct precursor to this cleanup ticket
 ExternalSources: []
 Summary: Chronological record of creating the dedicated frontend cleanup ticket and defining a no-compatibility plan to realign the UI with the backend.
-LastUpdated: 2026-04-09T17:27:31-04:00
+LastUpdated: 2026-04-09T18:05:00-04:00
 WhatFor: Preserve the reasoning, evidence, and document-creation steps behind the dedicated frontend cleanup ticket.
 WhenToUse: Read when continuing the cleanup ticket, reviewing why the ticket exists, or checking which existing frontend files were considered the primary cleanup targets.
 ---
@@ -239,6 +239,138 @@ sed -n '1,220p' ui/src/features/session/wsClient.ts
 sed -n '1,260p' ui/src/mocks/data.ts
 sed -n '1,260p' ui/src/mocks/handlers.ts
 pnpm --dir ui build
+```
+
+## Step 7: Replace The Shared REST And Websocket Contract With Protobuf
+
+This step pivoted the cleanup effort away from more handwritten transport maintenance and moved the web boundary to a single protobuf-defined schema shared by Go and TypeScript. The key idea was to keep the transport as JSON while replacing the duplicated contract declarations with generated code.
+
+The most important architectural choice in this step was to keep protobuf at the web boundary instead of dragging generated messages into the domain packages. `pkg/discovery`, `pkg/dsl`, and the recording packages remain domain-shaped. `internal/web/` now owns the explicit mapping into generated transport messages.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Alright, add a new implementation plan / analysis for switching to protobuf, within this ticket, and then tasks, and then tackle REST + WS protobuf use before we go on much further. That should simplify our code quite a bit."
+
+**Assistant interpretation:** Add a dedicated protobuf migration design note to `SCS-0003`, update the task plan to prioritize the migration, and then implement the shared-schema move now instead of continuing with more handwritten transport cleanup.
+
+### What I did
+
+- Added the protobuf migration design guide:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/design-doc/02-protobuf-transport-migration-plan.md`
+- Updated `tasks.md` so protobuf schema, generation, and REST plus websocket migration became the next implementation phases.
+- Added protobuf generation plumbing:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/buf.yaml`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/buf.gen.yaml`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/proto/screencast/studio/v1/web.proto`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/generate.go`
+- Generated and committed code for both languages:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1/web.pb.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/gen/proto/screencast/studio/v1/web_pb.ts`
+- Added runtime dependencies:
+  - `google.golang.org/protobuf` in `go.mod` / `go.sum`
+  - `@bufbuild/protobuf` in `ui/package.json` / `ui/pnpm-lock.yaml`
+- Replaced the old handwritten Go transport layer:
+  - deleted `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/api_types.go`
+  - added `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/api_errors.go`
+  - added `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pb_mapping.go`
+  - added `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/protojson.go`
+- Migrated backend handlers and tests to protobuf JSON:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`
+- Migrated the frontend transport boundary to generated schemas:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/proto.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/discoveryApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/setupApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/recordingApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/previewsApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/previews/previewSlice.ts`
+- Reworked mocks and stories to emit protobuf-shaped JSON instead of stale handwritten payloads.
+
+### Why
+
+- The frontend cleanup had reached the point where transport duplication was the main remaining source of confusion.
+- Websocket runtime validation was about to become a second schema language in the UI.
+- The app is still small enough that moving to a single schema now is cheaper than maintaining one more round of duplicated types.
+
+### What worked
+
+- Keeping JSON on the wire made the migration straightforward to test in the browser-oriented code paths.
+- `protojson` plus explicit mapping helpers gave the Go side a clear transport boundary.
+- `@bufbuild/protobuf` gave the frontend a small, predictable runtime decode path for both REST and websocket messages.
+- The websocket event contract became much clearer once `ServerEvent` used a protobuf `oneof` instead of string-dispatch plus free-form payloads.
+
+### What didn't work
+
+- The initial UI compile surfaced a few remaining assumptions about the old local transport types.
+- A few places still treated generated messages like arbitrary local interfaces and needed to move to `create(...)`, `fromJson(...)`, or updated camelCase field names.
+
+### What I learned
+
+- The best dividing line is “protobuf only at the transport boundary.” Pulling protobuf into the domain layer would have made the code harder to explain, not easier.
+- Generated TypeScript messages are usable in Redux and RTK Query as long as the code is disciplined about where decode and initialization happen.
+- The schema-first websocket path is much easier to review than local type guards spread through the UI.
+
+### Validation
+
+The following commands passed after the migration:
+
+```bash
+buf generate
+go test ./...
+go build ./...
+pnpm --dir ui build
+pnpm --dir ui lint
+pnpm --dir ui build-storybook
+```
+
+### What warrants a second pair of eyes
+
+- Whether `ui/src/api/types.ts` should stay as a thin re-export layer or be deleted entirely once call sites import generated types directly.
+- Whether the internal websocket event hub should stay string-based internally or switch to a typed Go event wrapper now that the transport schema is formalized.
+- Whether `ui/dist/` and `ui/storybook-static/` should remain committed now that generated client code and schema outputs are in the repo as well.
+
+### What should be done in the future
+
+- Do a real manual smoke test against the running Go server to confirm preview and recording flows under the new protobuf contract.
+- Finish the preview-integration cleanup on top of the new schema instead of adding any more handwritten transport logic.
+- Remove any remaining convenience layers that no longer provide enough value after the generated-code switch.
+
+### Code review instructions
+
+- Start with the schema:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/proto/screencast/studio/v1/web.proto`
+- Then review the Go web boundary:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pb_mapping.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/protojson.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+- Then review the frontend boundary:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/proto.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/recordingApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/previewsApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/sessionSlice.ts`
+- Finally review the generated outputs only for shape sanity:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1/web.pb.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/gen/proto/screencast/studio/v1/web_pb.ts`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+buf generate
+go test ./internal/web
+go test ./...
+go build ./...
+pnpm --dir ui add @bufbuild/protobuf
+pnpm --dir ui build
+pnpm --dir ui lint
+pnpm --dir ui build-storybook
 ```
 
 ## Step 3: Collapse The App To One Mounted Shell

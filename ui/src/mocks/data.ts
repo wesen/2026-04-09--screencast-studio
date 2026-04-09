@@ -1,11 +1,17 @@
+import { create } from '@bufbuild/protobuf';
 import type {
   CompileResponse,
   DiscoveryResponse,
   PreviewDescriptor,
   RecordingSession,
 } from '@/api/types';
+import {
+  CompileResponseSchema,
+  DiscoveryResponseSchema,
+  RecordingSessionSchema,
+} from '@/gen/proto/screencast/studio/v1/web_pb';
 
-export const mockDiscoveryData: DiscoveryResponse = {
+export const mockDiscoveryData: DiscoveryResponse = create(DiscoveryResponseSchema, {
   displays: [
     {
       id: 'display-1',
@@ -51,7 +57,7 @@ export const mockDiscoveryData: DiscoveryResponse = {
       id: '/dev/video0',
       label: 'Built-in Camera',
       device: '/dev/video0',
-      card_name: 'FaceTime HD',
+      cardName: 'FaceTime HD',
     },
   ],
   audio: [
@@ -59,32 +65,32 @@ export const mockDiscoveryData: DiscoveryResponse = {
       id: 'alsa_input.pci-0000_00_1f.3.analog-stereo',
       name: 'Built-in Mic',
       driver: 'ALSA',
-      sample_spec: 'S16LE 48000 Hz 2 channels',
+      sampleSpec: 'S16LE 48000 Hz 2 channels',
       state: 'RUNNING',
     },
   ],
-};
+});
 
-export const mockRecordingSession: RecordingSession = {
+export const mockRecordingSession: RecordingSession = create(RecordingSessionSchema, {
   active: false,
   outputs: [],
   warnings: [],
   logs: [],
-};
+});
 
-export const mockCompileResponse: CompileResponse = {
-  session_id: 'demo-session',
+export const mockCompileResponse: CompileResponse = create(CompileResponseSchema, {
+  sessionId: 'demo-session',
   warnings: [],
   outputs: [
     {
       kind: 'video',
-      source_id: 'desktop-1',
+      sourceId: 'desktop-1',
       name: 'Full Desktop',
       path: 'recordings/demo-session/Full Desktop.mov',
     },
   ],
-  video_jobs: [],
-  audio_jobs: [],
-};
+  videoJobs: [],
+  audioJobs: [],
+});
 
 export const mockPreviews: PreviewDescriptor[] = [];

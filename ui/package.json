@@ -12,6 +12,7 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.11.0",
     "@reduxjs/toolkit": "^2.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -38,6 +39,8 @@
     "vite": "^5.1.4"
   },
   "msw": {
-    "workerDirectory": ["public"]
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

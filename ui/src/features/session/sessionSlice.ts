@@ -1,5 +1,7 @@
+import { create } from '@bufbuild/protobuf';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { ProcessLog, RecordingSession, WsEvent } from '@/api/types';
+import type { ProcessLog, RecordingSession } from '@/api/types';
+import { RecordingSessionSchema } from '@/gen/proto/screencast/studio/v1/web_pb';
 
 // ── Types ──
 
@@ -12,12 +14,12 @@ export interface SessionState {
 // ── Initial State ──
 
 const initialState: SessionState = {
-  session: {
+  session: create(RecordingSessionSchema, {
     active: false,
     outputs: [],
     warnings: [],
     logs: [],
-  },
+  }),
   logs: [],
   wsConnected: false,
 };
@@ -49,9 +51,11 @@ const sessionSlice = createSlice({
     },
     addLog: (state, action: PayloadAction<ProcessLog>) => {
       state.logs.push(action.payload);
+      state.session.logs = state.logs;
       // Keep last 1000 logs
       if (state.logs.length > 1000) {
         state.logs = state.logs.slice(-1000);
+        state.session.logs = state.logs;
       }
     },
     clearLogs: (state) => {
@@ -90,31 +94,3 @@ export const selectWsConnected = (state: { session: SessionState }) =>
 
 export const selectLogs = (state: { session: SessionState }) =>
   state.session.logs;
-
-// ── Event Handler ──
-
-export function handleWsEvent(
-  state: SessionState,
-  event: WsEvent
-): SessionState {
-  switch (event.type) {
-    case 'session.state':
-      return {
-        ...state,
-        session: event.payload,
-        logs: event.payload.logs,
-      };
-    case 'session.log':
-      return {
-        ...state,
-        logs: [...state.logs.slice(-999), event.payload],
-      };
-    case 'preview.list':
-    case 'preview.state':
-      return {
-        ...state,
-      };
-    default:
-      return state;
-  }
-}
