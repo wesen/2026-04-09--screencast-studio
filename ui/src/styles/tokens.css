@@ -1,0 +1,77 @@
+/* Screencast Studio Design Tokens
+ * Based on screencast-studio-v2.jsx.jsx color palette and styling
+ */
+
+:root {
+  /* Color palette */
+  --studio-cream: #f5f0e8;
+  --studio-black: #1a1a1a;
+  --studio-dark: #2c2c2c;
+  --studio-mid: #8a8a7a;
+  --studio-light: #d4d0c8;
+  --studio-red: #c04040;
+  --studio-green: #5a8a5a;
+  --studio-amber: #b89840;
+  --studio-bg: #e8e4dc;
+
+  /* Typography */
+  --studio-font: "Chicago", "Geneva", "Monaco", monospace;
+  --studio-font-size-xs: 7px;
+  --studio-font-size-sm: 9px;
+  --studio-font-size-base: 10px;
+  --studio-font-size-md: 11px;
+  --studio-font-size-lg: 15px;
+
+  /* Spacing */
+  --studio-spacing-xs: 2px;
+  --studio-spacing-sm: 4px;
+  --studio-spacing-md: 6px;
+  --studio-spacing-lg: 8px;
+  --studio-spacing-xl: 10px;
+
+  /* Borders */
+  --studio-border-width: 1.5px;
+  --studio-border-radius-sm: 2px;
+  --studio-border-radius-md: 3px;
+
+  /* Shadows */
+  --studio-shadow: 2px 2px 0 var(--studio-dark);
+
+  /* Transitions */
+  --studio-transition-fast: 0.08s;
+  --studio-transition-normal: 0.2s;
+
+  /* Layout */
+  --studio-header-height: 28px;
+  --studio-panel-min-width: 175px;
+  --studio-content-max-width: 900px;
+}
+
+/* Global resets */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--studio-font);
+  font-size: var(--studio-font-size-md);
+  color: var(--studio-black);
+  background: var(--studio-bg);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--studio-bg) 0px,
+    var(--studio-bg) 1px,
+    var(--studio-cream) 1px,
+    var(--studio-cream) 6px
+  );
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}

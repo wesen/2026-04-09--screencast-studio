@@ -1,0 +1,69 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Introduction" />
+
+# Screencast Studio UI
+
+This is the component library for the Screencast Studio web control frontend.
+
+## Design Tokens
+
+The UI uses a consistent set of CSS variables for theming:
+
+```css
+--studio-cream: #f5f0e8;
+--studio-black: #1a1a1a;
+--studio-dark: #2c2c2c;
+--studio-mid: #8a8a7a;
+--studio-light: #d4d0c8;
+--studio-red: #c04040;
+--studio-green: #5a8a5a;
+--studio-amber: #b89840;
+--studio-bg: #e8e4dc;
+```
+
+## Components
+
+### Primitives
+
+- **Btn** - Button with active/accent states
+- **Radio** - Radio indicator
+- **Sel** - Custom dropdown selector
+- **Slider** - Range slider
+- **Win** - Window container
+- **WinBar** - Window title bar
+
+### Composites
+
+- **FakeScreen** - Source preview visualization
+- **MicMeter** - Audio level meter
+- **Waveform** - Audio waveform display
+
+### Source Cards
+
+- **SourceCard** - Individual source with controls
+- **AddSourceButton** - Add new source
+
+### Studio Panels
+
+- **SourceGrid** - Grid of source cards
+- **OutputPanel** - Output parameters and transport
+- **MicPanel** - Microphone controls
+- **StatusPanel** - Recording status
+- **MenuBar** - Application menu
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start development server
+pnpm dev
+
+# Start Storybook
+pnpm storybook
+
+# Build for production
+pnpm build
+```

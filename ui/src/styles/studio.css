@@ -1,0 +1,587 @@
+/* Screencast Studio Base Component Styles
+ * Components based on screencast-studio-v2.jsx.jsx
+ */
+
+/* ── Button ── */
+.studio-btn {
+  font-family: var(--studio-font);
+  font-size: var(--studio-font-size-base);
+  border: var(--studio-border-width) solid var(--studio-black);
+  border-radius: var(--studio-border-radius-md);
+  padding: 3px 10px;
+  cursor: pointer;
+  background: var(--studio-cream);
+  color: var(--studio-black);
+  box-shadow: 1px 1px 0 var(--studio-dark);
+  transition: all var(--studio-transition-normal);
+  white-space: nowrap;
+}
+
+.studio-btn:hover:not(:disabled) {
+  background: var(--studio-light);
+}
+
+.studio-btn:active:not(:disabled) {
+  box-shadow: none;
+}
+
+.studio-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.studio-btn--active {
+  background: var(--studio-black);
+  color: var(--studio-cream);
+  box-shadow: none;
+}
+
+.studio-btn--accent {
+  background: var(--studio-red);
+  color: var(--studio-cream);
+  border-color: var(--studio-red);
+}
+
+.studio-btn--solo {
+  color: var(--studio-amber);
+  background: var(--studio-amber);
+  color: var(--studio-cream);
+}
+
+/* ── Radio Indicator ── */
+.studio-radio {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: var(--studio-border-width) solid var(--studio-black);
+  border-radius: 6px;
+  background: var(--studio-cream);
+  margin-right: 4px;
+  vertical-align: middle;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.studio-radio::after {
+  content: '';
+  position: absolute;
+  top: 2.5px;
+  left: 2.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--studio-black);
+}
+
+.studio-radio--off::after {
+  display: none;
+}
+
+/* ── Selector (Custom Dropdown) ── */
+.studio-sel {
+  display: inline-flex;
+  align-items: center;
+  background: var(--studio-cream);
+  border: var(--studio-border-width) solid var(--studio-black);
+  border-radius: var(--studio-border-radius-sm);
+  padding: 1px 3px 1px 6px;
+  font-family: var(--studio-font);
+  font-size: var(--studio-font-size-base);
+  cursor: pointer;
+  justify-content: space-between;
+  height: 18px;
+}
+
+.studio-sel:hover {
+  background: var(--studio-light);
+}
+
+.studio-sel__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-sel__arrow {
+  font-size: 7px;
+  margin-left: 4px;
+}
+
+/* ── Slider ── */
+.studio-slider {
+  width: 100%;
+  height: 14px;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.studio-slider__track {
+  width: 100%;
+  height: 3px;
+  background: var(--studio-light);
+  border: 1px solid var(--studio-mid);
+  border-radius: 1px;
+  position: relative;
+}
+
+.studio-slider__fill {
+  height: 100%;
+  background: var(--studio-mid);
+  border-radius: 1px;
+  transition: width var(--studio-transition-fast);
+}
+
+.studio-slider__thumb {
+  position: absolute;
+  top: 1px;
+  width: 10px;
+  height: 12px;
+  background: var(--studio-cream);
+  border: var(--studio-border-width) solid var(--studio-black);
+  border-radius: var(--studio-border-radius-sm);
+}
+
+/* ── Window Container ── */
+.studio-win {
+  border: 2px solid var(--studio-black);
+  border-radius: var(--studio-border-radius-md);
+  background: var(--studio-cream);
+  box-shadow: var(--studio-shadow);
+  overflow: hidden;
+}
+
+.studio-win__content {
+  padding: 6px;
+}
+
+/* ── Window Bar ── */
+.studio-winbar {
+  background: repeating-linear-gradient(
+    to right,
+    var(--studio-black) 0px,
+    var(--studio-black) 2px,
+    var(--studio-cream) 2px,
+    var(--studio-cream) 4px
+  );
+  padding: 2px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: var(--studio-border-width) solid var(--studio-black);
+  height: 18px;
+  cursor: grab;
+  user-select: none;
+}
+
+.studio-winbar__title {
+  font-family: var(--studio-font);
+  font-size: var(--studio-font-size-base);
+  font-weight: bold;
+  color: var(--studio-black);
+  background: var(--studio-cream);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.studio-winbar__close {
+  width: 11px;
+  height: 11px;
+  border: var(--studio-border-width) solid var(--studio-black);
+  background: var(--studio-cream);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.studio-winbar__close:hover {
+  background: var(--studio-red);
+  color: var(--studio-cream);
+}
+
+.studio-winbar__spacer {
+  width: 11px;
+}
+
+/* ── Panel Layout ── */
+.studio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--studio-panel-min-width), 1fr));
+  gap: 8px;
+}
+
+/* ── Source Card ── */
+.studio-source-card {
+  border: var(--studio-border-width) solid var(--studio-black);
+  border-radius: var(--studio-border-radius-md);
+  background: var(--studio-cream);
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity var(--studio-transition-normal);
+}
+
+.studio-source-card--disarmed {
+  opacity: 0.55;
+}
+
+.studio-source-card--recording {
+  border-color: var(--studio-red);
+}
+
+.studio-source-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--studio-spacing-xs) 5px;
+  border-bottom: 1px solid var(--studio-black);
+}
+
+.studio-source-card__header--armed {
+  background: repeating-linear-gradient(
+    to right,
+    var(--studio-black) 0px,
+    var(--studio-black) 2px,
+    var(--studio-cream) 2px,
+    var(--studio-cream) 4px
+  );
+}
+
+.studio-source-card__header--disarmed {
+  background: var(--studio-light);
+}
+
+.studio-source-card__title {
+  font-family: var(--studio-font);
+  font-size: var(--studio-font-size-sm);
+  font-weight: bold;
+  background: var(--studio-cream);
+  padding: 0 5px;
+}
+
+.studio-source-card__body {
+  padding: 5px;
+}
+
+.studio-source-card__preview {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.studio-source-card__toolbar {
+  display: flex;
+  gap: 4px;
+}
+
+.studio-source-card__toolbar > * {
+  flex: 1;
+}
+
+/* ── Fake Screen Preview ── */
+.studio-fake-screen {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--studio-black);
+  border-radius: var(--studio-border-radius-sm);
+  border: var(--studio-border-width) solid var(--studio-dark);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.studio-fake-screen__scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.06) 3px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+}
+
+.studio-fake-screen__label {
+  position: absolute;
+  bottom: 3px;
+  font-family: var(--studio-font);
+  font-size: var(--studio-font-size-xs);
+  color: var(--studio-mid);
+}
+
+/* ── Mic Meter ── */
+.studio-mic-meter {
+  display: flex;
+  gap: 1px;
+  height: 10px;
+}
+
+.studio-mic-meter__bar {
+  width: 4px;
+  height: 9px;
+  border: 0.5px solid var(--studio-mid);
+  border-radius: 0.5px;
+  background: var(--studio-light);
+}
+
+.studio-mic-meter__bar--on {
+  background: var(--studio-green);
+}
+
+.studio-mic-meter__bar--warning {
+  background: var(--studio-amber);
+}
+
+.studio-mic-meter__bar--danger {
+  background: var(--studio-red);
+}
+
+/* ── Waveform ── */
+.studio-waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 18px;
+}
+
+.studio-waveform__bar {
+  width: 2px;
+  background: var(--studio-mid);
+  border-radius: 0.5px;
+  transition: height var(--studio-transition-fast);
+}
+
+.studio-waveform__bar--active {
+  background: var(--studio-green);
+}
+
+/* ── Add Source Card ── */
+.studio-add-source {
+  border: var(--studio-border-width) dashed var(--studio-mid);
+  border-radius: var(--studio-border-radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  cursor: pointer;
+  position: relative;
+}
+
+.studio-add-source:hover {
+  border-color: var(--studio-black);
+  background: rgba(245, 240, 232, 0.5);
+}
+
+.studio-add-source__icon {
+  font-size: 24px;
+  color: var(--studio-mid);
+  line-height: 1;
+}
+
+.studio-add-source__label {
+  font-size: var(--studio-font-size-sm);
+  color: var(--studio-mid);
+  margin-top: 4px;
+}
+
+.studio-add-source__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+}
+
+/* ── Transport Controls ── */
+.studio-transport {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--studio-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.studio-transport__time {
+  font-family: "Monaco", monospace;
+  font-size: var(--studio-font-size-lg);
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--studio-dark);
+  background: #e0dcd4;
+  padding: 2px 8px;
+  border-radius: var(--studio-border-radius-sm);
+  border: 1px inset var(--studio-light);
+}
+
+.studio-transport__time--recording {
+  color: var(--studio-red);
+}
+
+/* ── Menu Bar ── */
+.studio-menubar {
+  background: var(--studio-cream);
+  border-bottom: 2px solid var(--studio-black);
+  padding: 3px 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.studio-menubar__logo {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.studio-menubar__item {
+  cursor: pointer;
+  padding: 1px 4px;
+  font-size: var(--studio-font-size-md);
+}
+
+.studio-menubar__item:hover {
+  background: var(--studio-black);
+  color: var(--studio-cream);
+}
+
+.studio-menubar__spacer {
+  flex: 1;
+}
+
+.studio-menubar__status {
+  font-size: var(--studio-font-size-sm);
+  color: var(--studio-mid);
+}
+
+.studio-menubar__rec {
+  color: var(--studio-red);
+  font-weight: bold;
+  font-size: var(--studio-font-size-base);
+}
+
+.studio-menubar__time {
+  font-size: var(--studio-font-size-base);
+  color: var(--studio-mid);
+}
+
+/* ── Blink Animation ── */
+@keyframes studio-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+.studio-blink {
+  animation: studio-blink 1s steps(1) infinite;
+}
+
+/* ── Output Parameters ── */
+.studio-output-grid {
+  display: grid;
+  grid-template-columns: 75px 1fr 75px 1fr;
+  gap: 5px 8px;
+  align-items: center;
+}
+
+.studio-output-label {
+  color: var(--studio-mid);
+  font-size: var(--studio-font-size-sm);
+}
+
+.studio-output-radio {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--studio-font-size-base);
+}
+
+.studio-output-radio:hover {
+  color: var(--studio-dark);
+}
+
+/* ── Status Panel ── */
+.studio-status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--studio-font-size-sm);
+}
+
+.studio-status-label {
+  color: var(--studio-mid);
+  font-size: var(--studio-font-size-xs);
+}
+
+.studio-status-bar {
+  flex: 1;
+  height: 7px;
+  background: var(--studio-light);
+  border: 1px solid var(--studio-mid);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.studio-status-bar__fill {
+  height: 100%;
+  background: var(--studio-mid);
+  transition: width 1s;
+}
+
+.studio-status-bar__fill--warning {
+  background: var(--studio-amber);
+}
+
+.studio-status-value {
+  min-width: 24px;
+  font-size: var(--studio-font-size-sm);
+  text-align: right;
+}
+
+/* ── Form Layout ── */
+.studio-form-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.studio-form-label {
+  font-size: var(--studio-font-size-xs);
+  color: var(--studio-mid);
+}
+
+/* ── Main Layout ── */
+.studio-main {
+  padding: 8px 10px;
+  max-width: var(--studio-content-max-width);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.studio-content-row {
+  display: grid;
+  grid-template-columns: 1fr 210px;
+  gap: 10px;
+}
+
+.studio-panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
