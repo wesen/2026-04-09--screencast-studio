@@ -78,3 +78,8 @@ Implemented Phase 7 (scaffold the React frontend): created ui/ workspace with Vi
 
 Phase 8: Built main operator screen with source cards, preview panes, and recording controls (commit 86576d9)
 
+
+## 2026-04-09
+
+Phase 10: Added WebSocket client with reconnection and PreviewStream component (commit 0e101c4)
+

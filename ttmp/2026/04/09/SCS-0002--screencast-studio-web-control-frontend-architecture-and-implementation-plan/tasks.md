@@ -232,11 +232,11 @@ Acceptance criteria:
 
 ## Phase 10: Connect The UI To Recording And Preview Flows
 
-- [ ] Connect preview cards to preview ensure and release calls.
-- [ ] Connect the record button to the recording start endpoint.
-- [ ] Connect the stop button to the recording stop endpoint.
-- [ ] Subscribe the UI to WebSocket updates for session state, preview state, and logs.
-- [ ] Ensure the UI recovers cleanly if the WebSocket reconnects mid-session.
+- [x] Connect preview cards to preview ensure and release calls.
+- [x] Connect the record button to the recording start endpoint.
+- [x] Connect the stop button to the recording stop endpoint.
+- [x] Subscribe the UI to WebSocket updates for session state, preview state, and logs.
+- [x] Ensure the UI recovers cleanly if the WebSocket reconnects mid-session.
 
 Acceptance criteria:
 

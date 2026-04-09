@@ -681,4 +681,5 @@ The acceptance criteria for Phase 8 requires "raw DSL or compile output somewher
 
 - Phase 10: Connect UI to recording and preview flows
 - Phase 11: Production packaging with Go embed
+- Phase 10: Connect UI to recording and preview flows
 - Phase 12: Testing and validation
