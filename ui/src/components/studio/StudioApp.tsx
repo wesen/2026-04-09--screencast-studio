@@ -1,25 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import {
-  selectSources,
-  selectArmedSources,
-  addSource,
-  removeSource,
-  updateSource,
-  setFormat,
-  setFps,
-  setQuality,
-  setAudio,
-  setMultiTrack,
-  setMicInput,
-  setGain,
-  type SourceType,
-} from '@/features/studio-draft/studioDraftSlice';
-import {
-  selectSession,
-  setElapsed,
-  setMicLevel,
-} from '@/features/session/sessionSlice';
+import { selectSources, selectArmedSources, addSource, removeSource, updateSource, setFormat, setFps, setQuality, setAudio, setMultiTrack, setMicInput, setGain } from '@/features/studio-draft/studioDraftSlice';
+import { selectSession, selectWsConnected, setElapsed, setMicLevel as setMicLevelAction } from '@/features/session/sessionSlice';
+import { getWsClient } from '@/features/session/wsClient';
 import { MenuBar, SourceGrid, OutputPanel, MicPanel, StatusPanel } from './index';
 
 export const StudioApp: React.FC = () => {
@@ -27,24 +10,37 @@ export const StudioApp: React.FC = () => {
   const sources = useAppSelector(selectSources);
   const armedSources = useAppSelector(selectArmedSources);
   const session = useAppSelector(selectSession);
+  const wsConnected = useAppSelector(selectWsConnected);
 
   const [isPaused, setIsPaused] = useState(false);
   const [elapsed, setElapsedState] = useState(0);
-  const [diskPercent, setDiskPercent] = useState(8); // Simulated disk usage
+  const [diskPercent, setDiskPercent] = useState(8);
 
   const isRecording = session.active && session.state === 'running';
+
+  // Connect WebSocket on mount
+  useEffect(() => {
+    const wsClient = getWsClient(dispatch);
+    wsClient.connect();
+
+    return () => {
+      // Don't disconnect on unmount - keep connection alive
+    };
+  }, [dispatch]);
 
   // Simulate elapsed time
   useEffect(() => {
     if (!isRecording || isPaused) return;
 
     const id = setInterval(() => {
-      setElapsedState((prev) => prev + 1);
-      dispatch(setElapsed(elapsed + 1));
+      setElapsedState((prev) => {
+        dispatch(setElapsed(prev + 1));
+        return prev + 1;
+      });
     }, 1000);
 
     return () => clearInterval(id);
-  }, [isRecording, isPaused, elapsed, dispatch]);
+  }, [isRecording, isPaused, dispatch]);
 
   // Simulate disk usage growth during recording
   useEffect(() => {
@@ -63,19 +59,18 @@ export const StudioApp: React.FC = () => {
   // Simulate mic level during recording
   useEffect(() => {
     if (!isRecording || isPaused) {
-      dispatch(setMicLevel(0.12));
+      dispatch(setMicLevelAction(0.12));
       return;
     }
 
     const id = setInterval(() => {
       const level = 0.15 + Math.random() * 0.6;
-      dispatch(setMicLevel(level));
+      dispatch(setMicLevelAction(level));
     }, 110);
 
     return () => clearInterval(id);
   }, [isRecording, isPaused, dispatch]);
 
-  // Get output settings from draft
   const outputSettings = useAppSelector((state) => ({
     format: state.studioDraft.format,
     fps: state.studioDraft.fps,
@@ -104,32 +99,6 @@ export const StudioApp: React.FC = () => {
     setIsPaused(!isPaused);
   };
 
-  const handleAddSource = (kind: SourceType) => {
-    dispatch(addSource(kind));
-  };
-
-  const handleRemoveSource = (id: number) => {
-    dispatch(removeSource(id));
-  };
-
-  const handleToggleArmed = (id: number) => {
-    const source = sources.find((s) => s.id === id);
-    if (source) {
-      dispatch(updateSource({ id, patch: { armed: !source.armed } }));
-    }
-  };
-
-  const handleToggleSolo = (id: number) => {
-    const source = sources.find((s) => s.id === id);
-    if (source) {
-      dispatch(updateSource({ id, patch: { solo: !source.solo } }));
-    }
-  };
-
-  const handleChangeScene = (id: number, scene: string) => {
-    dispatch(updateSource({ id, patch: { scene } }));
-  };
-
   return (
     <>
       <MenuBar
@@ -142,11 +111,23 @@ export const StudioApp: React.FC = () => {
         <SourceGrid
           sources={sources}
           isRecording={isRecording}
-          onRemove={handleRemoveSource}
-          onToggleArmed={handleToggleArmed}
-          onToggleSolo={handleToggleSolo}
-          onChangeScene={handleChangeScene}
-          onAdd={handleAddSource}
+          onRemove={(id) => dispatch(removeSource(id))}
+          onToggleArmed={(id) => {
+            const source = sources.find((s) => s.id === id);
+            if (source) {
+              dispatch(updateSource({ id, patch: { armed: !source.armed } }));
+            }
+          }}
+          onToggleSolo={(id) => {
+            const source = sources.find((s) => s.id === id);
+            if (source) {
+              dispatch(updateSource({ id, patch: { solo: !source.solo } }));
+            }
+          }}
+          onChangeScene={(id, scene) => {
+            dispatch(updateSource({ id, patch: { scene } }));
+          }}
+          onAdd={(kind) => dispatch(addSource(kind))}
         />
 
         <div className="studio-content-row">
@@ -187,6 +168,24 @@ export const StudioApp: React.FC = () => {
             />
           </div>
         </div>
+
+        {/* WebSocket status indicator */}
+        {!wsConnected && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: 10,
+              right: 10,
+              background: 'var(--studio-amber)',
+              color: 'var(--studio-cream)',
+              padding: '4px 8px',
+              borderRadius: 3,
+              fontSize: 9,
+            }}
+          >
+            Reconnecting to server...
+          </div>
+        )}
       </div>
     </>
   );
