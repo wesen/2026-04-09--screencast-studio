@@ -34,3 +34,19 @@ Implemented phase 1 of the web ticket: added the Go web server shell, a glazed `
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — Health and placeholder transport tests
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/serve.go — New `serve` glazed command
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/root.go — Root command now wires in `serve`
+
+## 2026-04-09
+
+Implemented Phase 7 (scaffold the React frontend): created ui/ workspace with Vite, TypeScript, React 18, Redux Toolkit, RTK Query, Storybook, and MSW. Implemented all base primitives (Btn, Radio, Sel, Slider, Win, WinBar), composite components (FakeScreen, MicMeter, Waveform), source cards, and studio panels matching the screencast-studio-v2.jsx.jsx visual language. Added RTK Query API layer and MSW mock handlers.
+
+### Commit
+
+`981641b` — "ui: scaffold React frontend with RTK Query, Storybook, and MSW"
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/ — New frontend workspace
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/types.ts — TypeScript types matching Go DSL
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/sessionSlice.ts — Session state management
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/studio-draft/studioDraftSlice.ts — Draft state management
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/styles/tokens.css — CSS design tokens
