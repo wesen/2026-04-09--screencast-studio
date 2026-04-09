@@ -4,11 +4,10 @@ import { Meta } from '@storybook/blocks';
 
 # Screencast Studio UI
 
-This is the component library for the Screencast Studio web control frontend.
+Component library for the Screencast Studio web control frontend. Based on the
+visual design from `screencast-studio-v2.jsx.jsx`.
 
 ## Design Tokens
-
-The UI uses a consistent set of CSS variables for theming:
 
 ```css
 --studio-cream: #f5f0e8;
@@ -22,41 +21,39 @@ The UI uses a consistent set of CSS variables for theming:
 --studio-bg: #e8e4dc;
 ```
 
-## Components
+Font: `"Chicago", "Geneva", "Monaco", monospace`
+
+## Stories
 
 ### Primitives
+- **Button** - `Studio/Button` - Button with active/accent states
+- **Radio** - `Studio/Radio` - Radio indicator
+- **Sel** - `Studio/Sel` - Custom dropdown selector
+- **Slider** - `Studio/Slider` - Range slider
+- **WinBar** - `Studio/WinBar` - Window title bar with stripe pattern
+- **Win** - `Studio/Win` - Window container
 
-- **Btn** - Button with active/accent states
-- **Radio** - Radio indicator
-- **Sel** - Custom dropdown selector
-- **Slider** - Range slider
-- **Win** - Window container
-- **WinBar** - Window title bar
-
-### Composites
-
-- **FakeScreen** - Source preview visualization
-- **MicMeter** - Audio level meter
-- **Waveform** - Audio waveform display
-
-### Source Cards
-
-- **SourceCard** - Individual source with controls
-- **AddSourceButton** - Add new source
+### Source Components
+- **FakeScreen** - `Studio/FakeScreen` - Source preview visualization
+  - Display, Window, Region, Camera variants
+- **MicMeter** - `Studio/MicMeter` - Audio level meter
+- **Waveform** - `Studio/Waveform` - Audio waveform display
+- **SourceCard** - `Studio/SourceCard` - Individual source with controls
+- **AddSourceButton** - `Studio/AddSourceButton` - Add new source
+- **SourceGrid** - `Studio/SourceGrid` - Grid of source cards
 
 ### Studio Panels
-
-- **SourceGrid** - Grid of source cards
-- **OutputPanel** - Output parameters and transport
-- **MicPanel** - Microphone controls
-- **StatusPanel** - Recording status
-- **MenuBar** - Application menu
+- **OutputPanel** - `Studio/OutputPanel` - Output parameters and transport
+- **MicPanel** - `Studio/MicPanel` - Microphone controls
+- **StatusPanel** - `Studio/StatusPanel` - Recording status
+- **MenuBar** - `Studio/MenuBar` - Application menu
+- **StudioApp** - `Studio/StudioApp` - Complete studio layout
 
 ## Development
 
 ```bash
 # Install dependencies
-pnpm install
+cd ui && pnpm install
 
 # Start development server
 pnpm dev
@@ -67,3 +64,10 @@ pnpm storybook
 # Build for production
 pnpm build
 ```
+
+## Architecture
+
+- **RTK Query** for API data fetching
+- **Redux Toolkit** for local state
+- **MSW** for API mocking
+- **CSS Modules** via BEM-lite class naming
