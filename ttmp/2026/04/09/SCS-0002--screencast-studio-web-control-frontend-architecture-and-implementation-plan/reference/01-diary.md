@@ -39,7 +39,7 @@ RelatedFiles:
       Note: Imported mock used as the visual and product target for the web ticket
 ExternalSources: []
 Summary: Chronological record of how the second ticket for the web control frontend was created and documented.
-LastUpdated: 2026-04-09T16:41:00-04:00
+LastUpdated: 2026-04-09T17:03:00-04:00
 WhatFor: Track how the web-control frontend ticket was assembled, what evidence was used, and how to review the resulting design deliverables.
 WhenToUse: Read when continuing the frontend ticket, reviewing design provenance, or checking the exact repo evidence behind the recommendations.
 ---
@@ -438,4 +438,92 @@ Files updated in this step:
 
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/routes.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`
+
+## Step 6: Implement Phases 5 And 6 With WebSocket Delivery And Preview Workers
+
+This step completed the backend-only portion of the web ticket. It added the missing live event transport and preview runtime needed before the React frontend can start consuming the server in earnest.
+
+The key design decision was to keep previews separate from recordings, but still make them look structurally similar:
+
+- recordings are owned by `RecordingManager`
+- previews are owned by `PreviewManager`
+- both publish lifecycle changes into the shared server event hub
+- `/ws` is only an event transport, not a second session owner
+
+For previews, version 1 stayed with MJPEG rather than RTC/WebRTC. That was deliberate. The preview panels are small operator panes in a local control interface, so MJPEG keeps the backend simpler and much easier to debug while still delivering the product behavior we need right now.
+
+### What I did
+
+- Added `pkg/recording.BuildPreviewArgs(...)` so preview FFmpeg argv construction lives with the other media builders.
+- Added `internal/web/preview_runner.go` with:
+  - a preview runner interface
+  - the FFmpeg-backed runner
+  - JPEG frame extraction helpers
+- Added `internal/web/preview_manager.go` with:
+  - preview ensure logic
+  - release logic
+  - preview leasing/reference counting
+  - per-preview state and latest-frame tracking
+  - event publication for preview lifecycle and logs
+- Added `internal/web/handlers_preview.go` with:
+  - `POST /api/previews/ensure`
+  - `POST /api/previews/release`
+  - `GET /api/previews`
+  - `GET /api/previews/:id/mjpeg`
+- Added `internal/web/handlers_ws.go` with:
+  - WebSocket upgrade
+  - initial session and preview-list events
+  - event fan-out from the shared event hub
+- Updated `internal/web/server.go` so the server owns a preview manager in addition to the recording manager.
+- Expanded `internal/web/server_test.go` with:
+  - preview lifecycle endpoint tests
+  - MJPEG streaming test using a fake preview runner
+  - WebSocket handshake and initial-event test
+- Verified:
+  - `go test ./internal/web ./pkg/recording ./pkg/app`
+  - `go build ./...`
+
+### Why
+
+- The frontend cannot be built meaningfully until the server can push state changes and serve preview frames.
+- A preview runner abstraction keeps phase 6 testable without real FFmpeg or real capture devices.
+- Separating preview workers from recording workers avoids the exact ownership ambiguity we were already cleaning up in the runtime.
+
+### What worked
+
+- The event hub turned out to be the right seam: once it existed, `/ws` was mostly a transport concern.
+- The preview runner abstraction made the MJPEG endpoint testable with a fake frame source instead of an actual media process.
+- Reusing the recording package for preview argv generation kept the FFmpeg-specific logic out of the HTTP package.
+
+### What didn't work
+
+- The preview and MJPEG step added more moving parts than the earlier API phases, so it only became safe after the managed-process refactor was already done.
+- The handler layer needed a second round of route and payload expansion once preview endpoints existed.
+
+### What I learned
+
+- The preview manager is the media equivalent of the recording manager: the hardest problem is not “stream bytes,” it is “own lifecycle and state transitions cleanly.”
+- For the local control-surface use case, MJPEG remains a pragmatic first transport. It is not elegant, but it is observable and easy to wire into browser `<img>` tags.
+
+### What warrants a second pair of eyes
+
+- Whether preview managers should retain failed previews longer for debugging, rather than deleting finished previews once leases reach zero.
+- Whether the current preview event shapes are already sufficient for the frontend or should grow explicit `preview.created` and `preview.released` event types beyond the state updates.
+
+### Technical details
+
+Files added in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_runner.go`
+
+Files updated in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/routes.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/api_types.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/ffmpeg.go`
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`

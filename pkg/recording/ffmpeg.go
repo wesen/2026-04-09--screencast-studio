@@ -11,6 +11,28 @@ import (
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 )
 
+func BuildPreviewArgs(source dsl.EffectiveVideoSource) ([]string, error) {
+	args := []string{"-hide_banner", "-loglevel", "error", "-nostdin"}
+	var err error
+	args, err = appendVideoInputArgs(args, source)
+	if err != nil {
+		return nil, err
+	}
+	filters := []string{"fps=5", "scale=640:-1:force_original_aspect_ratio=decrease"}
+	if source.Type == "camera" && boolValue(source.Capture.Mirror, false) {
+		filters = append(filters, "hflip")
+	}
+	args = append(args,
+		"-an",
+		"-vf", strings.Join(filters, ","),
+		"-q:v", "7",
+		"-f", "image2pipe",
+		"-vcodec", "mjpeg",
+		"pipe:1",
+	)
+	return args, nil
+}
+
 func buildVideoRecordArgs(job dsl.VideoJob, maxDuration time.Duration) ([]string, error) {
 	args := []string{"-hide_banner", "-loglevel", "error", "-y"}
 	if maxDuration > 0 {

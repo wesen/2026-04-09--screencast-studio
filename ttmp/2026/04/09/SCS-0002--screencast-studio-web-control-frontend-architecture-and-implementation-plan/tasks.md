@@ -116,7 +116,7 @@ Acceptance criteria:
 
 - [x] Implement a backend session coordinator for the web server that owns one active recording session at a time for version 1.
 - [x] Add `start` and `stop` endpoints that operate on the existing recording runtime.
-- [ ] Map runtime state transitions into stable API responses and WebSocket events.
+- [x] Map runtime state transitions into stable API responses and WebSocket events.
 - [x] Ensure concurrent start attempts fail clearly.
 - [x] Ensure stop requests are idempotent.
 - [x] Add integration-style tests that start a fake or test-double session coordinator where appropriate.
@@ -135,12 +135,12 @@ Acceptance criteria:
 
 ## Phase 5: Add WebSocket Event Transport
 
-- [ ] Implement `/ws` for browser subscriptions to runtime and preview events.
-- [ ] Define concrete event envelopes with `type`, `timestamp`, and `payload`.
-- [ ] Publish session state changes to connected clients.
-- [ ] Publish selected FFmpeg log output or summarized process output where useful for UI diagnostics.
-- [ ] Publish preview lifecycle changes.
-- [ ] Handle disconnects and reconnects without leaking goroutines.
+- [x] Implement `/ws` for browser subscriptions to runtime and preview events.
+- [x] Define concrete event envelopes with `type`, `timestamp`, and `payload`.
+- [x] Publish session state changes to connected clients.
+- [x] Publish selected FFmpeg log output or summarized process output where useful for UI diagnostics.
+- [x] Publish preview lifecycle changes.
+- [x] Handle disconnects and reconnects without leaking goroutines.
 
 Acceptance criteria:
 
@@ -150,12 +150,12 @@ Acceptance criteria:
 
 ## Phase 6: Add Preview Lifecycle Management In Go
 
-- [ ] Implement preview leasing or reference counting so browser tabs do not create unbounded preview workers.
-- [ ] Add endpoints to ensure, list, and release previews.
-- [ ] Start with MJPEG preview transport for version 1.
-- [ ] Keep preview workers isolated from recording workers.
-- [ ] Limit the number of simultaneous previews and surface errors clearly.
-- [ ] Add metrics or logs that make preview lifecycle visible during debugging.
+- [x] Implement preview leasing or reference counting so browser tabs do not create unbounded preview workers.
+- [x] Add endpoints to ensure, list, and release previews.
+- [x] Start with MJPEG preview transport for version 1.
+- [x] Keep preview workers isolated from recording workers.
+- [x] Limit the number of simultaneous previews and surface errors clearly.
+- [x] Add metrics or logs that make preview lifecycle visible during debugging.
 
 Suggested endpoints:
 

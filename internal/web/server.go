@@ -25,6 +25,7 @@ type Server struct {
 	mux        *http.ServeMux
 	events     *EventHub
 	recordings *RecordingManager
+	previews   *PreviewManager
 }
 
 func NewServer(application ApplicationService, cfg Config) *Server {
@@ -45,6 +46,7 @@ func NewServer(application ApplicationService, cfg Config) *Server {
 		mux:        http.NewServeMux(),
 		events:     events,
 		recordings: NewRecordingManager(application, events.Publish),
+		previews:   NewPreviewManager(application, events.Publish, cfg.PreviewLimit, nil),
 	}
 	server.registerRoutes()
 	return server

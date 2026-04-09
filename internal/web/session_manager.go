@@ -37,6 +37,7 @@ type processLogEntry struct {
 
 type managedRecording struct {
 	cancel context.CancelFunc
+	done   chan struct{}
 	state  recordingSessionState
 }
 
@@ -83,6 +84,7 @@ func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.D
 	runCtx, cancel := context.WithCancel(context.Background())
 	current := &managedRecording{
 		cancel: cancel,
+		done:   make(chan struct{}),
 		state: recordingSessionState{
 			Active:    true,
 			SessionID: plan.SessionID,
@@ -101,6 +103,7 @@ func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.D
 
 	group, groupCtx := errgroup.WithContext(runCtx)
 	group.Go(func() error {
+		defer close(current.done)
 		summary, recordErr := m.app.RecordPlan(groupCtx, plan, app.RecordOptions{
 			GracePeriod: gracePeriod,
 			MaxDuration: maxDuration,

@@ -192,6 +192,35 @@ type apiSessionEnvelope struct {
 	Session apiRecordingSessionResponse `json:"session"`
 }
 
+type apiPreviewEnsureRequest struct {
+	DSL      string `json:"dsl"`
+	SourceID string `json:"source_id"`
+}
+
+type apiPreviewReleaseRequest struct {
+	PreviewID string `json:"preview_id"`
+}
+
+type apiPreviewResponse struct {
+	ID         string `json:"id"`
+	SourceID   string `json:"source_id"`
+	Name       string `json:"name"`
+	SourceType string `json:"source_type"`
+	State      string `json:"state"`
+	Reason     string `json:"reason,omitempty"`
+	Leases     int    `json:"leases"`
+	HasFrame   bool   `json:"has_frame"`
+	LastFrameAt string `json:"last_frame_at,omitempty"`
+}
+
+type apiPreviewEnvelope struct {
+	Preview apiPreviewResponse `json:"preview"`
+}
+
+type apiPreviewListResponse struct {
+	Previews []apiPreviewResponse `json:"previews"`
+}
+
 type apiProcessLog struct {
 	Timestamp    string `json:"timestamp"`
 	ProcessLabel string `json:"process_label"`
@@ -379,4 +408,18 @@ func mapRecordingSessionResponse(state recordingSessionState) apiRecordingSessio
 		})
 	}
 	return response
+}
+
+func mapPreviewResponse(snapshot previewSnapshot) apiPreviewResponse {
+	return apiPreviewResponse{
+		ID:          snapshot.ID,
+		SourceID:    snapshot.SourceID,
+		Name:        snapshot.Name,
+		SourceType:  snapshot.SourceType,
+		State:       snapshot.State,
+		Reason:      snapshot.Reason,
+		Leases:      snapshot.Leases,
+		HasFrame:    snapshot.HasFrame,
+		LastFrameAt: formatTimestamp(snapshot.LastFrameAt),
+	}
 }

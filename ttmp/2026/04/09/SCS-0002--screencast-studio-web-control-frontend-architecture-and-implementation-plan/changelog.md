@@ -60,6 +60,19 @@ Implemented phases 2 through 4 of the web ticket: added read-only discovery/sess
 
 ## 2026-04-09
 
+Implemented phases 5 and 6 of the backend web milestone: added `/ws` event delivery, preview lifecycle management with ensure/release/list semantics, MJPEG streaming endpoints, a preview runner abstraction, and fake-runner tests.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go — WebSocket upgrade and event fan-out
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go — Preview ensure/release/list/MJPEG handlers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go — Preview leasing, worker ownership, and state publication
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_runner.go — FFmpeg-backed preview runner plus JPEG frame parsing
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/ffmpeg.go — Exported preview argument builder reused by the web preview runtime
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — Preview lifecycle, MJPEG, and websocket tests
+
+## 2026-04-09
+
 Implemented Phase 7 (scaffold the React frontend): created ui/ workspace with Vite, TypeScript, React 18, Redux Toolkit, RTK Query, Storybook, and MSW. Implemented all base primitives (Btn, Radio, Sel, Slider, Win, WinBar), composite components (FakeScreen, MicMeter, Waveform), source cards, and studio panels matching the screencast-studio-v2.jsx.jsx visual language. Added RTK Query API layer and MSW mock handlers.
 
 ### Commit
@@ -82,4 +95,3 @@ Phase 8: Built main operator screen with source cards, preview panes, and record
 ## 2026-04-09
 
 Phase 10: Added WebSocket client with reconnection and PreviewStream component (commit 0e101c4)
-
