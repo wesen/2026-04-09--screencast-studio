@@ -4,9 +4,10 @@ import {
   useStartRecordingMutation,
   useStopRecordingMutation,
 } from '@/api/recordingApi';
-import { useCompileSetupMutation } from '@/api/setupApi';
-import type { ApiErrorResponse, ProcessLog } from '@/api/types';
+import { useCompileSetupMutation, useNormalizeSetupMutation } from '@/api/setupApi';
+import type { ApiErrorResponse, EffectiveVideoSource, ProcessLog } from '@/api/types';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import type { StudioSource } from '@/components/source-card';
 import {
   compileFailed,
   compileStarted,
@@ -18,10 +19,6 @@ import {
   setDslText,
 } from '@/features/editor/editorSlice';
 import {
-  addSource,
-  removeSource,
-  selectArmedSources,
-  selectSources,
   setAudio,
   setFormat,
   setFps,
@@ -29,7 +26,6 @@ import {
   setMicInput,
   setMultiTrack,
   setQuality,
-  updateSource,
 } from '@/features/studio-draft/studioDraftSlice';
 import { selectActiveTab, setActiveTab, type StudioTab } from '@/features/studio-ui/studioUiSlice';
 import {
@@ -40,6 +36,14 @@ import {
   selectWsConnected,
 } from '@/features/session/sessionSlice';
 import { getWsClient } from '@/features/session/wsClient';
+import {
+  normalizeFailed,
+  normalizeStarted,
+  normalizeSucceeded,
+  selectNormalizedConfig,
+  selectNormalizeErrors,
+  selectNormalizeWarnings,
+} from '@/features/setup/setupSlice';
 import { MenuBar, SourceGrid, OutputPanel, MicPanel, StatusPanel } from '@/components/studio';
 import { LogPanel } from '@/components/log-panel';
 import { DSLEditor } from '@/components/dsl-editor';
@@ -78,10 +82,29 @@ const errorMessageFromUnknown = (error: unknown): string => {
   return 'unknown error';
 };
 
+const toStudioSource = (source: EffectiveVideoSource): StudioSource => {
+  const normalizedType = source.type.trim().toLowerCase();
+  const kind = normalizedType === 'window'
+    ? 'Window'
+    : normalizedType === 'region'
+      ? 'Region'
+      : normalizedType === 'camera'
+        ? 'Camera'
+        : 'Display';
+
+  return {
+    id: source.id,
+    sourceId: source.id,
+    kind,
+    scene: source.name,
+    armed: source.enabled,
+    solo: false,
+    label: source.name,
+  };
+};
+
 export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const dispatch = useAppDispatch();
-  const sources = useAppSelector(selectSources);
-  const armedSources = useAppSelector(selectArmedSources);
   const session = useAppSelector(selectSession);
   const logs = useAppSelector(selectLogs);
   const wsConnected = useAppSelector(selectWsConnected);
@@ -90,11 +113,15 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const compileWarnings = useAppSelector(selectCompileWarnings);
   const compileErrors = useAppSelector(selectCompileErrors);
   const isCompiling = useAppSelector(selectIsCompiling);
+  const normalizedConfig = useAppSelector(selectNormalizedConfig);
+  const normalizeWarnings = useAppSelector(selectNormalizeWarnings);
+  const normalizeErrors = useAppSelector(selectNormalizeErrors);
   const [now, setNow] = useState(() => Date.now());
   const { data: currentSessionData } = useGetCurrentSessionQuery();
   const [startRecording, startRecordingState] = useStartRecordingMutation();
   const [stopRecording, stopRecordingState] = useStopRecordingMutation();
   const [compileSetup] = useCompileSetupMutation();
+  const [normalizeSetup] = useNormalizeSetupMutation();
 
   const isRecording = session.active;
   const isPaused = false;
@@ -104,6 +131,22 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     stopRecordingState.isLoading ||
     session.state === 'starting' ||
     session.state === 'stopping';
+  const sources = useMemo(
+    () => normalizedConfig?.video_sources.map(toStudioSource) ?? [],
+    [normalizedConfig]
+  );
+  const armedSources = useMemo(
+    () => sources.filter((source) => source.armed),
+    [sources]
+  );
+  const editorWarnings = useMemo(
+    () => [...normalizeWarnings, ...compileWarnings],
+    [compileWarnings, normalizeWarnings]
+  );
+  const editorErrors = useMemo(
+    () => [...normalizeErrors, ...compileErrors],
+    [compileErrors, normalizeErrors]
+  );
 
   useEffect(() => {
     if (currentSessionData?.session) {
@@ -132,6 +175,27 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
 
     return () => clearInterval(id);
   }, [isRecording, session.started_at]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        dispatch(normalizeStarted());
+        try {
+          const response = await normalizeSetup({ dsl: dslText }).unwrap();
+          dispatch(normalizeSucceeded({
+            config: response.config,
+            warnings: response.warnings,
+          }));
+        } catch (error) {
+          dispatch(normalizeFailed([errorMessageFromUnknown(error)]));
+        }
+      })();
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [dispatch, dslText, normalizeSetup]);
 
   const elapsed = useMemo(() => {
     const startedAt = parseTimestamp(session.started_at);
@@ -231,23 +295,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
             <SourceGrid
               sources={sources}
               isRecording={isRecording}
-              onRemove={(id) => dispatch(removeSource(id))}
-              onToggleArmed={(id) => {
-                const source = sources.find((item) => item.id === id);
-                if (source) {
-                  dispatch(updateSource({ id, patch: { armed: !source.armed } }));
-                }
-              }}
-              onToggleSolo={(id) => {
-                const source = sources.find((item) => item.id === id);
-                if (source) {
-                  dispatch(updateSource({ id, patch: { solo: !source.solo } }));
-                }
-              }}
-              onChangeScene={(id, scene) => {
-                dispatch(updateSource({ id, patch: { scene } }));
-              }}
-              onAdd={(kind) => dispatch(addSource(kind))}
+              editable={false}
             />
 
             <div className="studio-content-row">
@@ -303,8 +351,8 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
             onChange={(value) => dispatch(setDslText(value))}
             onCompile={handleCompile}
             isCompiling={isCompiling}
-            warnings={compileWarnings}
-            errors={compileErrors}
+            warnings={editorWarnings}
+            errors={editorErrors}
           />
         )}
       </div>

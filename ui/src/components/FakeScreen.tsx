@@ -1,8 +1,8 @@
 import React from 'react';
-import type { SourceType } from '@/features/studio-draft/studioDraftSlice';
+import type { StudioSourceKind } from '@/components/source-card/types';
 
 interface FakeScreenProps {
-  kind: SourceType;
+  kind: StudioSourceKind;
   scene?: string;
   className?: string;
 }

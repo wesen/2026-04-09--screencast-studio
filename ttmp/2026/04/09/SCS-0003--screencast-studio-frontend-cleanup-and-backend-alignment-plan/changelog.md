@@ -70,3 +70,18 @@ Added a real ESLint configuration for the frontend workspace and verified that b
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/.eslintrc.cjs — New ESLint configuration for the frontend workspace
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/.eslintignore — Ignore rules for generated and dependency directories
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/package.json — Existing lint script is now backed by a real config
+
+## 2026-04-09
+
+Replaced the mounted page’s synthetic source grid with backend-normalized setup data, added a dedicated setup slice for normalize results, decoupled source-card components from `studioDraftSlice`, and revalidated lint, build, and Storybook against the shared source-card type.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Page now derives visible sources from normalized DSL data instead of the demo source list
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup/setupSlice.ts — New slice for normalized config, warnings, and normalization errors
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/types.ts — Shared source-card type used by the page, grid, status panel, and stories
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourceGrid.tsx — Grid now accepts the shared source-card model and supports read-only rendering
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StatusPanel.tsx — Status panel no longer depends on `studioDraftSlice` source types
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/SourceCard.stories.tsx — Storybook updated for the shared source-card model
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/SourceGrid.stories.tsx — Storybook updated for the read-only normalized source-grid mode
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/StatusPanel.stories.tsx — Storybook updated for the shared source-card model

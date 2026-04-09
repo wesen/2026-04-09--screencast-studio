@@ -29,7 +29,7 @@ RelatedFiles:
       Note: Prior frontend review used as the direct precursor to this cleanup ticket
 ExternalSources: []
 Summary: Chronological record of creating the dedicated frontend cleanup ticket and defining a no-compatibility plan to realign the UI with the backend.
-LastUpdated: 2026-04-09T19:18:00-04:00
+LastUpdated: 2026-04-09T17:07:10-04:00
 WhatFor: Preserve the reasoning, evidence, and document-creation steps behind the dedicated frontend cleanup ticket.
 WhenToUse: Read when continuing the cleanup ticket, reviewing why the ticket exists, or checking which existing frontend files were considered the primary cleanup targets.
 ---
@@ -595,4 +595,106 @@ Commands used in this step:
 ```bash
 pnpm --dir ui lint
 pnpm --dir ui build
+```
+
+## Step 7: Replace The Synthetic Source Grid With Normalized Setup Data
+
+This step removed the most visible remaining fake runtime model from the mounted page. Before this step, `StudioPage` still rendered the source grid from `studioDraftSlice`, which meant the main capture surface was showing synthetic source IDs and demo-only source state even though compile and record actions were already using the real DSL.
+
+The goal of this slice was not to finish preview integration. The goal was to make the page read source cards from the backend-shaped normalized DSL so that later preview work can target real `source_id` values instead of client-invented numeric IDs.
+
+### What I did
+
+- Added `ui/src/features/setup/setupSlice.ts` to hold:
+  - the current normalized config
+  - normalization warnings
+  - normalization errors
+  - normalization loading state
+- Registered the setup slice in `ui/src/app/store.ts`.
+- Refactored `StudioPage.tsx` so it:
+  - calls `useNormalizeSetupMutation`
+  - debounces normalization after DSL changes
+  - stores normalize results in the setup slice
+  - derives source cards from `normalizedConfig.video_sources`
+  - merges normalize warnings and compile warnings for the raw DSL editor
+  - merges normalize errors and compile errors for the raw DSL editor
+- Introduced a shared `StudioSource` type under `ui/src/components/source-card/types.ts`.
+- Updated `SourceGrid`, `SourceCard`, `FakeScreen`, and `StatusPanel` to use the shared source-card type instead of depending on `studioDraftSlice` types.
+- Made the mounted source grid read-only for now by passing `editable={false}` from `StudioPage`.
+- Updated the source-card, source-grid, and status-panel stories to use the new shared source type and to cover the read-only normalized mode.
+- Ran:
+  - `pnpm --dir ui lint`
+  - `pnpm --dir ui build`
+  - `pnpm --dir ui build-storybook`
+
+### Why
+
+- The source grid was still the largest fake-data path in the mounted shell.
+- Preview APIs require real `source_id` values, so leaving the grid on demo IDs would have made the next step more confusing.
+- Moving the page to normalized setup data makes the frontend architecture much easier to explain: the editor owns text, the setup slice owns normalized DSL state, and the page renders source cards from that normalized state.
+
+### What worked
+
+- The existing backend normalize endpoint already returns the exact source fields the page needs: `id`, `name`, `type`, and `enabled`.
+- The shared `StudioSource` type made it straightforward to decouple presentational components from `studioDraftSlice`.
+- All frontend validation commands passed after updating the remaining story type drift.
+
+### What didn't work
+
+- The first `pnpm --dir ui build` failed because `StatusPanel.stories.tsx` was still typed against the old `studioDraftSlice` `Source` shape.
+
+### Exact failure
+
+```text
+src/stories/StatusPanel.stories.tsx(28,20): error TS2741: Property 'sourceId' is missing in type 'Source' but required in type 'StudioSource'.
+```
+
+After updating that story to use the shared source-card type, build passed again.
+
+### What I learned
+
+- The mounted screen is now materially closer to the backend than the stories were. Storybook was still carrying the older assumptions in a few places.
+- A normalized setup slice is the right boundary for the next preview step because it gives the page a stable place to read `source_id` values from.
+- `studioDraftSlice` is now more clearly limited to UI-side output and microphone controls, which makes its remaining cleanup scope much smaller.
+
+### What warrants a second pair of eyes
+
+- Whether normalization should stay page-driven with a debounce, or move later into a more explicit editor orchestration layer.
+- Whether the read-only normalized source cards should display more target detail than `source.name` once preview integration is in place.
+
+### What should be done in the future
+
+- Add preview ownership keyed by normalized `source_id`.
+- Continue shrinking `studioDraftSlice` now that source cards no longer depend on it.
+- Revisit whether output settings should also move closer to normalized DSL state later.
+
+### Code review instructions
+
+- Review the normalization flow:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup/setupSlice.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/setupApi.ts`
+- Then review the presentational decoupling:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/types.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/SourceCard.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourceGrid.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StatusPanel.tsx`
+- Finally review the story updates:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/SourceCard.stories.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/SourceGrid.stories.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/StatusPanel.stories.tsx`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+sed -n '1,260p' ui/src/pages/StudioPage.tsx
+sed -n '1,220p' ui/src/features/setup/setupSlice.ts
+sed -n '1,220p' ui/src/stories/SourceGrid.stories.tsx
+sed -n '1,220p' ui/src/stories/SourceCard.stories.tsx
+sed -n '1,220p' ui/src/stories/StatusPanel.stories.tsx
+pnpm --dir ui lint
+pnpm --dir ui build
+pnpm --dir ui build-storybook
 ```

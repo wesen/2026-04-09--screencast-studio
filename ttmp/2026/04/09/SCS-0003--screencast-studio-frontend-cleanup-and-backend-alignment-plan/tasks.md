@@ -95,7 +95,7 @@ Acceptance criteria:
 - [x] Replace stale MSW routes in `ui/src/mocks/handlers.ts`.
 - [x] Remove fake endpoints that the backend does not expose.
 - [x] Update mock payloads so they mirror real backend envelopes.
-- [ ] Re-test Storybook or local mock mode after transport alignment is complete.
+- [x] Re-test Storybook or local mock mode after transport alignment is complete.
 
 Acceptance criteria:
 
@@ -136,7 +136,7 @@ Acceptance criteria:
 ## Validation Checklist
 
 - [x] `pnpm --dir ui build`
-- [ ] `pnpm --dir ui lint`
+- [x] `pnpm --dir ui lint`
 - [x] `pnpm --dir ui build-storybook`
 - [ ] manual smoke test against the real Go server
 - [ ] review for remaining duplicate shells or stale routes

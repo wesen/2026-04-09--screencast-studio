@@ -1,12 +1,12 @@
 import React from 'react';
 import { Win } from '../primitives';
-import type { Source } from '@/features/studio-draft/studioDraftSlice';
+import type { StudioSource } from '@/components/source-card';
 
 interface StatusPanelProps {
   diskPercent: number;
   isRecording: boolean;
   isPaused: boolean;
-  armedSources: Source[];
+  armedSources: StudioSource[];
   className?: string;
 }
 

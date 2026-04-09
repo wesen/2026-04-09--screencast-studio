@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { SourceGrid } from '../components/studio/SourceGrid';
-import type { Source } from '../features/studio-draft/studioDraftSlice';
+import type { StudioSource } from '../components/source-card';
 
 const meta = {
   title: 'Studio/SourceGrid',
@@ -11,8 +11,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const createSource = (id: number, overrides: Partial<Source> = {}): Source => ({
+const createSource = (
+  id: string,
+  overrides: Partial<StudioSource> = {}
+): StudioSource => ({
   id,
+  sourceId: id,
   kind: 'Display',
   scene: 'Desktop 1',
   armed: true,
@@ -35,7 +39,7 @@ export const Empty: Story = {
 
 export const SingleSource: Story = {
   args: {
-    sources: [createSource(1, { kind: 'Display', label: 'Display 1' })],
+    sources: [createSource('display-main', { kind: 'Display', label: 'Display 1' })],
     isRecording: false,
     onRemove: () => {},
     onToggleArmed: () => {},
@@ -48,9 +52,9 @@ export const SingleSource: Story = {
 export const MultipleSources: Story = {
   args: {
     sources: [
-      createSource(1, { kind: 'Display', label: 'Display 1' }),
-      createSource(2, { kind: 'Camera', label: 'Camera 1', scene: 'Built-in' }),
-      createSource(3, { kind: 'Window', label: 'Terminal', scene: 'Terminal' }),
+      createSource('display-main', { kind: 'Display', label: 'Display 1' }),
+      createSource('camera-face', { kind: 'Camera', label: 'Camera 1', scene: 'Built-in' }),
+      createSource('window-terminal', { kind: 'Window', label: 'Terminal', scene: 'Terminal' }),
     ],
     isRecording: false,
     onRemove: () => {},
@@ -64,10 +68,10 @@ export const MultipleSources: Story = {
 export const AllSourceTypes: Story = {
   args: {
     sources: [
-      createSource(1, { kind: 'Display', label: 'Display 1' }),
-      createSource(2, { kind: 'Window', label: 'Window 1', scene: 'Finder' }),
-      createSource(3, { kind: 'Region', label: 'Region 1', scene: 'Top Half' }),
-      createSource(4, { kind: 'Camera', label: 'Camera 1', scene: 'Built-in' }),
+      createSource('display-main', { kind: 'Display', label: 'Display 1' }),
+      createSource('window-finder', { kind: 'Window', label: 'Window 1', scene: 'Finder' }),
+      createSource('region-top-half', { kind: 'Region', label: 'Region 1', scene: 'Top Half' }),
+      createSource('camera-main', { kind: 'Camera', label: 'Camera 1', scene: 'Built-in' }),
     ],
     isRecording: false,
     onRemove: () => {},
@@ -81,8 +85,8 @@ export const AllSourceTypes: Story = {
 export const WhileRecording: Story = {
   args: {
     sources: [
-      createSource(1, { kind: 'Display', label: 'Display 1', armed: true }),
-      createSource(2, { kind: 'Display', label: 'Display 2', armed: false }),
+      createSource('display-main', { kind: 'Display', label: 'Display 1', armed: true }),
+      createSource('display-secondary', { kind: 'Display', label: 'Display 2', armed: false }),
     ],
     isRecording: true,
     onRemove: () => {},
@@ -90,5 +94,17 @@ export const WhileRecording: Story = {
     onToggleSolo: () => {},
     onChangeScene: () => {},
     onAdd: () => {},
+  },
+};
+
+export const ReadOnlyNormalized: Story = {
+  args: {
+    sources: [
+      createSource('display-main', { kind: 'Display', label: 'DELL U2720Q', scene: 'DELL U2720Q' }),
+      createSource('window-browser', { kind: 'Window', label: 'Firefox', scene: 'Firefox' }),
+      createSource('camera-main', { kind: 'Camera', label: 'USB Camera', scene: 'USB Camera' }),
+    ],
+    isRecording: false,
+    editable: false,
   },
 };

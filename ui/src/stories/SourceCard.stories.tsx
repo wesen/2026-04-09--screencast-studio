@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { SourceCard } from '../components/source-card/SourceCard';
-import type { Source } from '../features/studio-draft/studioDraftSlice';
+import type { StudioSource } from '../components/source-card';
 
 const meta = {
   title: 'Studio/SourceCard',
@@ -11,8 +11,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const createSource = (overrides: Partial<Source> = {}): Source => ({
-  id: 1,
+const createSource = (overrides: Partial<StudioSource> = {}): StudioSource => ({
+  id: 'display-main',
+  sourceId: 'display-main',
   kind: 'Display',
   scene: 'Desktop 1',
   armed: true,
@@ -145,5 +146,19 @@ export const WhileRecordingDisarmed: Story = {
     source: createSource({ kind: 'Display', label: 'Display 2', armed: false }),
     isRecording: true,
     ...defaultHandlers,
+  },
+};
+
+export const ReadOnlyNormalized: Story = {
+  args: {
+    source: createSource({
+      id: 'window-browser',
+      sourceId: 'window-browser',
+      kind: 'Window',
+      label: 'Firefox',
+      scene: 'Firefox',
+    }),
+    isRecording: false,
+    editable: false,
   },
 };

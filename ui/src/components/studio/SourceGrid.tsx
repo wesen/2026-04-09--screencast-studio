@@ -1,22 +1,24 @@
 import React from 'react';
 import { Win } from '../primitives';
-import { SourceCard, AddSourceButton } from '../source-card';
-import type { Source, SourceType } from '@/features/studio-draft/studioDraftSlice';
+import { AddSourceButton, SourceCard } from '../source-card';
+import type { StudioSource, StudioSourceKind } from '../source-card';
 
 interface SourceGridProps {
-  sources: Source[];
+  sources: StudioSource[];
   isRecording: boolean;
-  onRemove: (id: number) => void;
-  onToggleArmed: (id: number) => void;
-  onToggleSolo: (id: number) => void;
-  onChangeScene: (id: number, scene: string) => void;
-  onAdd: (kind: SourceType) => void;
+  editable?: boolean;
+  onRemove?: (id: string) => void;
+  onToggleArmed?: (id: string) => void;
+  onToggleSolo?: (id: string) => void;
+  onChangeScene?: (id: string, scene: string) => void;
+  onAdd?: (kind: StudioSourceKind) => void;
   className?: string;
 }
 
 export const SourceGrid: React.FC<SourceGridProps> = ({
   sources,
   isRecording,
+  editable = true,
   onRemove,
   onToggleArmed,
   onToggleSolo,
@@ -32,13 +34,14 @@ export const SourceGrid: React.FC<SourceGridProps> = ({
             key={source.id}
             source={source}
             isRecording={isRecording}
-            onRemove={() => onRemove(source.id)}
-            onToggleArmed={() => onToggleArmed(source.id)}
-            onToggleSolo={() => onToggleSolo(source.id)}
-            onChangeScene={(scene) => onChangeScene(source.id, scene)}
+            editable={editable}
+            onRemove={onRemove ? () => onRemove(source.id) : undefined}
+            onToggleArmed={onToggleArmed ? () => onToggleArmed(source.id) : undefined}
+            onToggleSolo={onToggleSolo ? () => onToggleSolo(source.id) : undefined}
+            onChangeScene={onChangeScene ? (scene) => onChangeScene(source.id, scene) : undefined}
           />
         ))}
-        <AddSourceButton onAdd={onAdd} />
+        {editable && onAdd ? <AddSourceButton onAdd={onAdd} /> : null}
       </div>
     </Win>
   );

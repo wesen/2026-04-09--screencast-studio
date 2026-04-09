@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { StatusPanel } from '../components/studio/StatusPanel';
-import type { Source } from '../features/studio-draft/studioDraftSlice';
+import type { StudioSource } from '../components/source-card';
 
 const meta = {
   title: 'Studio/StatusPanel',
@@ -11,8 +11,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const createSource = (id: number, label: string, armed: boolean): Source => ({
+const createSource = (id: string, label: string, armed: boolean): StudioSource => ({
   id,
+  sourceId: id,
   kind: 'Display',
   scene: 'Desktop 1',
   armed,
@@ -25,7 +26,7 @@ export const Ready: Story = {
     diskPercent: 8,
     isRecording: false,
     isPaused: false,
-    armedSources: [createSource(1, 'Display 1', true)],
+    armedSources: [createSource('display-1', 'Display 1', true)],
   },
 };
 
@@ -34,7 +35,7 @@ export const ReadyLowDisk: Story = {
     diskPercent: 85,
     isRecording: false,
     isPaused: false,
-    armedSources: [createSource(1, 'Display 1', true)],
+    armedSources: [createSource('display-1', 'Display 1', true)],
   },
 };
 
@@ -43,7 +44,7 @@ export const Recording: Story = {
     diskPercent: 15,
     isRecording: true,
     isPaused: false,
-    armedSources: [createSource(1, 'Display 1', true)],
+    armedSources: [createSource('display-1', 'Display 1', true)],
   },
 };
 
@@ -53,9 +54,9 @@ export const RecordingMultipleSources: Story = {
     isRecording: true,
     isPaused: false,
     armedSources: [
-      createSource(1, 'Display 1', true),
-      createSource(2, 'Camera 1', true),
-      createSource(3, 'Display 2', true),
+      createSource('display-1', 'Display 1', true),
+      createSource('camera-1', 'Camera 1', true),
+      createSource('display-2', 'Display 2', true),
     ],
   },
 };
@@ -65,7 +66,7 @@ export const Paused: Story = {
     diskPercent: 40,
     isRecording: true,
     isPaused: true,
-    armedSources: [createSource(1, 'Display 1', true)],
+    armedSources: [createSource('display-1', 'Display 1', true)],
   },
 };
 
@@ -83,6 +84,6 @@ export const DiskAlmostFull: Story = {
     diskPercent: 92,
     isRecording: false,
     isPaused: false,
-    armedSources: [createSource(1, 'Display 1', true)],
+    armedSources: [createSource('display-1', 'Display 1', true)],
   },
 };

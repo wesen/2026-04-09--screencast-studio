@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Btn } from '../primitives';
-import type { SourceType } from '@/features/studio-draft/studioDraftSlice';
+import type { StudioSourceKind } from './types';
 
 interface AddSourceButtonProps {
-  onAdd: (kind: SourceType) => void;
+  onAdd: (kind: StudioSourceKind) => void;
   className?: string;
 }
 
-const SOURCE_TYPES: { kind: SourceType; icon: string; label: string }[] = [
+const SOURCE_TYPES: { kind: StudioSourceKind; icon: string; label: string }[] = [
   { kind: 'Display', icon: '🖥', label: 'Display' },
   { kind: 'Window', icon: '☐', label: 'Window' },
   { kind: 'Region', icon: '⊞', label: 'Region' },
