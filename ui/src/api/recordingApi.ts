@@ -1,21 +1,21 @@
 import { baseApi } from './baseApi';
-import type { RecordingState, RecordingStartResponse, RecordingStopResponse } from './types';
+import type { RecordingStartRequest, SessionEnvelope } from './types';
 
 export const recordingApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getCurrentSession: builder.query<RecordingState, void>({
+    getCurrentSession: builder.query<SessionEnvelope, void>({
       query: () => '/recordings/current',
       providesTags: ['Session'],
     }),
-    startRecording: builder.mutation<RecordingStartResponse, { dsl: string; max_duration_seconds?: number }>({
+    startRecording: builder.mutation<SessionEnvelope, RecordingStartRequest>({
       query: (body) => ({
         url: '/recordings/start',
         method: 'POST',
-        body: { dsl_format: 'yaml', ...body },
+        body,
       }),
       invalidatesTags: ['Session'],
     }),
-    stopRecording: builder.mutation<RecordingStopResponse, void>({
+    stopRecording: builder.mutation<SessionEnvelope, void>({
       query: () => ({
         url: '/recordings/stop',
         method: 'POST',

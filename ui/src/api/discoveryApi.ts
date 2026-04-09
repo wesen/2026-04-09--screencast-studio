@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi';
-import type { DiscoveryResponse, DiscoveryItem } from './types';
+import type { DiscoveryResponse } from './types';
 
 export const discoveryApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -7,22 +7,7 @@ export const discoveryApi = baseApi.injectEndpoints({
       query: () => '/discovery',
       providesTags: ['Discovery'],
     }),
-    getDiscoveryByKind: builder.query<DiscoveryItem[], string>({
-      query: (kind) => `/discovery/${kind}`,
-      providesTags: (_result, _error, kind) => [{ type: 'DiscoveryItem', id: kind }],
-    }),
-    refreshDiscovery: builder.mutation<{ success: boolean }, void>({
-      query: () => ({
-        url: '/discovery/refresh',
-        method: 'POST',
-      }),
-      invalidatesTags: ['Discovery'],
-    }),
   }),
 });
 
-export const {
-  useGetDiscoveryQuery,
-  useGetDiscoveryByKindQuery,
-  useRefreshDiscoveryMutation,
-} = discoveryApi;
+export const { useGetDiscoveryQuery } = discoveryApi;

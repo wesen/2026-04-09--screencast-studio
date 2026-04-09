@@ -15,6 +15,10 @@ topics:
       description: Configuration DSLs and normalization layers
     - slug: cli
       description: Command-line UX and glazed-based commands
+    - slug: architecture
+      description: Architecture design and system structure topics
+    - slug: ui
+      description: User interface implementation and cleanup topics
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes

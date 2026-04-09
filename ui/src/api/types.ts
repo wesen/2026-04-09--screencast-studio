@@ -1,9 +1,19 @@
-// TypeScript types matching Go DSL types from pkg/dsl/types.go
+export interface ApiError {
+  code: string;
+  message: string;
+}
 
-// ── Discovery Types ──
+export interface ApiErrorResponse {
+  error: ApiError;
+}
 
-export interface Display {
-  kind: 'display';
+export interface HealthResponse {
+  ok: boolean;
+  service: string;
+  preview_limit: number;
+}
+
+export interface DisplayDescriptor {
   id: string;
   name: string;
   primary: boolean;
@@ -14,8 +24,7 @@ export interface Display {
   connector: string;
 }
 
-export interface Window {
-  kind: 'window';
+export interface WindowDescriptor {
   id: string;
   title: string;
   x: number;
@@ -24,16 +33,14 @@ export interface Window {
   height: number;
 }
 
-export interface Camera {
-  kind: 'camera';
+export interface CameraDescriptor {
   id: string;
   label: string;
   device: string;
   card_name: string;
 }
 
-export interface AudioInput {
-  kind: 'audio';
+export interface AudioInputDescriptor {
   id: string;
   name: string;
   driver: string;
@@ -41,14 +48,12 @@ export interface AudioInput {
   state: string;
 }
 
-export type DiscoveryItem = Display | Window | Camera | AudioInput;
-
 export interface DiscoveryResponse {
-  generated_at: string;
-  items: DiscoveryItem[];
+  displays: DisplayDescriptor[];
+  windows: WindowDescriptor[];
+  cameras: CameraDescriptor[];
+  audio: AudioInputDescriptor[];
 }
-
-// ── Setup/DSL Types ──
 
 export interface Rect {
   x: number;
@@ -69,28 +74,13 @@ export interface VideoCaptureSettings {
   cursor?: boolean;
   follow_resize?: boolean;
   mirror?: boolean;
-  size: string;
+  size?: string;
 }
 
 export interface VideoOutputSettings {
   container: string;
   video_codec: string;
   quality: number;
-}
-
-export interface VideoDefaults {
-  capture: VideoCaptureSettings;
-  output: VideoOutputSettings;
-}
-
-export interface VideoSource {
-  id: string;
-  name: string;
-  type: string;
-  enabled?: boolean;
-  target: VideoTarget;
-  settings: VideoDefaults;
-  destination_template: string;
 }
 
 export interface AudioOutputSettings {
@@ -105,189 +95,153 @@ export interface AudioSourceSettings {
   denoise: boolean;
 }
 
-export interface AudioSource {
+export interface EffectiveVideoSource {
   id: string;
   name: string;
+  type: string;
+  enabled: boolean;
+  target: VideoTarget;
+  capture: VideoCaptureSettings;
+  output: VideoOutputSettings;
+  destination_template: string;
+}
+
+export interface EffectiveAudioSource {
+  id: string;
+  name: string;
+  enabled: boolean;
   device: string;
-  enabled?: boolean;
   settings: AudioSourceSettings;
 }
 
-export interface Config {
+export interface EffectiveConfig {
   schema: string;
   session_id: string;
   destination_templates: Record<string, string>;
-  screen_capture_defaults: VideoDefaults;
-  camera_capture_defaults: VideoDefaults;
-  audio_defaults: {
-    output: AudioOutputSettings;
-  };
-  audio_mix: {
-    destination_template: string;
-  };
-  video_sources: VideoSource[];
-  audio_sources: AudioSource[];
+  audio_mix_template: string;
+  audio_output: AudioOutputSettings;
+  video_sources: EffectiveVideoSource[];
+  audio_sources: EffectiveAudioSource[];
 }
 
-// ── Compile Types ──
+export interface NormalizeResponse {
+  session_id: string;
+  warnings: string[];
+  config: EffectiveConfig;
+}
 
 export interface PlannedOutput {
-  kind: 'video' | 'audio';
+  kind: string;
   source_id?: string;
   name: string;
   path: string;
 }
 
 export interface VideoJob {
-  source: {
-    id: string;
-    name: string;
-    type: string;
-    enabled: boolean;
-    target: VideoTarget;
-    capture: VideoCaptureSettings;
-    output: VideoOutputSettings;
-    destination_template: string;
-  };
+  source: EffectiveVideoSource;
   output_path: string;
 }
 
-export interface AudioJob {
+export interface AudioMixJob {
   name: string;
-  sources: {
-    id: string;
-    name: string;
-    enabled: boolean;
-    device: string;
-    settings: AudioSourceSettings;
-  }[];
+  sources: EffectiveAudioSource[];
   output: AudioOutputSettings;
   output_path: string;
-}
-
-export interface CompiledPlan {
-  session_id: string;
-  video_jobs: VideoJob[];
-  audio_jobs: AudioJob[];
-  outputs: PlannedOutput[];
-  warnings: string[];
-}
-
-export interface CompileRequest {
-  dsl_format: 'yaml';
-  dsl: string;
 }
 
 export interface CompileResponse {
   session_id: string;
   warnings: string[];
   outputs: PlannedOutput[];
-  video_jobs: number;
-  audio_jobs: number;
-}
-
-export interface NormalizeResponse {
-  valid: boolean;
-  config?: Config;
-  errors?: string[];
-}
-
-// ── Recording Types ──
-
-export interface RecordingState {
-  active: boolean;
-  session_id: string;
-  state: 'idle' | 'compiling' | 'starting' | 'running' | 'paused' | 'stopping' | 'stopped' | 'error';
-  reason: string;
-  started_at?: string;
-  finished_at?: string;
-  outputs: PlannedOutput[];
-  warnings: string[];
+  video_jobs: VideoJob[];
+  audio_jobs: AudioMixJob[];
 }
 
 export interface RecordingStartRequest {
-  dsl_format: 'yaml';
   dsl: string;
   max_duration_seconds?: number;
+  grace_period_seconds?: number;
 }
 
-export interface RecordingStartResponse {
-  session_id: string;
-  state: string;
-  reason: string;
+export interface ProcessLog {
+  timestamp: string;
+  process_label: string;
+  stream: string;
+  message: string;
 }
 
-export interface RecordingStopResponse {
-  session_id: string;
-  state: string;
-  reason: string;
+export interface RecordingSession {
+  active: boolean;
+  session_id?: string;
+  state?: string;
+  reason?: string;
+  started_at?: string;
+  finished_at?: string;
+  warnings: string[];
+  outputs: PlannedOutput[];
+  logs: ProcessLog[];
 }
 
-// ── Preview Types ──
+export interface SessionEnvelope {
+  session: RecordingSession;
+}
 
 export interface PreviewDescriptor {
   id: string;
   source_id: string;
-  state: 'starting' | 'ready' | 'error' | 'stopped';
-  stream_url: string;
+  name: string;
+  source_type: string;
+  state: string;
+  reason?: string;
+  leases: number;
+  has_frame: boolean;
+  last_frame_at?: string;
 }
 
 export interface PreviewEnsureRequest {
+  dsl: string;
   source_id: string;
 }
 
 export interface PreviewReleaseRequest {
-  source_id: string;
+  preview_id: string;
 }
 
-// ── WebSocket Event Types ──
+export interface PreviewEnvelope {
+  preview: PreviewDescriptor;
+}
 
-export interface WsSessionStateEvent {
+export interface PreviewListResponse {
+  previews: PreviewDescriptor[];
+}
+
+export interface ServerEventBase {
+  type: string;
+  timestamp: string;
+}
+
+export interface SessionStateEvent extends ServerEventBase {
   type: 'session.state';
-  payload: {
-    session_id: string;
-    state: string;
-    reason: string;
-  };
+  payload: RecordingSession;
 }
 
-export interface WsSessionLogEvent {
+export interface SessionLogEvent extends ServerEventBase {
   type: 'session.log';
-  payload: {
-    session_id: string;
-    level: 'debug' | 'info' | 'warn' | 'error';
-    line: string;
-  };
+  payload: ProcessLog;
 }
 
-export interface WsSessionOutputEvent {
-  type: 'session.output';
-  payload: {
-    session_id: string;
-    kind: string;
-    path: string;
-  };
+export interface PreviewListEvent extends ServerEventBase {
+  type: 'preview.list';
+  payload: PreviewListResponse;
 }
 
-export interface WsPreviewStateEvent {
+export interface PreviewStateEvent extends ServerEventBase {
   type: 'preview.state';
-  payload: {
-    source_id: string;
-    state: string;
-  };
-}
-
-export interface WsAudioMeterEvent {
-  type: 'meter.audio';
-  payload: {
-    device_id: string;
-    level: number;
-  };
+  payload: PreviewDescriptor;
 }
 
 export type WsEvent =
-  | WsSessionStateEvent
-  | WsSessionLogEvent
-  | WsSessionOutputEvent
-  | WsPreviewStateEvent
-  | WsAudioMeterEvent;
+  | SessionStateEvent
+  | SessionLogEvent
+  | PreviewListEvent
+  | PreviewStateEvent;

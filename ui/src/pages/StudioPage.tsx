@@ -4,7 +4,6 @@ import { selectSources, selectArmedSources } from '@/features/studio-draft/studi
 import {
   selectSession,
   selectLogs,
-  selectElapsed,
 } from '@/features/session/sessionSlice';
 import { MenuBar, SourceGrid, OutputPanel, MicPanel, StatusPanel } from '@/components/studio';
 import { LogPanel } from '@/components/log-panel';
@@ -22,10 +21,10 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const armedSources = useAppSelector(selectArmedSources);
   const session = useAppSelector(selectSession);
   const logs = useAppSelector(selectLogs);
-  const elapsed = useAppSelector(selectElapsed);
 
   const [activeTab, setActiveTab] = useState<Tab>('studio');
   const [isPaused, setIsPaused] = useState(false);
+  const [elapsed] = useState(0);
   const [dslText, setDslText] = useState(`schema: recorder.config/v1
 session_id: demo
 destination_templates:

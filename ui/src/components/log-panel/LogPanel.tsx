@@ -1,26 +1,22 @@
 import React, { useRef, useEffect } from 'react';
 import { Win } from '../primitives/Win';
-import type { LogEntry } from '@/features/session/sessionSlice';
+import type { ProcessLog } from '@/api/types';
 
 interface LogPanelProps {
-  logs: LogEntry[];
+  logs: ProcessLog[];
   maxLines?: number;
   autoScroll?: boolean;
   className?: string;
 }
 
-const LEVEL_COLORS: Record<string, string> = {
-  debug: 'var(--studio-mid)',
-  info: 'var(--studio-black)',
-  warn: 'var(--studio-amber)',
-  error: 'var(--studio-red)',
+const STREAM_COLORS: Record<string, string> = {
+  stdout: 'var(--studio-black)',
+  stderr: 'var(--studio-red)',
 };
 
-const LEVEL_PREFIXES: Record<string, string> = {
-  debug: 'D',
-  info: 'I',
-  warn: 'W',
-  error: 'E',
+const STREAM_PREFIXES: Record<string, string> = {
+  stdout: 'O',
+  stderr: 'E',
 };
 
 export const LogPanel: React.FC<LogPanelProps> = ({
@@ -77,15 +73,18 @@ export const LogPanel: React.FC<LogPanelProps> = ({
             >
               <span
                 style={{
-                  color: LEVEL_COLORS[log.level] || 'var(--studio-mid)',
+                  color: STREAM_COLORS[log.stream] || 'var(--studio-mid)',
                   fontWeight: 'bold',
                   minWidth: 12,
                 }}
               >
-                {LEVEL_PREFIXES[log.level] || '?'}
+                {STREAM_PREFIXES[log.stream] || '?'}
               </span>
               <span style={{ color: 'var(--studio-mid)', flexShrink: 0 }}>
                 {new Date(log.timestamp).toLocaleTimeString()}
+              </span>
+              <span style={{ color: 'var(--studio-mid)', flexShrink: 0 }}>
+                {log.process_label}
               </span>
               <span style={{ flex: 1, wordBreak: 'break-word' }}>
                 {log.message}

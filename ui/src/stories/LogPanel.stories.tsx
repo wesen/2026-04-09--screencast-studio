@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { LogPanel } from '../components/log-panel/LogPanel';
-import type { LogEntry } from '../features/session/sessionSlice';
+import type { ProcessLog } from '../api/types';
 
 const meta = {
   title: 'Studio/LogPanel',
@@ -12,12 +12,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const createLog = (
-  level: LogEntry['level'],
+  stream: ProcessLog['stream'],
   message: string,
   offsetMs = 0
-): LogEntry => ({
-  timestamp: Date.now() - offsetMs,
-  level,
+): ProcessLog => ({
+  timestamp: new Date(Date.now() - offsetMs).toISOString(),
+  process_label: 'preview-1',
+  stream,
   message,
 });
 
@@ -30,17 +31,17 @@ export const Empty: Story = {
 export const WithLogs: Story = {
   args: {
     logs: [
-      createLog('info', 'Starting screencast studio...', 10000),
-      createLog('info', 'Discovering displays...', 9000),
-      createLog('info', 'Found 2 displays', 8000),
-      createLog('info', 'Discovering windows...', 7000),
-      createLog('info', 'Found 15 windows', 6000),
-      createLog('warn', 'Window "Untitled - LibreOffice Writer" has no title', 5000),
-      createLog('info', 'Compiling setup...', 4000),
-      createLog('info', 'Plan generated with 1 video job, 1 audio job', 3000),
-      createLog('info', 'Starting recording session', 2000),
-      createLog('info', 'Worker desktop-1 started', 1000),
-      createLog('info', 'Worker mic-1 started', 500),
+      createLog('stdout', 'Starting screencast studio...', 10000),
+      createLog('stdout', 'Discovering displays...', 9000),
+      createLog('stdout', 'Found 2 displays', 8000),
+      createLog('stdout', 'Discovering windows...', 7000),
+      createLog('stdout', 'Found 15 windows', 6000),
+      createLog('stderr', 'Window "Untitled - LibreOffice Writer" has no title', 5000),
+      createLog('stdout', 'Compiling setup...', 4000),
+      createLog('stdout', 'Plan generated with 1 video job, 1 audio job', 3000),
+      createLog('stdout', 'Starting recording session', 2000),
+      createLog('stdout', 'Worker desktop-1 started', 1000),
+      createLog('stdout', 'Worker mic-1 started', 500),
     ],
   },
 };
@@ -48,11 +49,11 @@ export const WithLogs: Story = {
 export const WithErrors: Story = {
   args: {
     logs: [
-      createLog('info', 'Starting recording...', 5000),
-      createLog('error', 'FFmpeg exited with code 1', 4000),
-      createLog('error', 'Output file not writable: permission denied', 3000),
-      createLog('warn', 'Retrying...', 2000),
-      createLog('info', 'Recording stopped', 1000),
+      createLog('stdout', 'Starting recording...', 5000),
+      createLog('stderr', 'FFmpeg exited with code 1', 4000),
+      createLog('stderr', 'Output file not writable: permission denied', 3000),
+      createLog('stderr', 'Retrying...', 2000),
+      createLog('stdout', 'Recording stopped', 1000),
     ],
   },
 };
@@ -61,7 +62,7 @@ export const ManyLogs: Story = {
   args: {
     logs: Array.from({ length: 100 }, (_, i) =>
       createLog(
-        i % 10 === 0 ? 'warn' : i % 20 === 0 ? 'error' : 'info',
+        i % 10 === 0 ? 'stderr' : 'stdout',
         `Log entry ${i} with some additional text to make it wrap`,
         (100 - i) * 100
       )

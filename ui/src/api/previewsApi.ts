@@ -1,25 +1,30 @@
 import { baseApi } from './baseApi';
-import type { PreviewDescriptor } from './types';
+import type {
+  PreviewEnsureRequest,
+  PreviewEnvelope,
+  PreviewListResponse,
+  PreviewReleaseRequest,
+} from './types';
 
 export const previewsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    listPreviews: builder.query<PreviewDescriptor[], void>({
+    listPreviews: builder.query<PreviewListResponse, void>({
       query: () => '/previews',
       providesTags: ['Previews'],
     }),
-    ensurePreview: builder.mutation<PreviewDescriptor, string>({
-      query: (sourceId) => ({
+    ensurePreview: builder.mutation<PreviewEnvelope, PreviewEnsureRequest>({
+      query: (body) => ({
         url: '/previews/ensure',
         method: 'POST',
-        body: { source_id: sourceId },
+        body,
       }),
       invalidatesTags: ['Previews'],
     }),
-    releasePreview: builder.mutation<{ success: boolean }, string>({
-      query: (sourceId) => ({
+    releasePreview: builder.mutation<PreviewEnvelope, PreviewReleaseRequest>({
+      query: (body) => ({
         url: '/previews/release',
         method: 'POST',
-        body: { source_id: sourceId },
+        body,
       }),
       invalidatesTags: ['Previews'],
     }),

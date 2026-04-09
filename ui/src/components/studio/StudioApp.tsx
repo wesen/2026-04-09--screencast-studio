@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { selectSources, selectArmedSources, addSource, removeSource, updateSource, setFormat, setFps, setQuality, setAudio, setMultiTrack, setMicInput, setGain } from '@/features/studio-draft/studioDraftSlice';
-import { selectSession, selectWsConnected, setElapsed, setMicLevel as setMicLevelAction } from '@/features/session/sessionSlice';
+import { selectSession, selectWsConnected } from '@/features/session/sessionSlice';
 import { getWsClient } from '@/features/session/wsClient';
 import { MenuBar, SourceGrid, OutputPanel, MicPanel, StatusPanel } from './index';
 
@@ -33,10 +33,7 @@ export const StudioApp: React.FC = () => {
     if (!isRecording || isPaused) return;
 
     const id = setInterval(() => {
-      setElapsedState((prev) => {
-        dispatch(setElapsed(prev + 1));
-        return prev + 1;
-      });
+      setElapsedState((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(id);
@@ -55,21 +52,6 @@ export const StudioApp: React.FC = () => {
 
     return () => clearInterval(id);
   }, [isRecording, armedSources.length]);
-
-  // Simulate mic level during recording
-  useEffect(() => {
-    if (!isRecording || isPaused) {
-      dispatch(setMicLevelAction(0.12));
-      return;
-    }
-
-    const id = setInterval(() => {
-      const level = 0.15 + Math.random() * 0.6;
-      dispatch(setMicLevelAction(level));
-    }, 110);
-
-    return () => clearInterval(id);
-  }, [isRecording, isPaused, dispatch]);
 
   const outputSettings = useAppSelector((state) => ({
     format: state.studioDraft.format,

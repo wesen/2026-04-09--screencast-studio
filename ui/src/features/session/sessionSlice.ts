@@ -1,20 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { RecordingState, WsEvent } from '@/api/types';
+import type { ProcessLog, RecordingSession, WsEvent } from '@/api/types';
 
 // ── Types ──
 
 export interface SessionState {
-  session: RecordingState;
-  logs: LogEntry[];
-  audioLevels: Record<string, number>;
+  session: RecordingSession;
+  logs: ProcessLog[];
   wsConnected: boolean;
-  elapsed: number;
-}
-
-export interface LogEntry {
-  timestamp: number;
-  level: 'debug' | 'info' | 'warn' | 'error';
-  message: string;
 }
 
 // ── Initial State ──
@@ -22,16 +14,12 @@ export interface LogEntry {
 const initialState: SessionState = {
   session: {
     active: false,
-    session_id: '',
-    state: 'idle',
-    reason: '',
     outputs: [],
     warnings: [],
+    logs: [],
   },
   logs: [],
-  audioLevels: {},
   wsConnected: false,
-  elapsed: 0,
 };
 
 // ── Slice ──
@@ -40,20 +28,26 @@ const sessionSlice = createSlice({
   name: 'session',
   initialState,
   reducers: {
-    setSession: (state, action: PayloadAction<RecordingState>) => {
+    setSession: (state, action: PayloadAction<RecordingSession>) => {
       state.session = action.payload;
+      state.logs = action.payload.logs;
     },
     updateSessionState: (
       state,
-      action: PayloadAction<{ state: string; reason: string }>
+      action: PayloadAction<RecordingSession>
     ) => {
-      state.session.state = action.payload.state as SessionState['session']['state'];
-      state.session.reason = action.payload.reason;
+      state.session = {
+        ...state.session,
+        ...action.payload,
+      };
+      if (action.payload.logs) {
+        state.logs = action.payload.logs;
+      }
     },
     setWsConnected: (state, action: PayloadAction<boolean>) => {
       state.wsConnected = action.payload;
     },
-    addLog: (state, action: PayloadAction<LogEntry>) => {
+    addLog: (state, action: PayloadAction<ProcessLog>) => {
       state.logs.push(action.payload);
       // Keep last 1000 logs
       if (state.logs.length > 1000) {
@@ -62,19 +56,6 @@ const sessionSlice = createSlice({
     },
     clearLogs: (state) => {
       state.logs = [];
-    },
-    setAudioLevel: (
-      state,
-      action: PayloadAction<{ deviceId: string; level: number }>
-    ) => {
-      state.audioLevels[action.payload.deviceId] = action.payload.level;
-    },
-    setElapsed: (state, action: PayloadAction<number>) => {
-      state.elapsed = action.payload;
-    },
-    setMicLevel: (state, action: PayloadAction<number>) => {
-      // Store mic level in audioLevels for the default device
-      state.audioLevels['default'] = action.payload;
     },
     resetSession: () => initialState,
   },
@@ -88,9 +69,6 @@ export const {
   setWsConnected,
   addLog,
   clearLogs,
-  setAudioLevel,
-  setElapsed,
-  setMicLevel,
   resetSession,
 } = sessionSlice.actions;
 
@@ -113,12 +91,6 @@ export const selectWsConnected = (state: { session: SessionState }) =>
 export const selectLogs = (state: { session: SessionState }) =>
   state.session.logs;
 
-export const selectAudioLevels = (state: { session: SessionState }) =>
-  state.session.audioLevels;
-
-export const selectElapsed = (state: { session: SessionState }) =>
-  state.session.elapsed;
-
 // ── Event Handler ──
 
 export function handleWsEvent(
@@ -129,47 +101,18 @@ export function handleWsEvent(
     case 'session.state':
       return {
         ...state,
-        session: {
-          ...state.session,
-          state: event.payload.state as SessionState['session']['state'],
-          reason: event.payload.reason,
-          active: event.payload.state === 'running',
-        },
+        session: event.payload,
+        logs: event.payload.logs,
       };
     case 'session.log':
       return {
         ...state,
-        logs: [
-          ...state.logs.slice(-999),
-          {
-            timestamp: Date.now(),
-            level: event.payload.level,
-            message: event.payload.line,
-          },
-        ],
+        logs: [...state.logs.slice(-999), event.payload],
       };
-    case 'session.output':
+    case 'preview.list':
+    case 'preview.state':
       return {
         ...state,
-        session: {
-          ...state.session,
-          outputs: [
-            ...state.session.outputs,
-            {
-              kind: event.payload.kind as 'video' | 'audio',
-              name: event.payload.path.split('/').pop() || event.payload.path,
-              path: event.payload.path,
-            },
-          ],
-        },
-      };
-    case 'meter.audio':
-      return {
-        ...state,
-        audioLevels: {
-          ...state.audioLevels,
-          [event.payload.device_id]: event.payload.level,
-        },
       };
     default:
       return state;

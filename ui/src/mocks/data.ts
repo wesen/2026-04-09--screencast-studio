@@ -1,15 +1,13 @@
 import type {
-  DiscoveryResponse,
-  RecordingState,
   CompileResponse,
+  DiscoveryResponse,
   PreviewDescriptor,
+  RecordingSession,
 } from '@/api/types';
 
 export const mockDiscoveryData: DiscoveryResponse = {
-  generated_at: new Date().toISOString(),
-  items: [
+  displays: [
     {
-      kind: 'display',
       id: 'display-1',
       name: 'Display 1',
       primary: true,
@@ -20,7 +18,6 @@ export const mockDiscoveryData: DiscoveryResponse = {
       connector: 'HDMI-A-1',
     },
     {
-      kind: 'display',
       id: 'display-2',
       name: 'Display 2',
       primary: false,
@@ -30,8 +27,9 @@ export const mockDiscoveryData: DiscoveryResponse = {
       height: 1440,
       connector: 'DP-1',
     },
+  ],
+  windows: [
     {
-      kind: 'window',
       id: '0x3a00007',
       title: 'Browser Window',
       x: 10,
@@ -40,7 +38,6 @@ export const mockDiscoveryData: DiscoveryResponse = {
       height: 800,
     },
     {
-      kind: 'window',
       id: '0x3a00008',
       title: 'Terminal',
       x: 100,
@@ -48,15 +45,17 @@ export const mockDiscoveryData: DiscoveryResponse = {
       width: 800,
       height: 600,
     },
+  ],
+  cameras: [
     {
-      kind: 'camera',
       id: '/dev/video0',
       label: 'Built-in Camera',
       device: '/dev/video0',
       card_name: 'FaceTime HD',
     },
+  ],
+  audio: [
     {
-      kind: 'audio',
       id: 'alsa_input.pci-0000_00_1f.3.analog-stereo',
       name: 'Built-in Mic',
       driver: 'ALSA',
@@ -66,13 +65,11 @@ export const mockDiscoveryData: DiscoveryResponse = {
   ],
 };
 
-export const mockRecordingState: RecordingState = {
+export const mockRecordingSession: RecordingSession = {
   active: false,
-  session_id: '',
-  state: 'idle',
-  reason: '',
   outputs: [],
   warnings: [],
+  logs: [],
 };
 
 export const mockCompileResponse: CompileResponse = {
@@ -86,8 +83,8 @@ export const mockCompileResponse: CompileResponse = {
       path: 'recordings/demo-session/Full Desktop.mov',
     },
   ],
-  video_jobs: 1,
-  audio_jobs: 1,
+  video_jobs: [],
+  audio_jobs: [],
 };
 
 export const mockPreviews: PreviewDescriptor[] = [];

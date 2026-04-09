@@ -1,5 +1,5 @@
 import type { AppDispatch } from '@/app/store';
-import { setWsConnected, addLog, setAudioLevel, updateSessionState } from './sessionSlice';
+import { setWsConnected, addLog, updateSessionState } from './sessionSlice';
 import type { WsEvent } from '@/api/types';
 
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
@@ -84,31 +84,16 @@ export class WsClient {
   private handleMessage(event: WsEvent): void {
     switch (event.type) {
       case 'session.state':
-        this.dispatch(updateSessionState({
-          state: event.payload.state,
-          reason: event.payload.reason,
-        }));
+        this.dispatch(updateSessionState(event.payload));
         break;
 
       case 'session.log':
-        this.dispatch(addLog({
-          timestamp: Date.now(),
-          level: event.payload.level,
-          message: event.payload.line,
-        }));
+        this.dispatch(addLog(event.payload));
         break;
 
-      case 'meter.audio':
-        this.dispatch(setAudioLevel({
-          deviceId: event.payload.device_id,
-          level: event.payload.level,
-        }));
-        break;
-
-      case 'session.output':
+      case 'preview.list':
       case 'preview.state':
-        // Handle in future phases
-        console.log('[WS] Unhandled event:', event.type);
+        console.log('[WS] Event received:', event.type, event.payload);
         break;
 
       default:
