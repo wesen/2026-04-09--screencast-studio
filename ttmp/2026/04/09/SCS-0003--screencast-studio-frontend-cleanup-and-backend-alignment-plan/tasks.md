@@ -32,11 +32,11 @@ Acceptance criteria:
 
 ## Phase 3: Collapse To One Mounted Shell
 
-- [ ] Decide whether `StudioPage.tsx` is the surviving shell. The default expectation is yes.
-- [ ] Move real orchestration into the surviving shell or a page-level container.
-- [ ] Change `ui/src/App.tsx` to mount the new shell.
-- [ ] Delete or demote `ui/src/components/studio/StudioApp.tsx` once the replacement is in place.
-- [ ] Remove duplicated handler logic and placeholder shell-specific state.
+- [x] Decide whether `StudioPage.tsx` is the surviving shell. The default expectation is yes.
+- [x] Move real orchestration into the surviving shell or a page-level container.
+- [x] Change `ui/src/App.tsx` to mount the new shell.
+- [x] Delete or demote `ui/src/components/studio/StudioApp.tsx` once the replacement is in place.
+- [x] Remove duplicated handler logic and placeholder shell-specific state.
 
 Acceptance criteria:
 
@@ -128,7 +128,7 @@ Acceptance criteria:
 ## Suggested Commit Boundaries
 
 - [x] Commit 1: transport types and endpoint cleanup
-- [ ] Commit 2: mounted shell consolidation
+- [x] Commit 2: mounted shell consolidation
 - [ ] Commit 3: state model cleanup
 - [ ] Commit 4: websocket and preview cleanup
 - [ ] Commit 5: mocks, linting, and dead-code deletion
@@ -137,6 +137,6 @@ Acceptance criteria:
 
 - [x] `pnpm --dir ui build`
 - [ ] `pnpm --dir ui lint`
-- [ ] `pnpm --dir ui build-storybook`
+- [x] `pnpm --dir ui build-storybook`
 - [ ] manual smoke test against the real Go server
 - [ ] review for remaining duplicate shells or stale routes

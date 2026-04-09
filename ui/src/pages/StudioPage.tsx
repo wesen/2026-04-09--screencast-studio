@@ -1,10 +1,25 @@
-import React, { useState } from 'react';
-import { useAppSelector } from '@/app/hooks';
-import { selectSources, selectArmedSources } from '@/features/studio-draft/studioDraftSlice';
+import React, { useEffect, useState } from 'react';
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import {
+  addSource,
+  removeSource,
+  selectArmedSources,
+  selectSources,
+  setAudio,
+  setFormat,
+  setFps,
+  setGain,
+  setMicInput,
+  setMultiTrack,
+  setQuality,
+  updateSource,
+} from '@/features/studio-draft/studioDraftSlice';
 import {
   selectSession,
   selectLogs,
+  selectWsConnected,
 } from '@/features/session/sessionSlice';
+import { getWsClient } from '@/features/session/wsClient';
 import { MenuBar, SourceGrid, OutputPanel, MicPanel, StatusPanel } from '@/components/studio';
 import { LogPanel } from '@/components/log-panel';
 import { DSLEditor } from '@/components/dsl-editor';
@@ -17,14 +32,17 @@ interface StudioPageProps {
 }
 
 export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
+  const dispatch = useAppDispatch();
   const sources = useAppSelector(selectSources);
   const armedSources = useAppSelector(selectArmedSources);
   const session = useAppSelector(selectSession);
   const logs = useAppSelector(selectLogs);
+  const wsConnected = useAppSelector(selectWsConnected);
 
   const [activeTab, setActiveTab] = useState<Tab>('studio');
   const [isPaused, setIsPaused] = useState(false);
-  const [elapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [diskPercent, setDiskPercent] = useState(8);
   const [dslText, setDslText] = useState(`schema: recorder.config/v1
 session_id: demo
 destination_templates:
@@ -50,9 +68,58 @@ audio_sources:
 
   const isRecording = session.active && session.state === 'running';
 
+  useEffect(() => {
+    const wsClient = getWsClient(dispatch);
+    wsClient.connect();
+
+    return () => {
+      wsClient.disconnect();
+    };
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!isRecording || isPaused) {
+      return;
+    }
+
+    const id = setInterval(() => {
+      setElapsed((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [isPaused, isRecording]);
+
+  useEffect(() => {
+    if (!isRecording) {
+      setDiskPercent(8);
+      return;
+    }
+
+    const id = setInterval(() => {
+      setDiskPercent((prev) => Math.min(95, prev + 0.2 * armedSources.length));
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [armedSources.length, isRecording]);
+
+  const outputSettings = useAppSelector((state) => ({
+    format: state.studioDraft.format,
+    fps: state.studioDraft.fps,
+    quality: state.studioDraft.quality,
+    audio: state.studioDraft.audio,
+    multiTrack: state.studioDraft.multiTrack,
+  }));
+
+  const micSettings = useAppSelector((state) => ({
+    micInput: state.studioDraft.micInput,
+    gain: state.studioDraft.gain,
+    micLevel: state.studioDraft.micLevel,
+  }));
+
   const handleToggleRecording = () => {
     if (isRecording) {
       setIsPaused(false);
+      setElapsed(0);
     }
   };
 
@@ -97,45 +164,57 @@ audio_sources:
             <SourceGrid
               sources={sources}
               isRecording={isRecording}
-              onRemove={(id) => console.log('remove', id)}
-              onToggleArmed={(id) => console.log('toggle armed', id)}
-              onToggleSolo={(id) => console.log('toggle solo', id)}
-              onChangeScene={(id, scene) => console.log('change scene', id, scene)}
-              onAdd={(kind) => console.log('add source', kind)}
+              onRemove={(id) => dispatch(removeSource(id))}
+              onToggleArmed={(id) => {
+                const source = sources.find((item) => item.id === id);
+                if (source) {
+                  dispatch(updateSource({ id, patch: { armed: !source.armed } }));
+                }
+              }}
+              onToggleSolo={(id) => {
+                const source = sources.find((item) => item.id === id);
+                if (source) {
+                  dispatch(updateSource({ id, patch: { solo: !source.solo } }));
+                }
+              }}
+              onChangeScene={(id, scene) => {
+                dispatch(updateSource({ id, patch: { scene } }));
+              }}
+              onAdd={(kind) => dispatch(addSource(kind))}
             />
 
             <div className="studio-content-row">
               <OutputPanel
-                format="MOV"
-                fps="24 fps"
-                quality={75}
-                audio="48 kHz, 16-bit"
-                multiTrack={true}
+                format={outputSettings.format}
+                fps={outputSettings.fps}
+                quality={outputSettings.quality}
+                audio={outputSettings.audio}
+                multiTrack={outputSettings.multiTrack}
                 isRecording={isRecording}
                 isPaused={isPaused}
                 elapsed={elapsed}
                 armedCount={armedSources.length}
-                onFormatChange={(f) => console.log('format', f)}
-                onFpsChange={(f) => console.log('fps', f)}
-                onQualityChange={(q) => console.log('quality', q)}
-                onAudioChange={(a) => console.log('audio', a)}
-                onMultiTrackChange={(m) => console.log('multitrack', m)}
+                onFormatChange={(value) => dispatch(setFormat(value))}
+                onFpsChange={(value) => dispatch(setFps(value))}
+                onQualityChange={(value) => dispatch(setQuality(value))}
+                onAudioChange={(value) => dispatch(setAudio(value))}
+                onMultiTrackChange={(value) => dispatch(setMultiTrack(value))}
                 onToggleRecording={handleToggleRecording}
                 onTogglePause={handleTogglePause}
               />
 
               <div className="studio-panel-stack">
                 <MicPanel
-                  micLevel={0.35}
-                  micInput="Built-in Mic"
-                  gain={55}
+                  micLevel={micSettings.micLevel}
+                  micInput={micSettings.micInput}
+                  gain={micSettings.gain}
                   isRecording={isRecording}
-                  onMicInputChange={(m) => console.log('mic input', m)}
-                  onGainChange={(g) => console.log('gain', g)}
+                  onMicInputChange={(value) => dispatch(setMicInput(value))}
+                  onGainChange={(value) => dispatch(setGain(value))}
                 />
 
                 <StatusPanel
-                  diskPercent={15}
+                  diskPercent={diskPercent}
                   isRecording={isRecording}
                   isPaused={isPaused}
                   armedSources={armedSources}
@@ -159,6 +238,23 @@ audio_sources:
           />
         )}
       </div>
+
+      {!wsConnected && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 10,
+            right: 10,
+            background: 'var(--studio-amber)',
+            color: 'var(--studio-cream)',
+            padding: '4px 8px',
+            borderRadius: 3,
+            fontSize: 9,
+          }}
+        >
+          Reconnecting to server...
+        </div>
+      )}
     </div>
   );
 };

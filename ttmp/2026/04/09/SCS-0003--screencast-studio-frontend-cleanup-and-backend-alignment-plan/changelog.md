@@ -28,3 +28,13 @@ Completed the first frontend cleanup slice by replacing the stale transport cont
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/previewsApi.ts — Preview API now uses backend preview envelopes and `preview_id` release semantics
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts — Websocket client now decodes the current backend event payload shapes
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/mocks/handlers.ts — Mock handlers updated to stop reinforcing deprecated routes
+
+## 2026-04-09
+
+Completed the mounted-shell consolidation by making `StudioPage` the app entrypoint, moving the remaining shell-level orchestration there, deleting `StudioApp`, and updating Storybook to present `StudioPage` as the main top-level screen.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/App.tsx — App now mounts the surviving shell directly
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — StudioPage now owns the top-level shell orchestration
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/Introduction.mdx — Storybook introduction now points at StudioPage

@@ -240,3 +240,97 @@ sed -n '1,260p' ui/src/mocks/data.ts
 sed -n '1,260p' ui/src/mocks/handlers.ts
 pnpm --dir ui build
 ```
+
+## Step 3: Collapse The App To One Mounted Shell
+
+This step removed the most obvious frontend duplication by making `StudioPage` the single mounted shell and deleting `StudioApp`. The purpose of this slice was not to finish the runtime integration. The purpose was to establish one place where future state and transport cleanup can happen.
+
+Before this step:
+
+- `App.tsx` mounted `StudioApp`
+- `StudioPage.tsx` existed in parallel with overlapping layout ideas
+- `StudioApp` owned websocket startup and some screen orchestration
+- Storybook exposed both shells
+
+After this step:
+
+- `App.tsx` mounts `StudioPage`
+- `StudioPage` owns the top-level shell orchestration
+- `StudioApp.tsx` is deleted
+- `StudioApp.stories.tsx` is deleted
+- Storybook documentation now refers to `StudioPage` as the main screen
+
+This matters because later state cleanup becomes much easier once there is only one surviving shell.
+
+### What I did
+
+- Deleted:
+  - `ui/src/components/studio/StudioApp.tsx`
+  - `ui/src/stories/StudioApp.stories.tsx`
+- Updated `ui/src/App.tsx` to mount `StudioPage`.
+- Moved the shell orchestration that still existed in `StudioApp` into `StudioPage`, including:
+  - websocket connect and disconnect ownership
+  - source-grid handlers
+  - output-panel settings handlers
+  - mic-panel settings handlers
+  - local elapsed and disk simulation that still remains for now
+- Updated the Storybook introduction so it references `StudioPage` instead of `StudioApp`.
+- Ran:
+  - `pnpm --dir ui build`
+  - `pnpm --dir ui build-storybook`
+
+### Why
+
+- There should be exactly one mounted shell for the studio screen.
+- Keeping both shells alive would make every later cleanup step more expensive.
+- The page-level shell is the right place to centralize UI orchestration before deeper state cleanup.
+
+### What worked
+
+- `StudioPage` already had the right overall layout structure, so it was the natural surviving shell.
+- The migration was mostly a matter of moving handlers and ownership, not redesigning components.
+- Both the app build and the Storybook build passed after the consolidation.
+
+### What didn't work
+
+- Nothing failed hard in this slice, but Storybook still reports its existing large-chunk warnings and `eval` warnings from Storybook internals. Those are not regressions introduced by this slice.
+
+### What I learned
+
+- The shell duplication was making the codebase look more complex than it really is.
+- Once `StudioPage` became the mounted shell, the next cleanup steps became much easier to reason about.
+- There is still simulated session-adjacent behavior left in the surviving shell, which is the next thing to remove.
+
+### What warrants a second pair of eyes
+
+- Whether the remaining local elapsed and disk simulation should be removed immediately in the next slice or only as part of the larger state-model cleanup.
+- Whether the websocket client should keep its singleton wrapper now that ownership is clearly page-level.
+
+### What should be done in the future
+
+- Remove the remaining shell-level simulated runtime state.
+- Replace the shell’s current demo-oriented control behavior with backend-driven state.
+- Continue simplifying the store so the page is easier to reason about.
+
+### Code review instructions
+
+- Review:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/App.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/Introduction.mdx`
+- Confirm deletion of:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StudioApp.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/StudioApp.stories.tsx`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+rg -n "StudioApp|StudioPage" ui/src ui/.storybook ui/src/stories
+sed -n '1,240p' ui/src/App.tsx
+sed -n '1,220p' ui/src/pages/StudioPage.tsx
+sed -n '1,220p' ui/src/stories/Introduction.mdx
+pnpm --dir ui build
+pnpm --dir ui build-storybook
+```
