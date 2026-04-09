@@ -13,12 +13,20 @@ DocType: reference
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: go.mod
+      Note: Root module added in Step 3
     - Path: jank-prototype/dsl.md
       Note: Primary DSL evidence inspected during documentation
     - Path: jank-prototype/main.go
       Note: Primary backend evidence inspected during documentation
     - Path: jank-prototype/research.md
       Note: Platform research inspected during documentation
+    - Path: pkg/app/application.go
+      Note: Placeholder application boundary added in Step 3
+    - Path: pkg/cli/discovery/list.go
+      Note: Discovery list command skeleton added in Step 3
+    - Path: pkg/cli/root.go
+      Note: CLI skeleton added in Step 3
     - Path: ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/sources/local/screencast-studio-v2.jsx.jsx
       Note: Imported UI mock inspected during documentation
 ExternalSources: []
@@ -27,6 +35,7 @@ LastUpdated: 2026-04-09T13:12:49.194734392-04:00
 WhatFor: Chronological record of how the screencast studio architecture ticket was assembled and what evidence shaped the design.
 WhenToUse: Read when reviewing this ticket, continuing the documentation work, or checking what commands and sources were used.
 ---
+
 
 
 # Diary
@@ -163,7 +172,7 @@ Then, work on these tasks one by one, committing at appropriate intervals, keepi
 
 **Inferred user intent:** Reduce project risk by proving the underlying capture primitives from the terminal before investing effort in the control frontend.
 
-**Commit (code):** pending
+**Commit (code):** `9e194aa` — "docs: refocus screencast studio on cli milestone"
 
 ### What I did
 
@@ -221,3 +230,101 @@ Key edits were made to:
 - `ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/design-doc/01-screencast-studio-system-design.md`
 - `ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/tasks.md`
 - `ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/reference/01-diary.md`
+
+## Step 3: Establish The Root Module And CLI Skeleton
+
+This step created the first executable code for the new CLI-first direction. The goal was not to implement real discovery or recording yet, but to create the top-level module, root command tree, and Glazed wiring so the later implementation slices have a stable place to land.
+
+The result is a new root binary with `discovery`, `setup`, and `record` commands, plus a small application container that exposes the future service boundaries. At this point the commands compile and render help correctly, but the underlying discovery and compile methods still return `not implemented`.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 2)
+
+**Assistant interpretation:** Build the first implementation slice of the CLI milestone by establishing the root module and command plumbing before filling in real runtime behavior.
+
+**Inferred user intent:** Make the project executable from the repo root and reduce architectural thrash by proving the command structure first.
+
+**Commit (code):** `047d61c` — "feat: add cli-first screencast studio skeleton"
+
+### What I did
+
+- Created the root `go.mod` with Glazed, Cobra, and `pkg/errors`.
+- Added `cmd/screencast-studio/main.go`.
+- Added `pkg/app/application.go` as the first application boundary.
+- Added the root CLI and Glazed command helpers under `pkg/cli/`.
+- Added grouped commands for:
+  - `discovery list`
+  - `setup compile`
+  - `setup validate`
+  - `record`
+- Ran:
+  - `go mod tidy`
+  - `go mod download github.com/pkg/errors github.com/spf13/cobra github.com/go-go-golems/glazed`
+  - `go build ./...`
+  - `go run ./cmd/screencast-studio --help`
+  - `go run ./cmd/screencast-studio discovery list --help`
+  - `go run ./cmd/screencast-studio setup compile --help`
+  - `go run ./cmd/screencast-studio record --help`
+
+### Why
+
+- The repo previously had no top-level module, only `jank-prototype/go.mod`.
+- The command tree needed to exist before the deeper discovery and DSL work could be implemented cleanly.
+- Verifying help output early proves the Glazed wiring and flag layout without mixing in media-runtime debugging yet.
+
+### What worked
+
+- The local Glazed patterns from nearby repos transferred cleanly.
+- The root command now exposes the intended CLI surface.
+- `go build ./...` succeeds from the repo root.
+
+### What didn't work
+
+- The first `go build ./...` complained about missing `go.sum` entries even though `go mod tidy` had already run. Running `go mod download` for the direct dependencies resolved that.
+- `go run ./cmd/screencast-studio discovery list` still exits with `not implemented`, which is expected for this slice but confirms that the next task is real discovery logic.
+
+### What I learned
+
+- The CLI wiring is now stable enough that the next steps can focus on discovery and DSL behavior rather than Cobra or Glazed mechanics.
+- A root module plus command tree is a meaningful milestone in this repo because it moves active development out of the prototype submodule.
+
+### What was tricky to build
+
+- The main subtlety was committing only my files while leaving the user's staged prototype research files untouched. I handled that by committing only the new root-module and CLI paths explicitly.
+
+### What warrants a second pair of eyes
+
+- The initial module path choice: `github.com/wesen/2026-04-09--screencast-studio`.
+- Whether the temporary `pkg/app` placeholder should stay minimal or be replaced quickly by more domain-specific packages in the next slice.
+
+### What should be done in the future
+
+- Implement real structured discovery output next.
+- Replace the `not implemented` application methods with actual services.
+- Start extracting the DSL package immediately after discovery plumbing is in place.
+
+### Code review instructions
+
+- Start with:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/go.mod`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/cmd/screencast-studio/main.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/root.go`
+- Then inspect the command implementations under:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/discovery/`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/setup/`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/record.go`
+- Validate with:
+  - `go build ./...`
+  - `go run ./cmd/screencast-studio --help`
+
+### Technical details
+
+The current command status is:
+
+```text
+screencast-studio --help            -> works
+screencast-studio discovery list    -> wired, returns not implemented
+screencast-studio setup compile     -> wired
+screencast-studio record            -> wired
+```

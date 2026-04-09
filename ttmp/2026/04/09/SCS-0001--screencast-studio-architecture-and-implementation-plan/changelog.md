@@ -35,3 +35,14 @@ Re-scoped the ticket to a CLI-first milestone centered on discover, compile, and
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/reference/01-diary.md — Diary now records the scope shift and execution order
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/tasks.md — Detailed CLI-first milestone checklist added
 
+
+## 2026-04-09
+
+Added the root Go module and CLI skeleton with discovery, setup compile, setup validate, and record commands (commit 047d61c).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/go.mod — Top-level module established for the new implementation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/record.go — Record verb introduced in the CLI surface
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/root.go — Root command tree introduced
+

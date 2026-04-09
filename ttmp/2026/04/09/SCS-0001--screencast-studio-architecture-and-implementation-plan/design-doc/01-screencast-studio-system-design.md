@@ -13,6 +13,10 @@ DocType: design-doc
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: cmd/screencast-studio/main.go
+      Note: Root binary entrypoint for the new CLI
+    - Path: go.mod
+      Note: Root module for the new CLI-first implementation
     - Path: jank-prototype/dsl.md
       Note: Current DSL examples that motivate the intermediate spec
     - Path: jank-prototype/main.go
@@ -23,6 +27,10 @@ RelatedFiles:
       Note: Prototype frontend rendering and polling baseline
     - Path: jank-prototype/web/index.html
       Note: Prototype UI structure baseline
+    - Path: pkg/cli/record.go
+      Note: Top-level record command wiring
+    - Path: pkg/cli/root.go
+      Note: Root Glazed/Cobra command tree
     - Path: ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/sources/local/screencast-studio-v2.jsx.jsx
       Note: Imported UI mock defining the target control surface
 ExternalSources: []
@@ -31,6 +39,7 @@ LastUpdated: 2026-04-09T13:12:49.178772118-04:00
 WhatFor: Exhaustive architecture and implementation guide for the screencast studio backend, DSL, discovery, compile, and capture runtime, with web explicitly deferred.
 WhenToUse: Use when implementing the CLI-first recorder, reviewing the proposed architecture, or onboarding a new engineer to the project.
 ---
+
 
 
 # Screencast Studio System Design

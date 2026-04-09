@@ -12,7 +12,7 @@
 ## Current CLI-First Milestone
 
 - [x] Update the design doc to make `discover`, `compile`, and `record` the active milestone
-- [ ] Create a top-level Go module and root Glazed CLI
+- [x] Create a top-level Go module and root Glazed CLI
 - [ ] Implement `discovery list` with structured output for displays, windows, cameras, and audio devices
 - [ ] Extract the setup DSL into `pkg/dsl` with normalization and validation tests
 - [ ] Implement `setup compile --file <path>` and print a compiled execution plan
