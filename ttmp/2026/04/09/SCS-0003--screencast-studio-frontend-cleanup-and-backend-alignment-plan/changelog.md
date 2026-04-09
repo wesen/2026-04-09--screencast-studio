@@ -60,3 +60,13 @@ Wired the page’s compile and recording controls to the real backend mutations 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Page now compiles DSL and starts or stops recording through RTK Query mutations
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts — Editor slice now tracks compile warnings, compile errors, and compile loading state
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx — Transport controls now support a busy state during start and stop transitions
+
+## 2026-04-09
+
+Added a real ESLint configuration for the frontend workspace and verified that both lint and build now pass under `ui/`.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/.eslintrc.cjs — New ESLint configuration for the frontend workspace
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/.eslintignore — Ignore rules for generated and dependency directories
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/package.json — Existing lint script is now backed by a real config

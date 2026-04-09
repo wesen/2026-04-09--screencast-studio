@@ -518,3 +518,81 @@ sed -n '1,240p' ui/src/components/studio/OutputPanel.tsx
 pnpm --dir ui build
 pnpm --dir ui build-storybook
 ```
+
+## Step 6: Add Real Frontend Linting
+
+This step fixed the frontend hygiene gap where `ui/package.json` declared a lint command but the workspace had no ESLint configuration at all.
+
+The goal was not to build a perfect lint regime. The goal was to make the workspace honest: if `pnpm --dir ui lint` exists, it should work and enforce a reasonable baseline for the rest of the cleanup.
+
+### What I did
+
+- Confirmed the existing lint failure was caused by a missing ESLint config rather than rule violations.
+- Added:
+  - `ui/.eslintrc.cjs`
+  - `ui/.eslintignore`
+- Configured ESLint with:
+  - `eslint:recommended`
+  - `plugin:@typescript-eslint/recommended`
+  - `plugin:react-hooks/recommended`
+  - `react-refresh/only-export-components`
+- Ignored generated directories:
+  - `dist`
+  - `storybook-static`
+  - `node_modules`
+- Ran:
+  - `pnpm --dir ui lint`
+  - `pnpm --dir ui build`
+
+### Why
+
+- The workspace already claimed to support linting.
+- Without linting, the cleanup work can drift quickly and reviewers lose a low-cost validation step.
+- Adding linting before the later preview and source-model cleanup helps prevent avoidable regressions.
+
+### What worked
+
+- The frontend passed lint immediately once the baseline config existed.
+- No rule changes or source fixes were needed beyond the configuration itself.
+- The build stayed green after adding the lint setup.
+
+### What didn't work
+
+- Nothing failed beyond the original missing-config issue.
+
+### Exact original failure
+
+```text
+ESLint couldn't find a configuration file.
+```
+
+### What I learned
+
+- The main frontend hygiene problem at this point was missing infrastructure, not a large volume of actual lint violations.
+- The repo can now use lint as a real gate for later cleanup slices.
+
+### What warrants a second pair of eyes
+
+- Whether we want a stricter lint profile later, especially around `console.log`, unused exports, or import ordering.
+- Whether generated build output under `ui/dist` and `ui/storybook-static` should be removed from version control in a later cleanup slice.
+
+### What should be done in the future
+
+- Decide how generated frontend output should be handled in source control.
+- Consider adding frontend build and lint commands to CI once the main cleanup stabilizes.
+
+### Code review instructions
+
+- Review:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/.eslintrc.cjs`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/.eslintignore`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/package.json`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+pnpm --dir ui lint
+pnpm --dir ui build
+```

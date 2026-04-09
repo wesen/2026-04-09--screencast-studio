@@ -104,8 +104,8 @@ Acceptance criteria:
 
 ## Phase 8: Add Frontend Hygiene
 
-- [ ] Add an ESLint configuration under `ui/`.
-- [ ] Make `pnpm --dir ui lint` pass.
+- [x] Add an ESLint configuration under `ui/`.
+- [x] Make `pnpm --dir ui lint` pass.
 - [ ] Decide whether `ui/dist/` and `ui/storybook-static/` should remain checked in.
 - [ ] Add a short frontend validation checklist to the ticket diary or follow-on docs.
 
