@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/discovery"
+	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -19,6 +21,8 @@ func New() *Application {
 type CompileSummary struct {
 	File      string
 	SessionID string
+	Outputs   []dsl.PlannedOutput
+	Warnings  []string
 }
 
 func (a *Application) DiscoveryList(ctx context.Context, kind string) ([]map[string]any, error) {
@@ -100,8 +104,28 @@ func (a *Application) DiscoveryList(ctx context.Context, kind string) ([]map[str
 
 func (a *Application) CompileFile(ctx context.Context, file string) (*CompileSummary, error) {
 	_ = ctx
-	_ = file
-	return nil, ErrNotImplemented
+
+	body, err := dsl.LoadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := dsl.ParseAndNormalize(body)
+	if err != nil {
+		return nil, err
+	}
+
+	plan, err := dsl.BuildPlan(cfg, time.Now())
+	if err != nil {
+		return nil, err
+	}
+
+	return &CompileSummary{
+		File:      file,
+		SessionID: plan.SessionID,
+		Outputs:   append([]dsl.PlannedOutput(nil), plan.Outputs...),
+		Warnings:  append([]string(nil), plan.Warnings...),
+	}, nil
 }
 
 func (a *Application) RecordFile(ctx context.Context, file string) error {

@@ -2,6 +2,7 @@ package setup
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/fields"
@@ -53,9 +54,34 @@ func (c *compileCommand) RunIntoGlazeProcessor(ctx context.Context, vals *values
 		return err
 	}
 
-	return gp.AddRow(ctx, types.NewRow(
-		types.MRP("operation", "setup.compile"),
-		types.MRP("file", settings.File),
-		types.MRP("session_id", summary.SessionID),
-	))
+	if len(summary.Outputs) == 0 {
+		return gp.AddRow(ctx, types.NewRow(
+			types.MRP("operation", "setup.compile"),
+			types.MRP("file", settings.File),
+			types.MRP("session_id", summary.SessionID),
+			types.MRP("output_count", 0),
+			types.MRP("warning_count", len(summary.Warnings)),
+			types.MRP("warnings", strings.Join(summary.Warnings, "; ")),
+		))
+	}
+
+	for i, output := range summary.Outputs {
+		if err := gp.AddRow(ctx, types.NewRow(
+			types.MRP("operation", "setup.compile"),
+			types.MRP("file", settings.File),
+			types.MRP("session_id", summary.SessionID),
+			types.MRP("output_index", i),
+			types.MRP("output_count", len(summary.Outputs)),
+			types.MRP("warning_count", len(summary.Warnings)),
+			types.MRP("warnings", strings.Join(summary.Warnings, "; ")),
+			types.MRP("kind", output.Kind),
+			types.MRP("source_id", output.SourceID),
+			types.MRP("name", output.Name),
+			types.MRP("path", output.Path),
+		)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

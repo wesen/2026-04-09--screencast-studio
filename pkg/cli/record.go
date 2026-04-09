@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/fields"
@@ -61,6 +62,9 @@ func (c *recordCommand) RunIntoGlazeProcessor(ctx context.Context, vals *values.
 			types.MRP("operation", "record.dry-run"),
 			types.MRP("file", settings.File),
 			types.MRP("session_id", summary.SessionID),
+			types.MRP("output_count", len(summary.Outputs)),
+			types.MRP("warning_count", len(summary.Warnings)),
+			types.MRP("warnings", strings.Join(summary.Warnings, "; ")),
 			types.MRP("print_plan", settings.PrintPlan),
 		))
 	}
