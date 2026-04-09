@@ -643,3 +643,42 @@ Validate with:
 cd ui && pnpm storybook
 # Open http://localhost:6006
 ```
+
+---
+
+## Step 8: Add Page Components and Loading States
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok continue. Don't forget to check tasks off and make stories for pages too."
+
+**Assistant interpretation:** Continue with Phase 8-9, add DSLEditor, LogPanel, loading/error/empty states, and StudioPage with stories.
+
+**Inferred user intent:** Complete the main operator screen and add comprehensive stories.
+
+**Commit (code):** `86576d9` — "ui: add DSLEditor, LogPanel, loading/error/empty states, and StudioPage"
+
+### What I did
+
+1. Added DSLEditor component for raw YAML debugging
+2. Added LogPanel component for session log viewing
+3. Added LoadingState, ErrorState, EmptyState common components
+4. Created StudioPage with Studio/Logs/Raw DSL tabs
+5. Added stories for all new components
+6. Checked off Phase 7-9 tasks via docmgr
+
+### Why
+
+The acceptance criteria for Phase 8 requires "raw DSL or compile output somewhere for debugging". The DSLEditor provides this. Loading states are needed for async panels per Phase 9.
+
+### What worked
+
+- All new components have proper TypeScript types
+- Stories cover default, loading, error, and empty states
+- StudioPage brings all components together with tab navigation
+
+### What should be done in the future
+
+- Phase 10: Connect UI to recording and preview flows
+- Phase 11: Production packaging with Go embed
+- Phase 12: Testing and validation

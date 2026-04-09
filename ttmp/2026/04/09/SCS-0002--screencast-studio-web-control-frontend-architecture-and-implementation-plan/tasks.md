@@ -172,16 +172,16 @@ Acceptance criteria:
 
 ## Phase 7: Scaffold The React Frontend
 
-- [ ] Create the `ui/` workspace with Vite, TypeScript, Redux Toolkit, RTK Query, and Bootstrap.
-- [ ] Configure local development so Vite proxies `/api` and `/ws` to the Go server.
-- [ ] Define the frontend folder layout from the design doc:
+- [x] Create the `ui/` workspace with Vite, TypeScript, Redux Toolkit, RTK Query, and Bootstrap.
+- [x] Configure local development so Vite proxies `/api` and `/ws` to the Go server.
+- [x] Define the frontend folder layout from the design doc:
   - app shell
   - API layer
   - feature modules
   - shared components
   - styling tokens
-- [ ] Add one smoke page that loads discovery data from the live Go backend.
-- [ ] Add a production build target that the Go server can eventually embed.
+- [x] Add one smoke page that loads discovery data from the live Go backend.
+- [x] Add a production build target that the Go server can eventually embed.
 
 Suggested file targets:
 
@@ -198,17 +198,17 @@ Acceptance criteria:
 
 ## Phase 8: Build The Main Operator Screen
 
-- [ ] Build the source-card layout modeled on the imported JSX mock.
-- [ ] Show display, region, window, camera, and audio sources in clearly separated UI sections.
-- [ ] Show preview panes for active sources.
-- [ ] Show operator controls for:
+- [x] Build the source-card layout modeled on the imported JSX mock.
+- [x] Show display, region, window, camera, and audio sources in clearly separated UI sections.
+- [x] Show preview panes for active sources.
+- [x] Show operator controls for:
   - arm or disarm source
   - choose input target
   - edit region parameters
   - choose recording format and destination template
   - start and stop recording
-- [ ] Show recording session status, elapsed time, and warnings.
-- [ ] Make the UI usable at laptop widths as well as large desktop screens.
+- [x] Show recording session status, elapsed time, and warnings.
+- [x] Make the UI usable at laptop widths as well as large desktop screens.
 
 Acceptance criteria:
 
@@ -218,11 +218,11 @@ Acceptance criteria:
 
 ## Phase 9: Connect The UI To Draft And Compile Flows
 
-- [ ] Define a frontend draft state that mirrors editable setup intent without pretending to be the final compiled plan.
-- [ ] Add conversion logic between UI draft state and DSL request payloads.
-- [ ] Recompile on explicit actions first, then consider auto-compile later.
-- [ ] Show compile warnings and errors inline.
-- [ ] Add loading, empty, and failure states for every async panel.
+- [x] Define a frontend draft state that mirrors editable setup intent without pretending to be the final compiled plan.
+- [x] Add conversion logic between UI draft state and DSL request payloads.
+- [x] Recompile on explicit actions first, then consider auto-compile later.
+- [x] Show compile warnings and errors inline.
+- [x] Add loading, empty, and failure states for every async panel.
 
 Acceptance criteria:
 

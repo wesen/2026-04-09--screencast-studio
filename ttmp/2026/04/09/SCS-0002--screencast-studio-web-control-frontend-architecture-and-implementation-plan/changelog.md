@@ -73,3 +73,8 @@ Implemented Phase 7 (scaffold the React frontend): created ui/ workspace with Vi
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/sessionSlice.ts — Session state management
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/studio-draft/studioDraftSlice.ts — Draft state management
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/styles/tokens.css — CSS design tokens
+
+## 2026-04-09
+
+Phase 8: Built main operator screen with source cards, preview panes, and recording controls (commit 86576d9)
+
