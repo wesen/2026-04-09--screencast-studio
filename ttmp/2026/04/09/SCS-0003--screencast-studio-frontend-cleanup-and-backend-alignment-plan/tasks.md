@@ -46,8 +46,8 @@ Acceptance criteria:
 
 ## Phase 4: Replace Demo State With Real State
 
-- [ ] Audit `ui/src/features/studio-draft/studioDraftSlice.ts` and `ui/src/features/session/sessionSlice.ts`.
-- [ ] Decide which state is truly UI-owned and which state should come from backend queries or websocket events.
+- [x] Audit `ui/src/features/studio-draft/studioDraftSlice.ts` and `ui/src/features/session/sessionSlice.ts`.
+- [x] Decide which state is truly UI-owned and which state should come from backend queries or websocket events.
 - [ ] Create or refactor slices around:
   - editor DSL text
   - discovery snapshot
@@ -55,7 +55,7 @@ Acceptance criteria:
   - preview descriptors
   - websocket connectivity
   - UI-only tab and panel state
-- [ ] Remove simulated elapsed time, mic level, and disk growth from the mounted shell.
+- [x] Remove simulated elapsed time, mic level, and disk growth from the mounted shell.
 
 Acceptance criteria:
 
@@ -129,7 +129,7 @@ Acceptance criteria:
 
 - [x] Commit 1: transport types and endpoint cleanup
 - [x] Commit 2: mounted shell consolidation
-- [ ] Commit 3: state model cleanup
+- [x] Commit 3: state model cleanup
 - [ ] Commit 4: websocket and preview cleanup
 - [ ] Commit 5: mocks, linting, and dead-code deletion
 

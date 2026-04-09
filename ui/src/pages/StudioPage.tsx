@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useGetCurrentSessionQuery } from '@/api/recordingApi';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { selectDslText, setDslText } from '@/features/editor/editorSlice';
 import {
   addSource,
   removeSource,
@@ -14,9 +16,11 @@ import {
   setQuality,
   updateSource,
 } from '@/features/studio-draft/studioDraftSlice';
+import { selectActiveTab, setActiveTab, type StudioTab } from '@/features/studio-ui/studioUiSlice';
 import {
   selectSession,
   selectLogs,
+  setSession,
   selectWsConnected,
 } from '@/features/session/sessionSlice';
 import { getWsClient } from '@/features/session/wsClient';
@@ -25,11 +29,20 @@ import { LogPanel } from '@/components/log-panel';
 import { DSLEditor } from '@/components/dsl-editor';
 import { Btn } from '@/components/primitives/Btn';
 
-type Tab = 'studio' | 'logs' | 'raw';
-
 interface StudioPageProps {
   className?: string;
 }
+
+const parseTimestamp = (value?: string): number | null => {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+  return parsed;
+};
 
 export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const dispatch = useAppDispatch();
@@ -38,35 +51,20 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const session = useAppSelector(selectSession);
   const logs = useAppSelector(selectLogs);
   const wsConnected = useAppSelector(selectWsConnected);
-
-  const [activeTab, setActiveTab] = useState<Tab>('studio');
-  const [isPaused, setIsPaused] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [diskPercent, setDiskPercent] = useState(8);
-  const [dslText, setDslText] = useState(`schema: recorder.config/v1
-session_id: demo
-destination_templates:
-  video: recordings/{session_id}/{name}.mov
-video_sources:
-  - id: desktop-1
-    name: Full Desktop
-    type: display
-    target:
-      display: display-1
-    settings:
-      capture:
-        fps: 24
-      output:
-        container: mov
-        video_codec: h264
-        quality: 75
-audio_sources:
-  - id: mic-1
-    name: Built-in Mic
-    device: default
-`);
+  const activeTab = useAppSelector(selectActiveTab);
+  const dslText = useAppSelector(selectDslText);
+  const [now, setNow] = useState(() => Date.now());
+  const { data: currentSessionData } = useGetCurrentSessionQuery();
 
   const isRecording = session.active && session.state === 'running';
+  const isPaused = false;
+  const diskPercent = 8;
+
+  useEffect(() => {
+    if (currentSessionData?.session) {
+      dispatch(setSession(currentSessionData.session));
+    }
+  }, [currentSessionData, dispatch]);
 
   useEffect(() => {
     const wsClient = getWsClient(dispatch);
@@ -78,29 +76,28 @@ audio_sources:
   }, [dispatch]);
 
   useEffect(() => {
-    if (!isRecording || isPaused) {
+    const startedAt = parseTimestamp(session.started_at);
+    if (!isRecording || startedAt === null) {
       return;
     }
 
     const id = setInterval(() => {
-      setElapsed((prev) => prev + 1);
+      setNow(Date.now());
     }, 1000);
 
     return () => clearInterval(id);
-  }, [isPaused, isRecording]);
+  }, [isRecording, session.started_at]);
 
-  useEffect(() => {
-    if (!isRecording) {
-      setDiskPercent(8);
-      return;
+  const elapsed = useMemo(() => {
+    const startedAt = parseTimestamp(session.started_at);
+    if (startedAt === null) {
+      return 0;
     }
 
-    const id = setInterval(() => {
-      setDiskPercent((prev) => Math.min(95, prev + 0.2 * armedSources.length));
-    }, 1000);
-
-    return () => clearInterval(id);
-  }, [armedSources.length, isRecording]);
+    const finishedAt = parseTimestamp(session.finished_at);
+    const end = finishedAt ?? now;
+    return Math.max(0, Math.floor((end - startedAt) / 1000));
+  }, [now, session.finished_at, session.started_at]);
 
   const outputSettings = useAppSelector((state) => ({
     format: state.studioDraft.format,
@@ -118,13 +115,8 @@ audio_sources:
 
   const handleToggleRecording = () => {
     if (isRecording) {
-      setIsPaused(false);
-      setElapsed(0);
+      return;
     }
-  };
-
-  const handleTogglePause = () => {
-    setIsPaused(!isPaused);
   };
 
   return (
@@ -149,7 +141,7 @@ audio_sources:
           <Btn
             key={tab}
             active={activeTab === tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => dispatch(setActiveTab(tab as StudioTab))}
             style={{ fontSize: 9, padding: '2px 8px' }}
           >
             {tab === 'studio' ? 'Studio' : tab === 'logs' ? 'Logs' : 'Raw DSL'}
@@ -192,6 +184,7 @@ audio_sources:
                 multiTrack={outputSettings.multiTrack}
                 isRecording={isRecording}
                 isPaused={isPaused}
+                pauseSupported={false}
                 elapsed={elapsed}
                 armedCount={armedSources.length}
                 onFormatChange={(value) => dispatch(setFormat(value))}
@@ -200,7 +193,7 @@ audio_sources:
                 onAudioChange={(value) => dispatch(setAudio(value))}
                 onMultiTrackChange={(value) => dispatch(setMultiTrack(value))}
                 onToggleRecording={handleToggleRecording}
-                onTogglePause={handleTogglePause}
+                onTogglePause={() => {}}
               />
 
               <div className="studio-panel-stack">
@@ -231,7 +224,7 @@ audio_sources:
         {activeTab === 'raw' && (
           <DSLEditor
             value={dslText}
-            onChange={setDslText}
+            onChange={(value) => dispatch(setDslText(value))}
             onCompile={() => console.log('compile', dslText)}
             isCompiling={false}
             warnings={session.warnings}

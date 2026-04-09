@@ -38,3 +38,15 @@ Completed the mounted-shell consolidation by making `StudioPage` the app entrypo
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/App.tsx — App now mounts the surviving shell directly
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — StudioPage now owns the top-level shell orchestration
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/Introduction.mdx — Storybook introduction now points at StudioPage
+
+## 2026-04-09
+
+Started the deeper state cleanup by moving DSL text and page tab state into explicit slices, seeding session state from the real current-session query, deriving elapsed time from backend timestamps, and removing the fake shell-level elapsed and disk-growth timers.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts — New editor-owned DSL state
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/studio-ui/studioUiSlice.ts — New UI-owned tab state
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/app/store.ts — Store now includes the new page-level state slices
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Page now uses backend-seeded session state and explicit slices instead of local timers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx — Pause control can now be explicitly disabled when unsupported

@@ -334,3 +334,95 @@ sed -n '1,220p' ui/src/stories/Introduction.mdx
 pnpm --dir ui build
 pnpm --dir ui build-storybook
 ```
+
+## Step 4: Move Page State Into Explicit Slices And Remove Fake Runtime Timers
+
+This step began the deeper state cleanup. The main goal was to stop treating the page shell as a small self-contained app with its own fake runtime timers and instead make the page consume more explicit state.
+
+The biggest changes in this step were:
+
+- creating an editor slice for DSL text
+- creating a studio UI slice for active tab state
+- wiring `StudioPage` to read those slices instead of owning that state locally
+- seeding the session slice from the real `/api/recordings/current` query
+- replacing the fake elapsed timer with a value derived from `session.started_at` and `session.finished_at`
+- removing the fake disk growth interval and the page-local pause state
+
+This is not the full state cleanup yet. `studioDraftSlice.ts` still exists and still drives the source-card model. But the page is now materially less demo-driven than it was before this step.
+
+### What I did
+
+- Added:
+  - `ui/src/features/editor/editorSlice.ts`
+  - `ui/src/features/studio-ui/studioUiSlice.ts`
+- Updated `ui/src/app/store.ts` to include the new reducers.
+- Updated `ui/src/pages/StudioPage.tsx` to:
+  - use Redux-backed DSL text
+  - use Redux-backed active-tab state
+  - query the current recording session via RTK Query
+  - dispatch `setSession(...)` when current session data arrives
+  - derive elapsed time from backend timestamps instead of incrementing a fake counter
+  - stop simulating disk usage growth and local pause behavior
+- Updated `ui/src/components/studio/OutputPanel.tsx` to support a disabled pause control when the backend does not support pause.
+- Updated `ui/src/stories/StudioPage.stories.tsx` so Storybook provides the new reducers.
+- Ran:
+  - `pnpm --dir ui build`
+  - `pnpm --dir ui build-storybook`
+
+### Why
+
+- `dslText` and active tab are genuinely UI-owned state and should live in explicit frontend state, not as incidental local variables in the page.
+- `elapsed` is derived from real session timestamps, so the page should compute it from backend data rather than inventing it locally.
+- The backend does not currently support pause, so keeping a fake page-level pause toggle was misleading.
+- This cleanup sets up the next slice, where more of the remaining demo state can be replaced with backend-driven behavior.
+
+### What worked
+
+- The new slices fit naturally into the existing store.
+- Moving DSL text and active-tab state out of the component reduced the page’s local ambiguity.
+- Deriving elapsed from session timestamps removed a fake behavior without requiring a large component rewrite.
+- Both the app build and Storybook build remained green after the change.
+
+### What didn't work
+
+- Storybook still emits the same pre-existing large-chunk and `eval` warnings from its build pipeline. Those warnings are not caused by this slice, but they remain visible in validation output.
+
+### What I learned
+
+- The easiest demo behaviors to remove are the ones that can be replaced by derived values, not by whole new backend APIs.
+- `StudioPage` is now a better place to continue cleanup because its local state is shrinking.
+- The next major state cleanup question is what to do with `studioDraftSlice.ts`, which still mixes real settings controls with a synthetic source model.
+
+### What warrants a second pair of eyes
+
+- Whether `sessionSlice.ts` should own the current-session query result more directly instead of being updated from the page.
+- Whether `studioDraftSlice.ts` should be split into a UI-only settings slice and a source-model slice, or retired more aggressively once discovery-backed sources land.
+
+### What should be done in the future
+
+- Continue replacing the synthetic source model with backend-aligned source and preview state.
+- Wire real start/stop recording actions through the page now that the transport layer and page shell are in better shape.
+- Revisit the WebSocket client singleton and preview ownership after the recording controls are real.
+
+### Code review instructions
+
+- Review the new slices:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/studio-ui/studioUiSlice.ts`
+- Review the page/store integration:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/app/store.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/StudioPage.stories.tsx`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+sed -n '1,220p' ui/src/pages/StudioPage.tsx
+sed -n '1,220p' ui/src/app/store.ts
+sed -n '1,260p' ui/src/stories/OutputPanel.stories.tsx
+pnpm --dir ui build
+pnpm --dir ui build-storybook
+```
