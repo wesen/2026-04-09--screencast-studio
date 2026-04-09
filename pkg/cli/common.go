@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"time"
+
 	"github.com/go-go-golems/glazed/pkg/cli"
 	"github.com/go-go-golems/glazed/pkg/cmds"
 	"github.com/go-go-golems/glazed/pkg/cmds/schema"
@@ -28,4 +30,11 @@ func buildCobra(command cmds.Command) (*cobra.Command, error) {
 			MiddlewaresFunc:   cli.CobraCommandDefaultMiddlewares,
 		}),
 	)
+}
+
+func durationSeconds(seconds int) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
 }

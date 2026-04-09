@@ -39,7 +39,7 @@ RelatedFiles:
       Note: Imported mock used as the visual and product target for the web ticket
 ExternalSources: []
 Summary: Chronological record of how the second ticket for the web control frontend was created and documented.
-LastUpdated: 2026-04-09T15:26:00-04:00
+LastUpdated: 2026-04-09T16:02:00-04:00
 WhatFor: Track how the web-control frontend ticket was assembled, what evidence was used, and how to review the resulting design deliverables.
 WhenToUse: Read when continuing the frontend ticket, reviewing design provenance, or checking the exact repo evidence behind the recommendations.
 ---
@@ -222,3 +222,67 @@ Files edited in this step:
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/tasks.md`
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/changelog.md`
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/reference/01-diary.md`
+
+## Step 3: Implement Phase 1 With A Real Serve Command And Server Shell
+
+This step created the actual Go server shell for the web ticket. The goal was not to add business logic yet. It was to establish the long-lived HTTP process, graceful shutdown behavior, root command wiring, and the minimal route skeleton that later phases can extend safely.
+
+The key architectural choice was to put the transport boundary in `internal/web` rather than embedding handlers into `pkg/app` or the CLI package. That keeps `pkg/app` as the domain-facing application boundary while letting the web layer own HTTP concerns such as routing, response serialization, and server lifecycle.
+
+### What I did
+
+- Added `internal/web/server.go` with:
+  - server config
+  - `NewServer(...)`
+  - `ListenAndServe(...)`
+  - graceful shutdown driven by context cancellation
+- Added `internal/web/routes.go` with:
+  - `/api/healthz`
+  - `/ws` placeholder
+  - `/` placeholder
+- Added a glazed `serve` command in `pkg/cli/serve.go`.
+- Wired `serve` into the root command in `pkg/cli/root.go`.
+- Added small duration conversion support in `pkg/cli/common.go`.
+- Added handler tests in `internal/web/server_test.go`.
+- Verified:
+  - `go test ./internal/web ./pkg/cli`
+  - `go build ./...`
+
+### Why
+
+- The later API and preview phases need a stable server package first.
+- Graceful shutdown needs to be correct before long-lived recording or preview workers exist.
+- The route skeleton makes it possible to layer handlers incrementally rather than writing one large, difficult-to-review patch.
+
+### What worked
+
+- The existing glazed command structure made it straightforward to add `serve` without disturbing the current CLI commands.
+- The app boundary was already thin enough that the server could depend on `pkg/app` immediately.
+- A focused route test provided a quick sanity check before any complex transport logic was added.
+
+### What didn't work
+
+- The first version of `serve` inherited the caller context directly, which would not have given clean Ctrl-C shutdown behavior. That had to be corrected by wrapping the command in `signal.NotifyContext(...)`, mirroring the existing `record` command.
+
+### What I learned
+
+- The cleanest first web milestone is not “add discovery handlers.” It is “make the server lifecycle boring and correct.” That reduces risk when later phases introduce long-running goroutines.
+
+### What warrants a second pair of eyes
+
+- Whether the placeholder `/` behavior should stay as a simple HTML response until the frontend exists or whether it should become a stricter 404 in API-only mode.
+- Whether server config should gain explicit static-mode enums once the embedded frontend phase starts.
+
+### Technical details
+
+Files added in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/routes.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/serve.go`
+
+Files updated in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/root.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/common.go`

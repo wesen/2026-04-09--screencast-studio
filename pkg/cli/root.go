@@ -52,5 +52,15 @@ func NewRootCommand() (*cobra.Command, error) {
 	}
 	rootCmd.AddCommand(recordCobra)
 
+	serveCmd, err := newServeCommand(application)
+	if err != nil {
+		return nil, errors.Wrap(err, "create serve command")
+	}
+	serveCobra, err := buildCobra(serveCmd)
+	if err != nil {
+		return nil, errors.Wrap(err, "build serve cobra command")
+	}
+	rootCmd.AddCommand(serveCobra)
+
 	return rootCmd, nil
 }

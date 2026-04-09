@@ -44,16 +44,16 @@ Acceptance criteria:
 
 ## Phase 1: Add The Server Shell In Go
 
-- [ ] Create the backend web package layout described in the design doc.
-- [ ] Add an HTTP server entrypoint that lives alongside the current CLI instead of replacing it.
-- [ ] Add a `serve` CLI command using glazed command patterns.
-- [ ] Define server configuration fields for:
+- [x] Create the backend web package layout described in the design doc.
+- [x] Add an HTTP server entrypoint that lives alongside the current CLI instead of replacing it.
+- [x] Add a `serve` CLI command using glazed command patterns.
+- [x] Define server configuration fields for:
   - bind address
   - static asset mode for development versus embedded production assets
   - log level
   - preview limits
-- [ ] Wire the `serve` command into the existing application boundary rather than bypassing `pkg/app`.
-- [ ] Serve a minimal JSON health endpoint and a placeholder WebSocket endpoint before adding business logic.
+- [x] Wire the `serve` command into the existing application boundary rather than bypassing `pkg/app`.
+- [x] Serve a minimal JSON health endpoint and a placeholder WebSocket endpoint before adding business logic.
 
 Suggested file targets:
 
