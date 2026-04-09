@@ -8,6 +8,8 @@ import (
 
 func BuildPlan(cfg *EffectiveConfig, now time.Time) (*CompiledPlan, error) {
 	outputs := []PlannedOutput{}
+	videoJobs := []VideoJob{}
+	audioJobs := []AudioMixJob{}
 
 	for _, src := range cfg.VideoSources {
 		if !src.Enabled {
@@ -30,6 +32,10 @@ func BuildPlan(cfg *EffectiveConfig, now time.Time) (*CompiledPlan, error) {
 			SourceID: src.ID,
 			Name:     src.Name,
 			Path:     outPath,
+		})
+		videoJobs = append(videoJobs, VideoJob{
+			Source:     src,
+			OutputPath: outPath,
 		})
 	}
 
@@ -72,6 +78,12 @@ func BuildPlan(cfg *EffectiveConfig, now time.Time) (*CompiledPlan, error) {
 			Name: "audio-mix",
 			Path: outPath,
 		})
+		audioJobs = append(audioJobs, AudioMixJob{
+			Name:       "audio-mix",
+			Sources:    append([]EffectiveAudioSource(nil), enabledAudio...),
+			Output:     cfg.AudioOutput,
+			OutputPath: outPath,
+		})
 	}
 
 	if len(outputs) == 0 {
@@ -80,6 +92,8 @@ func BuildPlan(cfg *EffectiveConfig, now time.Time) (*CompiledPlan, error) {
 
 	return &CompiledPlan{
 		SessionID: cfg.SessionID,
+		VideoJobs: videoJobs,
+		AudioJobs: audioJobs,
 		Outputs:   outputs,
 		Warnings:  append([]string(nil), cfg.Warnings...),
 	}, nil

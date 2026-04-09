@@ -121,8 +121,22 @@ type PlannedOutput struct {
 	Path     string `json:"path"`
 }
 
+type VideoJob struct {
+	Source     EffectiveVideoSource `json:"source"`
+	OutputPath string               `json:"output_path"`
+}
+
+type AudioMixJob struct {
+	Name       string                 `json:"name"`
+	Sources    []EffectiveAudioSource `json:"sources"`
+	Output     AudioOutputSettings    `json:"output"`
+	OutputPath string                 `json:"output_path"`
+}
+
 type CompiledPlan struct {
 	SessionID string          `json:"session_id"`
+	VideoJobs []VideoJob      `json:"video_jobs"`
+	AudioJobs []AudioMixJob   `json:"audio_jobs"`
 	Outputs   []PlannedOutput `json:"outputs"`
 	Warnings  []string        `json:"warnings"`
 }

@@ -33,6 +33,8 @@ func TestBuildPlanProducesOutputs(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, plan.Outputs, 5)
+	require.Len(t, plan.VideoJobs, 4)
+	require.Len(t, plan.AudioJobs, 1)
 	require.Equal(t, "demo", plan.SessionID)
 	require.Contains(t, plan.Outputs[0].Path, "recordings/demo")
 }

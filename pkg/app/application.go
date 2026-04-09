@@ -2,15 +2,15 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/discovery"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
+	"github.com/wesen/2026-04-09--screencast-studio/pkg/recording"
 )
-
-var ErrNotImplemented = errors.New("not implemented")
 
 type Application struct{}
 
@@ -23,6 +23,22 @@ type CompileSummary struct {
 	SessionID string
 	Outputs   []dsl.PlannedOutput
 	Warnings  []string
+}
+
+type RecordOptions struct {
+	GracePeriod time.Duration
+	MaxDuration time.Duration
+}
+
+type RecordSummary struct {
+	File       string
+	SessionID  string
+	State      string
+	Reason     string
+	Outputs    []dsl.PlannedOutput
+	Warnings   []string
+	StartedAt  time.Time
+	FinishedAt time.Time
 }
 
 func (a *Application) DiscoveryList(ctx context.Context, kind string) ([]map[string]any, error) {
@@ -96,7 +112,7 @@ func (a *Application) DiscoveryList(ctx context.Context, kind string) ([]map[str
 	}
 
 	if kind != "all" && kind != "display" && kind != "window" && kind != "camera" && kind != "audio" {
-		return nil, errors.Errorf("unsupported discovery kind %q", kind)
+		return nil, fmt.Errorf("unsupported discovery kind %q", kind)
 	}
 
 	return rows, nil
@@ -104,18 +120,7 @@ func (a *Application) DiscoveryList(ctx context.Context, kind string) ([]map[str
 
 func (a *Application) CompileFile(ctx context.Context, file string) (*CompileSummary, error) {
 	_ = ctx
-
-	body, err := dsl.LoadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg, err := dsl.ParseAndNormalize(body)
-	if err != nil {
-		return nil, err
-	}
-
-	plan, err := dsl.BuildPlan(cfg, time.Now())
+	plan, err := a.compileFileAt(file, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +133,52 @@ func (a *Application) CompileFile(ctx context.Context, file string) (*CompileSum
 	}, nil
 }
 
-func (a *Application) RecordFile(ctx context.Context, file string) error {
-	_ = ctx
-	_ = file
-	return ErrNotImplemented
+func (a *Application) RecordFile(ctx context.Context, file string, options RecordOptions) (*RecordSummary, error) {
+	plan, err := a.compileFileAt(file, time.Now())
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := recording.Run(ctx, plan, recording.RunOptions{
+		GracePeriod: options.GracePeriod,
+		MaxDuration: options.MaxDuration,
+		Logger: func(format string, args ...any) {
+			log.Info().Msgf(format, args...)
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &RecordSummary{
+		File:       file,
+		SessionID:  plan.SessionID,
+		State:      string(result.State),
+		Reason:     result.Reason,
+		Outputs:    append([]dsl.PlannedOutput(nil), plan.Outputs...),
+		Warnings:   append([]string(nil), plan.Warnings...),
+		StartedAt:  result.StartedAt,
+		FinishedAt: result.FinishedAt,
+	}, nil
+}
+
+func (a *Application) compileFileAt(file string, now time.Time) (*dsl.CompiledPlan, error) {
+	body, err := dsl.LoadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := dsl.ParseAndNormalize(body)
+	if err != nil {
+		return nil, err
+	}
+
+	plan, err := dsl.BuildPlan(cfg, now)
+	if err != nil {
+		return nil, err
+	}
+	if len(plan.Outputs) == 0 {
+		return nil, fmt.Errorf("compiled plan for %s produced no outputs", file)
+	}
+	return plan, nil
 }
