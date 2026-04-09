@@ -66,3 +66,14 @@ Extracted the setup DSL into `pkg/dsl` and replaced the compile stub with a real
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/normalize.go — DSL normalization and validation rules
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/compile.go — Compiled output manifest generation
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/setup/compile.go — Structured CLI rendering of compiled outputs
+
+
+## 2026-04-09
+
+Introduced a formal recording session state machine, added FFmpeg stdout/stderr capture, and stored ticket-local smoke repro scripts for the recording runtime investigation.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/session.go — Explicit session states and transition helpers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/run.go — Event-driven runtime coordination around the session state machine
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/scripts/smoke-record-region.sh — Ticket-local CLI smoke repro

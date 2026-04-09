@@ -37,11 +37,17 @@ RelatedFiles:
       Note: DSL-to-plan compilation added in Step 5
     - Path: pkg/dsl/normalize.go
       Note: DSL normalization and validation added in Step 5
+    - Path: pkg/recording/ffmpeg.go
+      Note: FFmpeg builders and stdout/stderr capture added in Step 6
+    - Path: pkg/recording/run.go
+      Note: Recording runtime refactored around an explicit session state machine in Step 6
+    - Path: pkg/recording/session.go
+      Note: Formal recording session states and transition helpers added in Step 6
     - Path: ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/sources/local/screencast-studio-v2.jsx.jsx
       Note: Imported UI mock inspected during documentation
 ExternalSources: []
 Summary: Chronological record of how the screencast studio architecture ticket, supporting docs, and delivery bundle were created.
-LastUpdated: 2026-04-09T13:12:49.194734392-04:00
+LastUpdated: 2026-04-09T14:53:43.000000000-04:00
 WhatFor: Chronological record of how the screencast studio architecture ticket was assembled and what evidence shaped the design.
 WhenToUse: Read when reviewing this ticket, continuing the documentation work, or checking what commands and sources were used.
 ---
@@ -541,4 +547,130 @@ recordings/demo/Browser Window.mov
 recordings/demo/Top Left Region.mov
 recordings/demo/Webcam.mov
 recordings/demo/audio-mix.wav
+```
+
+## Step 6: Introduce A Formal Recording Session State Machine
+
+This step replaced the implicit runtime lifecycle with an explicit recording session state machine and used that refactor to make the `record` command much easier to reason about. The recording package now owns concrete session states, event handling, and shutdown ownership instead of spreading those decisions across context branches and worker waiters.
+
+The practical result is better than just cleaner code. The runtime no longer truncates bounded runs to zero-byte outputs by sending a stop request at the exact same moment FFmpeg is supposed to end naturally. Bounded runs now let FFmpeg own the nominal duration through `-t`, while Go only uses a later hard-timeout as a fallback if the worker fails to exit.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, make a formal state machine. Make an implementation / architecture guide in the ticket to clearly document it, then implement it and see if that makes handling the situation better / more robust / more clear."
+
+**Assistant interpretation:** Document the recording lifecycle as a formal state machine in the ticket, then refactor the runtime to use explicit states and validate whether that clarifies and improves shutdown behavior.
+
+**Inferred user intent:** Replace hand-wavy runtime coordination with a precise, reviewable lifecycle model that makes future debugging and frontend integration safer.
+
+**Commit (code):** Pending at the time of this diary entry
+
+### What I did
+
+- Extended the ticket design doc with a formal recording session state machine:
+  - explicit states
+  - explicit events
+  - legal transition table
+  - ownership rules
+  - session pseudocode
+- Added `pkg/recording/session.go` with:
+  - `SessionState`
+  - session event types
+  - transition helper
+  - process tracking helpers
+- Refactored `pkg/recording/run.go` so the runtime now:
+  - creates a `Session`
+  - transitions from `starting` to `running`
+  - reacts to worker exits, cancellation, and hard timeouts as events
+  - transitions into `stopping`, `finished`, or `failed`
+- Changed bounded-run policy so FFmpeg owns the nominal duration via `-t`, and Go only triggers a later hard-timeout fallback.
+- Added stdout capture alongside stderr capture for FFmpeg worker processes.
+- Added a startup log line with the exact FFmpeg argv used for each worker.
+- Added ticket-local repro scripts under:
+  - `ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/scripts/`
+- Validated with:
+  - `go test ./...`
+  - `go build ./...`
+  - `./ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/scripts/smoke-record-region.sh`
+  - `TIMEFMT='%E'; time ./ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/scripts/direct-ffmpeg-region-smoke.sh /tmp/direct-smoke-runtime-check.mkv`
+
+### Why
+
+- The previous runtime had the right components but the wrong abstraction level. It coordinated contexts, worker goroutines, and graceful stop logic without naming the actual lifecycle states.
+- A formal state machine is a better fit for a recorder because the system needs to distinguish:
+  - natural bounded completion
+  - unexpected worker exit
+  - user interrupt
+  - hard-timeout fallback
+- The explicit state model will also be the right shape for the eventual web control surface because a frontend can subscribe to session state changes much more naturally than to opaque goroutine behavior.
+
+### What worked
+
+- The new state machine made the runtime flow much easier to read and reason about.
+- The zero-byte bounded-recording failure was eliminated once the runtime stopped sending `q` exactly when the nominal duration elapsed.
+- The `record` command now returns a `final_state` and `state_reason`.
+- Capturing both stdout and stderr confirmed that stderr is the relevant stream for FFmpeg diagnostics on this path.
+
+### What didn't work
+
+- Even after the runtime semantics were corrected, the one-second X11 smoke capture still took about five to six seconds of wall-clock time to complete.
+- The key validation result is that this timing behavior reproduced in a direct FFmpeg call outside the runtime:
+
+```text
+TIMEFMT='%E'; time ./.../direct-ffmpeg-region-smoke.sh /tmp/direct-smoke-runtime-check.mkv
+...
+5.57s
+```
+
+- That means the remaining wall-clock delay is not a state-machine bug in the recorder. It appears to be an FFmpeg/X11 behavior on this host.
+
+### What I learned
+
+- The formal state machine absolutely improved robustness and clarity even though it did not change the host-level FFmpeg timing.
+- The most important runtime insight was separating:
+  - bounded natural completion
+  - Go-side hard-timeout fallback
+- Once those were treated as different events, the shutdown logic stopped fighting FFmpeg.
+
+### What was tricky to build
+
+- The hardest part was making the state machine own policy without forcing `errgroup` to become the state machine itself.
+- Another subtle issue was that one producer goroutine originally waited only on the parent context, which kept the runtime from shutting down cleanly after local completion. That had to be taught to also observe local producer cancellation.
+
+### What warrants a second pair of eyes
+
+- Whether the bounded-run hard-timeout should transition to `failed` immediately or still attempt graceful stop first and then fail.
+- Whether the session should eventually keep a ring buffer of recent FFmpeg log lines and attach them to failures.
+
+### What should be done in the future
+
+- Add explicit session-state tests beyond the current builder tests.
+- Add command-level smoke validation into a reproducible test harness where practical.
+- Investigate why short X11 captures take roughly five seconds of wall-clock time on this host even with `-t 1`.
+
+### Code review instructions
+
+- Start with:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/session.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/run.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/ffmpeg.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/record.go`
+- Then compare the runtime behavior with the ticket scripts:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/scripts/smoke-record-region.sh`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/scripts/direct-ffmpeg-region-smoke.sh`
+
+### Technical details
+
+Observed bounded-run argv after the refactor:
+
+```text
+ffmpeg -hide_banner -loglevel error -y -t 1 -f x11grab -framerate 2 -video_size 320x240 -draw_mouse 0 -i :0.0+0,0 -c:v libx264 -preset veryfast -crf 24 -pix_fmt yuv420p ttmp/smoke-output/smoke_region.mkv
+```
+
+Observed result from the runtime smoke script:
+
+```text
+final_state: finished
+state_reason: all bounded workers exited cleanly
+output file: ttmp/smoke-output/smoke_region.mkv
 ```

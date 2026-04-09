@@ -43,6 +43,12 @@ RelatedFiles:
       Note: Compiled plan generation from the normalized setup DSL
     - Path: pkg/dsl/normalize.go
       Note: Setup DSL normalization and validation rules
+    - Path: pkg/recording/ffmpeg.go
+      Note: FFmpeg job argument builders for the recording runtime
+    - Path: pkg/recording/session.go
+      Note: Explicit recording session state machine
+    - Path: pkg/recording/run.go
+      Note: Recording session runtime that should be driven by an explicit state machine
     - Path: ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/sources/local/screencast-studio-v2.jsx.jsx
       Note: Imported UI mock defining the target control surface
 ExternalSources: []
@@ -685,6 +691,176 @@ user sends interrupt or recording duration elapses
   -> outputs are finalized
   -> command prints final output manifest
 ```
+
+## Formal Session State Machine
+
+The recording runtime should not rely on scattered conditionals to decide whether a worker exit is good, bad, or part of shutdown. The runtime should instead own one explicit session state machine that governs startup, steady-state recording, graceful shutdown, and failure handling.
+
+This matters for the CLI-first milestone because the runtime currently has to coordinate four separate concerns at once:
+
+- FFmpeg process startup
+- natural FFmpeg exit for bounded runs
+- user-driven cancellation via `Ctrl-C` or `SIGTERM`
+- forced shutdown after the grace period
+
+Without an explicit state model, these concerns become encoded as branches spread across context cancellation, worker waiters, and timeout handling. That makes it too easy to accidentally interpret a valid bounded-run completion as an early exit or to keep waiting after all workers have already finished.
+
+### States
+
+The formal session states should be:
+
+- `starting`
+- `running`
+- `stopping`
+- `finished`
+- `failed`
+
+`starting` means the runtime is building FFmpeg arguments and spawning every worker required by the compiled plan. `running` means all required workers started successfully and the session is now waiting on worker completion, interrupt, or timer expiry. `stopping` means the session has committed to shutdown and is sending graceful stop signals to workers. `finished` means all outputs are finalized and the session has ended cleanly. `failed` means the session encountered an unrecoverable startup, runtime, or shutdown error.
+
+### Events
+
+The state machine should respond to the following events:
+
+- `start_requested`
+- `all_workers_started`
+- `worker_exited_cleanly`
+- `worker_exited_with_error`
+- `interrupt_requested`
+- `duration_elapsed`
+- `graceful_stop_completed`
+- `graceful_stop_timed_out`
+- `startup_failed`
+
+The important rule is that events are interpreted differently depending on the current state. For example, `worker_exited_cleanly` is expected in `running` for a bounded session where FFmpeg received `-t`, but the same event is suspicious in an open-ended session that should still be recording.
+
+### Transition Table
+
+```text
+starting
+  start_requested           -> starting
+  all_workers_started       -> running
+  startup_failed            -> failed
+  interrupt_requested       -> stopping
+  duration_elapsed          -> stopping
+
+running
+  worker_exited_cleanly     -> finished    (only when all workers are done and bounded exit is expected)
+  worker_exited_with_error  -> failed
+  interrupt_requested       -> stopping
+  duration_elapsed          -> stopping
+
+stopping
+  graceful_stop_completed   -> finished
+  graceful_stop_timed_out   -> failed
+  worker_exited_with_error  -> failed
+
+finished
+  any further event         -> finished
+
+failed
+  any further event         -> failed
+```
+
+### Ownership Rules
+
+The runtime should have one object that owns the current state and is the only code allowed to advance it. Worker goroutines should report facts upward, not mutate state directly. In practice that means:
+
+- CLI code owns the parent context and user-facing flags.
+- application code owns compilation and the call into the runtime.
+- runtime code owns session state transitions.
+- managed FFmpeg processes own only process lifecycle and IO details.
+
+That separation keeps the CLI from making runtime-state decisions and keeps the FFmpeg wrappers from encoding policy.
+
+### Recommended Runtime Structure
+
+The recording package should contain a `Session` type that owns:
+
+- the compiled plan
+- runtime options such as grace period and max duration
+- the current `SessionState`
+- the reason for the current state
+- the started and finished timestamps
+- the managed worker list
+
+Pseudocode:
+
+```go
+type SessionState string
+
+const (
+    StateStarting SessionState = "starting"
+    StateRunning  SessionState = "running"
+    StateStopping SessionState = "stopping"
+    StateFinished SessionState = "finished"
+    StateFailed   SessionState = "failed"
+)
+
+type Session struct {
+    plan        *dsl.CompiledPlan
+    options     RunOptions
+    state       SessionState
+    reason      string
+    startedAt   time.Time
+    finishedAt  time.Time
+    processes   []*ManagedProcess
+}
+```
+
+Transition helper:
+
+```go
+func (s *Session) transition(next SessionState, reason string) error {
+    if !isAllowedTransition(s.state, next) {
+        return fmt.Errorf("invalid transition %s -> %s", s.state, next)
+    }
+    s.state = next
+    s.reason = reason
+    return nil
+}
+```
+
+### Sequence Diagram
+
+```text
+CLI record command
+  -> compile setup into CompiledPlan
+  -> create Session(state=starting)
+  -> session starts FFmpeg workers
+  -> transition: starting -> running
+  -> wait for events
+       -> user interrupt      -> transition: running -> stopping
+       -> duration elapsed    -> transition: running -> stopping
+       -> worker error        -> transition: running -> failed
+       -> bounded clean exit  -> transition: running -> finished
+  -> if stopping:
+       -> send "q" to ffmpeg stdin
+       -> wait grace period
+       -> on success          -> transition: stopping -> finished
+       -> on timeout/error    -> transition: stopping -> failed
+  -> emit final manifest and state
+```
+
+### Implementation Guidance
+
+The runtime should use `errgroup` as a worker-coordination tool, not as the state machine itself. `errgroup` is useful for:
+
+- waiting on worker goroutines
+- canceling helper goroutines when one fails
+- propagating the first fatal error
+
+But `errgroup` should not be the thing that decides whether the session is `running`, `stopping`, `finished`, or `failed`. Those are session-state decisions and belong in explicit transition code.
+
+For bounded runs, the recommended policy is:
+
+- pass `-t <duration>` to FFmpeg so the worker can exit naturally;
+- separately keep a Go-side hard-timeout event slightly longer than `duration + grace` as a fallback;
+- interpret clean worker exit in `running` as success only when the session is bounded and all workers have exited;
+- interpret clean worker exit in `running` as failure for unbounded runs, because that means the recorder ended before the user asked it to stop.
+
+That policy becomes much easier to review once it is encoded as state transitions rather than hidden in worker-wait branches.
+
+One important validation result from the CLI milestone is that a short X11 region capture on this machine still takes about five to six seconds of wall-clock time even when FFmpeg receives `-t 1`. The same timing behavior reproduces in a direct FFmpeg invocation outside the runtime, so that delay should currently be treated as an FFmpeg/X11 characteristic on this host rather than as a state-machine bug in the recorder.
 
 ## Implementation Plan
 
