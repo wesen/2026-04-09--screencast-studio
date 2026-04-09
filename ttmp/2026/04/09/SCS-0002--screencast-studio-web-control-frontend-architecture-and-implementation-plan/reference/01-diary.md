@@ -39,7 +39,7 @@ RelatedFiles:
       Note: Imported mock used as the visual and product target for the web ticket
 ExternalSources: []
 Summary: Chronological record of how the second ticket for the web control frontend was created and documented.
-LastUpdated: 2026-04-09T15:08:00-04:00
+LastUpdated: 2026-04-09T15:26:00-04:00
 WhatFor: Track how the web-control frontend ticket was assembled, what evidence was used, and how to review the resulting design deliverables.
 WhenToUse: Read when continuing the frontend ticket, reviewing design provenance, or checking the exact repo evidence behind the recommendations.
 ---
@@ -154,3 +154,71 @@ docmgr ticket create-ticket --ticket SCS-0002 --title "Screencast Studio Web Con
 docmgr doc add --ticket SCS-0002 --doc-type design-doc --title "Screencast Studio Web Control Frontend System Design"
 docmgr doc add --ticket SCS-0002 --doc-type reference --title "Diary"
 ```
+
+## Step 2: Expand The Ticket Tasks Into An Intern Execution Plan
+
+This step turned the placeholder task list into a detailed implementation checklist for the intern who will build the web ticket. The goal was to remove ambiguity about sequencing and to make the work executable in phases instead of leaving the ticket with only broad “start implementation” notes.
+
+The new task plan deliberately starts with backend transport and session ownership before frontend screens. That sequencing matters because the frontend should consume stable server primitives rather than inventing temporary browser-only behavior that later has to be undone.
+
+### Prompt Context
+
+**User prompt (verbatim):** "add detailed tasks to the new ticket for an intern to implement"
+
+**Assistant interpretation:** Expand `SCS-0002` so the ticket contains a practical, phased, intern-friendly implementation plan with concrete milestones, acceptance criteria, and file targets.
+
+### What I did
+
+- Replaced the placeholder “Next” section in `tasks.md` with a phased implementation plan.
+- Added explicit phases for:
+  - backend server shell
+  - HTTP APIs
+  - recording transport
+  - WebSocket events
+  - preview lifecycle
+  - React frontend scaffold
+  - operator UI
+  - production packaging
+  - testing and validation
+- Added acceptance criteria to each phase so implementation can be reviewed against concrete outcomes.
+- Added guardrails to reduce architecture drift during implementation.
+- Added suggested milestone commit boundaries.
+- Updated the changelog to record that the task plan was expanded.
+
+### Why
+
+- A strong design document is not enough for an intern if the execution order is still ambiguous.
+- The web ticket spans backend, transport, runtime observation, and frontend implementation. Without a phased checklist, it is too easy to work in the wrong order.
+- Acceptance criteria make future code review much easier.
+
+### What worked
+
+- The design document already had enough structure to derive an implementation sequence from it.
+- The backend-first ordering became much clearer once each phase was forced to name its success condition.
+
+### What didn't work
+
+- The original task file was too small to act as an execution plan. It needed a full rewrite rather than incremental edits.
+
+### What I learned
+
+- The most useful task lists for this kind of ticket are not generic issue bullets. They are phase-based and explicit about state ownership, transport boundaries, and validation commands.
+
+### What warrants a second pair of eyes
+
+- Whether the intern should build the YAML editor surface in the same milestone as the main operator screen or leave it as a later debugging feature.
+- Whether preview lifecycle management should be completed before any browser UI work or can safely proceed in parallel once the API contract is frozen.
+
+### What should be done in the future
+
+- Keep the task list synchronized with actual implementation progress.
+- Mark phase completion in the ticket as commits land.
+- Update the design doc if implementation forces different API contracts.
+
+### Technical details
+
+Files edited in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/tasks.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/changelog.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/reference/01-diary.md`
