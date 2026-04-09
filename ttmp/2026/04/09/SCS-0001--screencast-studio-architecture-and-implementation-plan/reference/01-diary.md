@@ -25,12 +25,18 @@ RelatedFiles:
       Note: Placeholder application boundary added in Step 3
     - Path: pkg/cli/discovery/list.go
       Note: Discovery list command skeleton added in Step 3
+    - Path: pkg/cli/setup/compile.go
+      Note: Compile command now emits a real execution plan in Step 5
     - Path: pkg/cli/root.go
       Note: CLI skeleton added in Step 3
     - Path: pkg/discovery/service.go
       Note: Discovery implementation added in Step 4
     - Path: pkg/discovery/types.go
       Note: Discovery descriptor types added in Step 4
+    - Path: pkg/dsl/compile.go
+      Note: DSL-to-plan compilation added in Step 5
+    - Path: pkg/dsl/normalize.go
+      Note: DSL normalization and validation added in Step 5
     - Path: ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/sources/local/screencast-studio-v2.jsx.jsx
       Note: Imported UI mock inspected during documentation
 ExternalSources: []
@@ -429,4 +435,110 @@ DISPLAY=:0
 /usr/bin/v4l2-ctl
 /usr/bin/pactl
 /usr/bin/ffmpeg
+```
+
+## Step 5: Extract The DSL Package And Make `setup compile` Real
+
+This step turned the setup DSL from architecture intent into executable code. The repo now has a dedicated `pkg/dsl` package that can load a YAML or JSON setup file, normalize it into an effective configuration, validate the source definitions, and compile the result into a concrete output manifest for the session.
+
+This is the second major milestone in the CLI-first plan because it creates the stable boundary that `record` will execute next. Discovery gives us visibility into the machine. Compilation gives us a deterministic runtime plan that can be inspected and tested before any FFmpeg process is launched.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 2)
+
+**Assistant interpretation:** Continue the CLI-first implementation by extracting the DSL into its own package and replacing the placeholder compile command with a real planning pipeline.
+
+**Inferred user intent:** Make the setup compiler concrete and reviewable before attempting recording execution.
+
+**Commit (code):** Pending at the time of this diary entry
+
+### What I did
+
+- Added `pkg/dsl/types.go` with the configuration, normalized, and compiled-plan structs.
+- Added `pkg/dsl/load.go` so setup files can be read and decoded as JSON or YAML.
+- Added `pkg/dsl/normalize.go` to validate source definitions, merge defaults, and emit warnings for unsupported-but-known fields.
+- Added `pkg/dsl/templates.go` and `pkg/dsl/helpers.go` for destination rendering, slug generation, and path handling.
+- Added package tests:
+  - `pkg/dsl/normalize_test.go`
+  - `pkg/dsl/templates_test.go`
+- Updated `pkg/app/application.go` so `CompileFile` now performs:
+  - load file
+  - normalize DSL
+  - build compiled plan
+- Updated `pkg/cli/setup/compile.go` so the command now emits one structured row per planned output instead of a placeholder session id.
+- Updated `pkg/cli/record.go` dry-run output so it exposes output and warning counts from the real compile step.
+- Ran:
+  - `go mod tidy`
+  - `go test ./pkg/dsl`
+  - `go build ./...`
+  - `go run ./cmd/screencast-studio setup compile --file ./jank-prototype/examples/example.yaml --output json`
+
+### Why
+
+- `record` should execute a reviewed plan, not parse ad hoc config at launch time.
+- Keeping normalization in `pkg/dsl` makes the same logic reusable from the future web ticket without duplicating policy in handlers.
+- Package-level tests are the right place to lock down DSL rules, template rendering, and default-merging behavior before FFmpeg orchestration enters the picture.
+
+### What worked
+
+- The sample config in `jank-prototype/examples/example.yaml` mapped cleanly into the new DSL package.
+- The compile command now returns five concrete outputs from the sample setup: four video files and one mixed-audio file.
+- `go build ./...` and `go test ./pkg/dsl` both passed after the module metadata was updated.
+
+### What didn't work
+
+- The first test run failed with:
+
+```text
+go: updates to go.mod needed; to update it:
+    go mod tidy
+```
+
+- That was expected once `gopkg.in/yaml.v3` and `github.com/stretchr/testify/require` were introduced. Running `go mod tidy` resolved it.
+- I briefly called a nonexistent `dsl.Now()` helper while wiring the application layer. I replaced that with `time.Now()` immediately instead of inventing a premature abstraction.
+
+### What I learned
+
+- The prototype DSL is already close to a valid compiler boundary. The main work was separating configuration loading, normalization, and plan-building into explicit functions with tests.
+- The compiled plan is already useful as a standalone artifact. It makes `setup compile` a meaningful review command instead of just a validation pass.
+
+### What was tricky to build
+
+- The most delicate part was deciding which unsupported fields should be hard validation errors and which should be preserved as warnings. For now, obviously incomplete features like `follow_resize`, `noise_gate`, and `denoise` remain visible to users as warnings so the runtime contract stays honest.
+- Template rendering also needed to be strict enough to avoid silently generating nonsense paths while still remaining easy to author in YAML.
+
+### What warrants a second pair of eyes
+
+- Whether the current `CompiledPlan` should soon grow explicit FFmpeg input/output argument slices, or whether that should wait for the runtime layer.
+- Whether mixed audio should always compile to one output or eventually support multiple named mixes in the DSL.
+
+### What should be done in the future
+
+- Implement `record --file <path>` by translating `CompiledPlan` entries into supervised FFmpeg jobs.
+- Add command-level smoke tests that exercise `setup compile` and `record --dry-run`.
+- Open the second ticket for the web control surface only after the recording runtime is stable.
+
+### Code review instructions
+
+- Start with:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/normalize.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/compile.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/app/application.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/setup/compile.go`
+- Validate with:
+  - `go test ./pkg/dsl`
+  - `go build ./...`
+  - `go run ./cmd/screencast-studio setup compile --file ./jank-prototype/examples/example.yaml --output json`
+
+### Technical details
+
+Observed compile output from the sample config:
+
+```text
+recordings/demo/Full Desktop.mov
+recordings/demo/Browser Window.mov
+recordings/demo/Top Left Region.mov
+recordings/demo/Webcam.mov
+recordings/demo/audio-mix.wav
 ```

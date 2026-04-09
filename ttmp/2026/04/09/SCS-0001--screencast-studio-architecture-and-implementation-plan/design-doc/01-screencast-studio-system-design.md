@@ -27,14 +27,22 @@ RelatedFiles:
       Note: Prototype frontend rendering and polling baseline
     - Path: jank-prototype/web/index.html
       Note: Prototype UI structure baseline
+    - Path: pkg/app/application.go
+      Note: Application boundary that now compiles DSL files into execution plans
     - Path: pkg/cli/record.go
       Note: Top-level record command wiring
     - Path: pkg/cli/root.go
       Note: Root Glazed/Cobra command tree
+    - Path: pkg/cli/setup/compile.go
+      Note: Setup compile command that exposes compiled outputs on the CLI
     - Path: pkg/discovery/service.go
       Note: Concrete command-backed discovery for displays
     - Path: pkg/discovery/types.go
       Note: Typed discovery descriptors used by the CLI milestone
+    - Path: pkg/dsl/compile.go
+      Note: Compiled plan generation from the normalized setup DSL
+    - Path: pkg/dsl/normalize.go
+      Note: Setup DSL normalization and validation rules
     - Path: ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/sources/local/screencast-studio-v2.jsx.jsx
       Note: Imported UI mock defining the target control surface
 ExternalSources: []

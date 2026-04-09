@@ -56,3 +56,13 @@ Implemented real platform discovery for displays, windows, cameras, and audio in
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/discovery/service.go — Command-backed discovery implementation
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/discovery/types.go — Discovery descriptor definitions
 
+
+## 2026-04-09
+
+Extracted the setup DSL into `pkg/dsl` and replaced the compile stub with a real planning pipeline that emits concrete output rows from a setup file.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/normalize.go — DSL normalization and validation rules
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/compile.go — Compiled output manifest generation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/setup/compile.go — Structured CLI rendering of compiled outputs
