@@ -1,0 +1,164 @@
+:root {
+  color-scheme: dark;
+  --bg: #111827;
+  --panel: #1f2937;
+  --panel2: #0f172a;
+  --border: #374151;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #2563eb;
+  --accent2: #1d4ed8;
+  --danger: #dc2626;
+  --danger2: #b91c1c;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+button, textarea { font: inherit; }
+button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+}
+button.secondary { background: transparent; }
+button:hover:not(:disabled) { background: var(--accent2); }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+#stopBtn { background: var(--danger); }
+#stopBtn:hover:not(:disabled) { background: var(--danger2); }
+.app-shell { max-width: 1500px; margin: 0 auto; padding: 1rem; }
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.app-header h1 { margin: 0 0 0.25rem; }
+.app-header p { margin: 0; color: var(--muted); }
+.transport-buttons { display: flex; gap: 0.75rem; }
+.layout {
+  display: grid;
+  grid-template-columns: minmax(380px, 520px) 1fr;
+  gap: 1rem;
+}
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem;
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
+}
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.panel-header h2 { margin: 0; font-size: 1rem; }
+.panel-actions { display: flex; gap: 0.5rem; }
+.config-panel { grid-row: span 2; }
+#dslInput {
+  width: 100%;
+  min-height: 820px;
+  resize: vertical;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #090f1a;
+  color: var(--text);
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+.status-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0 0 1rem;
+}
+.status-grid dt { color: var(--muted); }
+.status-grid dd { margin: 0; }
+.output-list, .warning-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.output-list li, .warning-list li {
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+}
+.output-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.preview-grid.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 260px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+}
+.preview-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+}
+.preview-card-header, .preview-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9rem;
+}
+.preview-card-header span, .preview-card-footer { color: var(--muted); }
+.preview-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: black;
+}
+.logs-panel { grid-column: span 2; }
+.log-view {
+  min-height: 260px;
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #090f1a;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+.muted { color: var(--muted); }
+@media (max-width: 1200px) {
+  .layout { grid-template-columns: 1fr; }
+  .config-panel { grid-row: auto; }
+  .logs-panel { grid-column: span 1; }
+  #dslInput { min-height: 460px; }
+}
+@media (max-width: 720px) {
+  .app-header { flex-direction: column; }
+  .transport-buttons { flex-wrap: wrap; width: 100%; }
+  .transport-buttons button { flex: 1 1 160px; }
+}

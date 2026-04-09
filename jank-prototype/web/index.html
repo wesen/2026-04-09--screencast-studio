@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recorder Control</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div>
+          <h1>Recorder Control</h1>
+          <p>Load a YAML DSL, preview enabled video sources, then start or stop capture.</p>
+        </div>
+        <div class="transport-buttons">
+          <button id="applyBtn">Apply Config</button>
+          <button id="startBtn" disabled>Start Capture</button>
+          <button id="stopBtn" disabled>Stop Capture</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel config-panel">
+          <div class="panel-header">
+            <h2>DSL</h2>
+            <div class="panel-actions">
+              <button id="loadExampleBtn" class="secondary">Load Example</button>
+              <button id="clearBtn" class="secondary">Clear</button>
+            </div>
+          </div>
+          <textarea id="dslInput" spellcheck="false" placeholder="Paste YAML here..."></textarea>
+        </section>
+
+        <section class="panel status-panel">
+          <div class="panel-header">
+            <h2>Status</h2>
+          </div>
+          <dl class="status-grid">
+            <dt>Config</dt>
+            <dd id="configStatus">None</dd>
+            <dt>Recording</dt>
+            <dd id="recordingStatus">No</dd>
+            <dt>Session</dt>
+            <dd id="sessionStatus">—</dd>
+            <dt>Started</dt>
+            <dd id="startedStatus">—</dd>
+          </dl>
+          <div>
+            <h3>Outputs</h3>
+            <ul id="outputList" class="output-list"></ul>
+          </div>
+        </section>
+
+        <section class="panel preview-panel">
+          <div class="panel-header">
+            <h2>Preview Streams</h2>
+            <span id="previewCount" class="muted">0 sources</span>
+          </div>
+          <div id="previewGrid" class="preview-grid empty-state">Apply a config to create preview streams.</div>
+        </section>
+
+        <section class="panel warnings-panel">
+          <div class="panel-header"><h2>Warnings</h2></div>
+          <ul id="warningList" class="warning-list"></ul>
+        </section>
+
+        <section class="panel logs-panel">
+          <div class="panel-header"><h2>Logs</h2></div>
+          <pre id="logView" class="log-view"></pre>
+        </section>
+      </main>
+    </div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
