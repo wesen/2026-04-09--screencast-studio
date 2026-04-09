@@ -63,34 +63,64 @@ Acceptance criteria:
 - UI-only state is clearly separated from server-backed state.
 - Deprecated demo-only state is deleted.
 
-## Phase 5: Rebuild WebSocket Handling
+## Phase 5: Introduce Shared Protobuf Transport Schemas
 
-- [ ] Define the typed server event model used by the frontend.
-- [ ] Refactor `ui/src/features/session/wsClient.ts` so socket lifecycle and event decoding are explicit.
-- [ ] Handle at least `session.state`, `session.log`, `preview.list`, and `preview.state`.
+- [ ] Add a new protobuf design note to the ticket and align the implementation order around it.
+- [ ] Create `proto/screencast/studio/v1/web.proto` for the shared REST and websocket contract.
+- [ ] Add `buf.yaml` and `buf.gen.yaml` using Buf v2 remote plugins.
+- [ ] Generate Go code under `gen/go/proto/...`.
+- [ ] Generate TypeScript code under `ui/src/gen/proto/...`.
+- [ ] Add any missing runtime dependencies for generated Go and TypeScript protobuf code.
+
+Acceptance criteria:
+
+- REST and websocket transport messages are defined once in `proto/`.
+- Go and TypeScript generated outputs can be reproduced with a committed command.
+- The repo no longer needs handwritten shared contract declarations as the long-term source of truth.
+
+## Phase 6: Migrate Go REST And Websocket Transport To Generated Types
+
+- [ ] Add Go-side `protojson` encode and decode helpers for REST messages.
+- [ ] Replace shared REST request and response structs in `internal/web/api_types.go` with generated protobuf messages or mapping helpers built around them.
+- [ ] Migrate health, discovery, setup, recording, and preview REST handlers to generated protobuf transport messages.
+- [ ] Replace websocket bootstrap and fan-out events with generated protobuf `ServerEvent` messages.
+- [ ] Update Go tests to assert the new lowerCamelCase protobuf JSON contract.
+
+Acceptance criteria:
+
+- Go REST handlers read and write generated protobuf JSON messages.
+- Websocket events are emitted from generated protobuf event messages.
+- The backend transport shape is defined by protobuf plus explicit domain-to-proto mapping helpers, not handwritten parallel structs.
+
+## Phase 7: Migrate Frontend Transport And Websocket Decode To Generated Types
+
+- [ ] Replace `ui/src/api/types.ts` as the source of truth for shared REST and websocket payloads.
+- [ ] Add small frontend protobuf JSON helpers for `fromJson(...)` and `toJson(...)`.
+- [ ] Update RTK Query endpoints in `ui/src/api/` to send and decode generated protobuf JSON.
+- [ ] Refactor `ui/src/features/session/wsClient.ts` so websocket lifecycle is explicit and event decoding uses the generated protobuf `ServerEvent` schema.
 - [ ] Ensure one app-level owner starts and stops the websocket connection.
-- [ ] Remove ambiguous singleton behavior if it no longer matches the final ownership model.
+- [ ] Remove handwritten websocket schema guards and stale singleton assumptions if they are no longer needed.
 
 Acceptance criteria:
 
-- WebSocket state updates flow through typed reducers or explicit actions.
-- Reconnect behavior still works.
-- Event handling is aligned with `internal/web/handlers_ws.go`.
+- Frontend REST and websocket transport logic uses generated protobuf schemas.
+- Websocket event handling is runtime-decoded from the shared schema rather than inferred from raw JSON.
+- One clear frontend owner controls websocket lifecycle.
 
-## Phase 6: Repair Preview Integration
+## Phase 8: Repair Preview Integration On Top Of The Shared Schema
 
-- [ ] Ensure preview creation uses `{ dsl, source_id }`.
-- [ ] Ensure preview release uses `preview_id`.
-- [ ] Make source-card or source-grid containers request previews through a shared preview state model.
-- [ ] Keep `PreviewStream` presentational and focused on rendering the given stream state.
-- [ ] Remove any preview code that assumes stale route names or source-id-only lifecycle semantics.
+- [ ] Ensure preview creation uses the protobuf-generated `{ dsl, sourceId }` request shape.
+- [ ] Ensure preview release uses the protobuf-generated `previewId` request shape.
+- [ ] Add or refactor preview state so source-card or source-grid containers lease previews through one shared state model.
+- [ ] Keep `PreviewStream` presentational and focused on rendering the supplied preview state.
+- [ ] Remove any preview code that assumes stale route names, stale field names, or source-id-only lifecycle shortcuts.
 
 Acceptance criteria:
 
-- Preview lifecycle matches the backend exactly.
+- Preview lifecycle matches the backend exactly through the generated protobuf transport contract.
 - Preview panels reflect real preview descriptors and preview IDs.
 
-## Phase 7: Rewrite The Mock Layer
+## Phase 9: Rewrite The Mock Layer
 
 - [x] Replace stale MSW routes in `ui/src/mocks/handlers.ts`.
 - [x] Remove fake endpoints that the backend does not expose.
@@ -102,7 +132,7 @@ Acceptance criteria:
 - Mock handlers validate the real contract instead of masking drift.
 - Storybook and mocked development remain useful after the cleanup.
 
-## Phase 8: Add Frontend Hygiene
+## Phase 10: Add Frontend Hygiene
 
 - [x] Add an ESLint configuration under `ui/`.
 - [x] Make `pnpm --dir ui lint` pass.
@@ -114,7 +144,7 @@ Acceptance criteria:
 - Frontend linting is real, not only declared.
 - Generated output handling is intentional.
 
-## Phase 9: Delete The Dead Code
+## Phase 11: Delete The Dead Code
 
 - [ ] Remove deprecated API helpers, stale types, and duplicate shell code once replacements are in place.
 - [ ] Remove unused imports, selectors, reducers, stories, or helpers discovered during cleanup.
@@ -130,8 +160,11 @@ Acceptance criteria:
 - [x] Commit 1: transport types and endpoint cleanup
 - [x] Commit 2: mounted shell consolidation
 - [x] Commit 3: state model cleanup
-- [ ] Commit 4: websocket and preview cleanup
-- [ ] Commit 5: mocks, linting, and dead-code deletion
+- [ ] Commit 4: protobuf schema and generation plumbing
+- [ ] Commit 5: Go REST and websocket protobuf migration
+- [ ] Commit 6: frontend protobuf transport and websocket decode migration
+- [ ] Commit 7: preview integration cleanup on top of protobuf
+- [ ] Commit 8: final dead-code deletion and hygiene cleanup
 
 ## Validation Checklist
 

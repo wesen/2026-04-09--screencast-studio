@@ -85,3 +85,13 @@ Replaced the mounted page’s synthetic source grid with backend-normalized setu
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/SourceCard.stories.tsx — Storybook updated for the shared source-card model
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/SourceGrid.stories.tsx — Storybook updated for the read-only normalized source-grid mode
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/StatusPanel.stories.tsx — Storybook updated for the shared source-card model
+
+## 2026-04-09
+
+Added a dedicated protobuf migration design note inside `SCS-0003`, reordered the remaining implementation phases around shared schema generation for REST and websocket transport, and explicitly pivoted away from continuing the handwritten transport cleanup path.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/design-doc/02-protobuf-transport-migration-plan.md — New detailed design and implementation guide for the protobuf migration
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/tasks.md — Task plan now prioritizes protobuf schema, generation, and REST plus websocket migration before further preview cleanup
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/reference/01-diary.md — Diary records why the cleanup plan pivoted away from more handwritten transport work

@@ -29,7 +29,7 @@ RelatedFiles:
       Note: Prior frontend review used as the direct precursor to this cleanup ticket
 ExternalSources: []
 Summary: Chronological record of creating the dedicated frontend cleanup ticket and defining a no-compatibility plan to realign the UI with the backend.
-LastUpdated: 2026-04-09T17:07:10-04:00
+LastUpdated: 2026-04-09T17:27:31-04:00
 WhatFor: Preserve the reasoning, evidence, and document-creation steps behind the dedicated frontend cleanup ticket.
 WhenToUse: Read when continuing the cleanup ticket, reviewing why the ticket exists, or checking which existing frontend files were considered the primary cleanup targets.
 ---
@@ -697,4 +697,109 @@ sed -n '1,220p' ui/src/stories/StatusPanel.stories.tsx
 pnpm --dir ui lint
 pnpm --dir ui build
 pnpm --dir ui build-storybook
+```
+
+## Step 8: Pivot The Remaining Transport Cleanup To Protobuf
+
+This step changed the planned implementation order for the rest of the ticket. The original next move was to keep cleaning up websocket handling and preview ownership directly on top of handwritten REST and websocket transport types. That would have improved the frontend architecture, but it would also have hardened the wrong contract boundary.
+
+The key realization was that the same transport schema is currently being maintained by hand in:
+
+- `internal/web/api_types.go`
+- `ui/src/api/types.ts`
+- whatever runtime validation logic the frontend adds when raw websocket JSON needs to be trusted
+
+That is too much duplication for a cleanup ticket whose explicit goal is to remove unclear and unnecessary code. Instead of adding a better handwritten websocket decoder, the right move is to switch the shared REST and websocket contract to protobuf-generated Go and TypeScript types before the preview and websocket cleanup goes much further.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Alright, add a new implementation plan / analysis for switching to protobuf, within this ticket, and then tasks, and then tackle REST + WS protobuf use before we go on much further. That should simplify our code quite a bit."
+
+**Assistant interpretation:** Pause the handwritten transport cleanup, document a schema-first protobuf migration inside `SCS-0003`, update the task plan to reflect that pivot, and then implement protobuf for shared REST and websocket transport before continuing the remaining frontend cleanup.
+
+### What I did
+
+- Read the `protobuf-go-ts-schema-exchange` skill and its supporting references.
+- Checked the repo for existing protobuf or Buf tooling and confirmed there was none yet.
+- Confirmed the local environment already has:
+  - `buf`
+  - `protoc`
+- Created a new design document:
+  - `ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/design-doc/02-protobuf-transport-migration-plan.md`
+- Rewrote the task plan so the next implementation phases are now:
+  - shared protobuf schema
+  - Go REST and websocket migration
+  - frontend REST and websocket decode migration
+  - preview integration cleanup on top of the shared schema
+- Abandoned an in-progress non-protobuf websocket and preview refactor by restoring those local UI files to the last committed state. That was intentional cleanup, not lost work. The aborted edits were exploratory and no longer fit the new direction.
+
+### Why
+
+- A protobuf-generated shared contract is a better simplification than more handwritten TypeScript interfaces plus websocket validators.
+- REST and websocket payloads share too many entities to keep evolving separately.
+- The cleanup ticket explicitly says not to add compatibility layers or preserve unnecessary code paths. A schema-first contract fits that goal better than a larger manually synchronized transport layer.
+
+### What worked
+
+- The protobuf skill already matched the exact migration we need: shared Go and TS schema generation with JSON transport.
+- The repo already has `buf` and `protoc`, which means the migration can be implemented directly instead of only documented.
+- Restoring the half-started non-protobuf websocket refactor put the tree back on a clean committed baseline before the real transport migration begins.
+
+### What didn't work
+
+- The first attempt to replace the newly created protobuf design document in one large patch failed because the template content did not match my patch context exactly.
+
+### Exact failure
+
+```text
+apply_patch verification failed: Failed to find expected lines in .../02-protobuf-transport-migration-plan.md
+```
+
+I resolved that by deleting the template file content and recreating the full document explicitly with one clean patch.
+
+### What I learned
+
+- The next biggest simplification opportunity is not in component structure anymore. It is at the transport contract boundary.
+- The current codebase is still early enough that adopting protobuf-generated shared transport should reduce complexity rather than add bureaucracy.
+- The right migration unit is “REST plus websocket together,” not “websocket first, REST later.”
+
+### What warrants a second pair of eyes
+
+- Whether to keep API error payloads handwritten for the first protobuf slice or include them in the schema immediately.
+- Whether generation should be wired into `go generate ./...` right away or first land with an explicit `buf generate` workflow.
+
+### What should be done in the future
+
+- Implement the shared protobuf schema and Buf generation config.
+- Migrate Go REST and websocket transport to generated types.
+- Migrate the frontend RTK Query and websocket layers to generated decode helpers.
+- Only then continue the preview ownership cleanup.
+
+### Code review instructions
+
+- Read the new protobuf migration guide:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/design-doc/02-protobuf-transport-migration-plan.md`
+- Then compare it to the current handwritten transport surface:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/api_types.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/types.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts`
+- Finally review the updated task ordering:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/tasks.md`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+sed -n '1,220p' /home/manuel/.codex/skills/protobuf-go-ts-schema-exchange/SKILL.md
+sed -n '1,240p' /home/manuel/.codex/skills/protobuf-go-ts-schema-exchange/references/templates.md
+sed -n '1,240p' /home/manuel/.codex/skills/protobuf-go-ts-schema-exchange/references/validation.md
+rg --files | rg '(^|/)(buf\\.ya?ml|buf\\.gen\\.ya?ml|.*\\.proto|package.json|pnpm-workspace.yaml)$'
+which buf
+which protoc
+git restore -- ui/src/api/types.ts ui/src/app/store.ts ui/src/components/preview/PreviewStream.tsx ui/src/components/source-card/SourceCard.tsx ui/src/components/source-card/types.ts ui/src/features/session/sessionSlice.ts ui/src/features/session/wsClient.ts
+docmgr doc add --ticket SCS-0003 --doc-type design-doc --title "Protobuf Transport Migration Plan"
 ```
