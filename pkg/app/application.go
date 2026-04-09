@@ -28,6 +28,7 @@ type CompileSummary struct {
 type RecordOptions struct {
 	GracePeriod time.Duration
 	MaxDuration time.Duration
+	EventSink   func(recording.RunEvent)
 }
 
 type RecordSummary struct {
@@ -118,6 +119,19 @@ func (a *Application) DiscoveryList(ctx context.Context, kind string) ([]map[str
 	return rows, nil
 }
 
+func (a *Application) DiscoverySnapshot(ctx context.Context) (*discovery.Snapshot, error) {
+	return discovery.SnapshotAll(ctx)
+}
+
+func (a *Application) NormalizeDSL(ctx context.Context, body []byte) (*dsl.EffectiveConfig, error) {
+	_ = ctx
+	cfg, err := dsl.ParseAndNormalize(body)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
 func (a *Application) CompileFile(ctx context.Context, file string) (*CompileSummary, error) {
 	_ = ctx
 	plan, err := a.compileFileAt(file, time.Now())
@@ -133,33 +147,48 @@ func (a *Application) CompileFile(ctx context.Context, file string) (*CompileSum
 	}, nil
 }
 
+func (a *Application) CompileDSL(ctx context.Context, body []byte) (*dsl.CompiledPlan, error) {
+	return a.compileDSLAt(ctx, body, time.Now())
+}
+
 func (a *Application) RecordFile(ctx context.Context, file string, options RecordOptions) (*RecordSummary, error) {
 	plan, err := a.compileFileAt(file, time.Now())
 	if err != nil {
 		return nil, err
 	}
 
+	summary, err := a.RecordPlan(ctx, plan, options)
+	if err != nil {
+		return nil, err
+	}
+	summary.File = file
+	return summary, nil
+}
+
+func (a *Application) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, options RecordOptions) (*RecordSummary, error) {
 	result, err := recording.Run(ctx, plan, recording.RunOptions{
 		GracePeriod: options.GracePeriod,
 		MaxDuration: options.MaxDuration,
+		EventSink:   options.EventSink,
 		Logger: func(format string, args ...any) {
 			log.Info().Msgf(format, args...)
 		},
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &RecordSummary{
-		File:       file,
+	summary := &RecordSummary{
 		SessionID:  plan.SessionID,
-		State:      string(result.State),
-		Reason:     result.Reason,
 		Outputs:    append([]dsl.PlannedOutput(nil), plan.Outputs...),
 		Warnings:   append([]string(nil), plan.Warnings...),
-		StartedAt:  result.StartedAt,
-		FinishedAt: result.FinishedAt,
-	}, nil
+	}
+	if result != nil {
+		summary.State = string(result.State)
+		summary.Reason = result.Reason
+		summary.StartedAt = result.StartedAt
+		summary.FinishedAt = result.FinishedAt
+	}
+	if err != nil {
+		return summary, err
+	}
+	return summary, nil
 }
 
 func (a *Application) compileFileAt(file string, now time.Time) (*dsl.CompiledPlan, error) {
@@ -168,7 +197,11 @@ func (a *Application) compileFileAt(file string, now time.Time) (*dsl.CompiledPl
 		return nil, err
 	}
 
-	cfg, err := dsl.ParseAndNormalize(body)
+	return a.compileDSLAt(context.Background(), body, now)
+}
+
+func (a *Application) compileDSLAt(ctx context.Context, body []byte, now time.Time) (*dsl.CompiledPlan, error) {
+	cfg, err := a.NormalizeDSL(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +211,7 @@ func (a *Application) compileFileAt(file string, now time.Time) (*dsl.CompiledPl
 		return nil, err
 	}
 	if len(plan.Outputs) == 0 {
-		return nil, fmt.Errorf("compiled plan for %s produced no outputs", file)
+		return nil, fmt.Errorf("compiled plan produced no outputs")
 	}
 	return plan, nil
 }

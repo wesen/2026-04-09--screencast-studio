@@ -39,7 +39,7 @@ RelatedFiles:
       Note: Imported mock used as the visual and product target for the web ticket
 ExternalSources: []
 Summary: Chronological record of how the second ticket for the web control frontend was created and documented.
-LastUpdated: 2026-04-09T16:02:00-04:00
+LastUpdated: 2026-04-09T16:24:00-04:00
 WhatFor: Track how the web-control frontend ticket was assembled, what evidence was used, and how to review the resulting design deliverables.
 WhenToUse: Read when continuing the frontend ticket, reviewing design provenance, or checking the exact repo evidence behind the recommendations.
 ---
@@ -286,3 +286,78 @@ Files updated in this step:
 
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/root.go`
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/common.go`
+
+## Step 4: Refactor Managed Process Ownership Before Adding Web Session APIs
+
+This step interrupted the API implementation on purpose. While building phases 2 through 4, a runtime concern became obvious: the existing `startManagedProcess(...)` helper was still doing too much hidden work. It launched FFmpeg, created background drainers, and hid process ownership behind a constructor-style function. That shape would have made the upcoming web session manager harder to reason about, especially once HTTP-triggered stop and live session observation were added.
+
+The key change was to invert that ownership. `ManagedProcess` is now a configured process object, and `ManagedProcess.Run(ctx, ...)` is the blocking owner of the subprocess lifecycle. The outer recording session runner remains responsible for concurrency with its own `errgroup`, while the process object owns:
+
+- starting FFmpeg
+- draining stdout and stderr
+- waiting for process completion
+- exposing a single `Stop(...)` path for graceful termination
+
+### Prompt Context
+
+**User prompt (verbatim):** "Every go routine should be able to be  cancelled / passed a ctx, and its ownership should be accounted for. (i'm looking at startManagedProcess), maybe there are others."
+
+**Follow-up prompt (verbatim):** "can we maybe reorganize this more elegantly? make ManagedProcess.Run(ctx, ...) (blocking) and such?"
+
+**Assistant interpretation:** Stop adding new web-layer behavior until the subprocess concurrency model is explicit and defensible. Refactor `ManagedProcess` so the process object has a clean blocking execution method and the session runner owns concurrency transparently.
+
+### What I did
+
+- Audited the current `go` statements in the codebase.
+- Confirmed the main hidden-goroutine cluster was in `pkg/recording/run.go`.
+- Added structured runtime events in `pkg/recording/events.go`.
+- Refactored `ManagedProcess` in `pkg/recording/run.go` so:
+  - process specs are created first
+  - `ManagedProcess.Run(ctx, ...)` starts and blocks on FFmpeg
+  - the outer recording runtime owns worker concurrency
+  - `Stop(...)` remains the explicit graceful-shutdown hook
+- Expanded `pkg/app/application.go` with helpers needed by the web layer:
+  - discovery snapshot
+  - normalize DSL
+  - compile DSL
+  - plan-aware record execution with runtime event forwarding
+- Verified:
+  - `go test ./pkg/recording ./pkg/app`
+  - `go build ./...`
+
+### Why
+
+- The original constructor-style process startup made goroutine ownership implicit.
+- The web ticket needs session coordination and live observation, which depend on a runtime that is explicit about who owns what.
+- Refactoring before adding more HTTP endpoints is cheaper than retrofitting cancellation semantics after the transport layer exists.
+
+### What worked
+
+- Moving the subprocess lifecycle into a blocking `Run(...)` method made the outer recording runtime easier to read immediately.
+- The event hook added in the same step sets up a cleaner path for WebSocket publication later.
+
+### What didn't work
+
+- The first attempt to patch the runtime in place drifted against the current file and had to be re-applied in smaller steps.
+- `pkg/app/application.go` still needed a follow-up cleanup so `RecordPlan(...)` preserved useful session information even when the runtime returned an error.
+
+### What I learned
+
+- The right concurrency boundary here is not “constructor starts work.” It is “runner owns concurrency, process object owns subprocess lifecycle.”
+- That boundary is substantially better for HTTP-triggered recording, because the session manager can now supervise process workers instead of relying on hidden background state.
+
+### What warrants a second pair of eyes
+
+- Whether `ManagedProcess.Run(ctx, ...)` should eventually observe a dedicated internal lifecycle context separate from the outer session context, or whether the current session-owned stop behavior is already the right final shape.
+- Whether scanner drain behavior should eventually surface pipe read errors more explicitly in runtime events.
+
+### Technical details
+
+Files added in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/events.go`
+
+Files updated in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/run.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/app/application.go`

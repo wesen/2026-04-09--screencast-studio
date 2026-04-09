@@ -37,6 +37,16 @@ Implemented phase 1 of the web ticket: added the Go web server shell, a glazed `
 
 ## 2026-04-09
 
+Refactored the recording runtime so `ManagedProcess.Run(ctx, ...)` is the blocking owner of the subprocess lifecycle and its drainers, reducing hidden goroutine ownership before the web session manager is layered on top.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/run.go — Managed process execution now uses an explicit blocking run method
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/events.go — Structured runtime events for session state and process log forwarding
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/app/application.go — Application boundary now exposes normalization, compile, and event-aware record helpers for web transport
+
+## 2026-04-09
+
 Implemented Phase 7 (scaffold the React frontend): created ui/ workspace with Vite, TypeScript, React 18, Redux Toolkit, RTK Query, Storybook, and MSW. Implemented all base primitives (Btn, Radio, Sel, Slider, Win, WinBar), composite components (FakeScreen, MicMeter, Waveform), source cards, and studio panels matching the screencast-studio-v2.jsx.jsx visual language. Added RTK Query API layer and MSW mock handlers.
 
 ### Commit

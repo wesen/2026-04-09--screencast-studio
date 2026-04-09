@@ -22,6 +22,7 @@ type RunOptions struct {
 	GracePeriod time.Duration
 	MaxDuration time.Duration
 	Logger      func(string, ...any)
+	EventSink   func(RunEvent)
 }
 
 type RunResult struct {
@@ -35,10 +36,12 @@ type RunResult struct {
 type ManagedProcess struct {
 	Label      string
 	OutputPath string
-	Cmd        *exec.Cmd
-	Stdin      io.WriteCloser
+	Args       []string
 
-	done    chan struct{}
+	Cmd   *exec.Cmd
+	Stdin io.WriteCloser
+	done  chan struct{}
+
 	waitErr error
 	mu      sync.RWMutex
 }
@@ -59,46 +62,43 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 	if logger == nil {
 		logger = func(string, ...any) {}
 	}
+	emit := func(event RunEvent) {
+		emitRunEvent(options.EventSink, event)
+	}
 
 	session := newSession(plan, options)
 	session.startedAt = time.Now()
+	emit(RunEvent{
+		Type:      RunEventStateChanged,
+		State:     session.state,
+		Reason:    "session created",
+		Timestamp: session.startedAt,
+	})
 	for _, job := range plan.VideoJobs {
 		args, err := buildVideoRecordArgs(job, options.MaxDuration)
 		if err != nil {
-			_ = session.transition(StateFailed, fmt.Sprintf("build video args for %s: %v", job.Source.Name, err))
+			_ = transitionSession(session, StateFailed, fmt.Sprintf("build video args for %s: %v", job.Source.Name, err), emit)
 			stopProcesses(session.processes, gracePeriod)
 			return nil, err
 		}
-		proc, err := startManagedProcess(job.Source.Name, args, job.OutputPath, logger)
-		if err != nil {
-			_ = session.transition(StateFailed, fmt.Sprintf("start process for %s: %v", job.Source.Name, err))
-			stopProcesses(session.processes, gracePeriod)
-			return nil, err
-		}
-		session.markProcessStarted(proc)
+		session.markProcessStarted(newManagedProcess(job.Source.Name, args, job.OutputPath))
 	}
 	for _, job := range plan.AudioJobs {
 		args, err := buildAudioMixArgs(job, options.MaxDuration)
 		if err != nil {
-			_ = session.transition(StateFailed, fmt.Sprintf("build audio args for %s: %v", job.Name, err))
+			_ = transitionSession(session, StateFailed, fmt.Sprintf("build audio args for %s: %v", job.Name, err), emit)
 			stopProcesses(session.processes, gracePeriod)
 			return nil, err
 		}
-		proc, err := startManagedProcess(job.Name, args, job.OutputPath, logger)
-		if err != nil {
-			_ = session.transition(StateFailed, fmt.Sprintf("start process for %s: %v", job.Name, err))
-			stopProcesses(session.processes, gracePeriod)
-			return nil, err
-		}
-		session.markProcessStarted(proc)
+		session.markProcessStarted(newManagedProcess(job.Name, args, job.OutputPath))
 	}
 	if len(session.processes) == 0 {
-		_ = session.transition(StateFailed, "compiled plan has no executable jobs")
+		_ = transitionSession(session, StateFailed, "compiled plan has no executable jobs", emit)
 		return nil, errors.New("compiled plan has no executable jobs")
 	}
 
-	if err := session.transition(StateRunning, "all workers started"); err != nil {
-		_ = session.transition(StateFailed, err.Error())
+	if err := transitionSession(session, StateRunning, "all workers started", emit); err != nil {
+		_ = transitionSession(session, StateFailed, err.Error(), emit)
 		stopProcesses(session.processes, gracePeriod)
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 	for _, proc := range session.processes {
 		proc := proc
 		group.Go(func() error {
-			err := proc.Wait()
+			err := proc.Run(ctx, logger, emit)
 			publishEvent(producerCtx, events, sessionEvent{
 				Type:    eventWorkerExited,
 				Process: proc,
@@ -176,7 +176,7 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 			case eventWorkerExited:
 				session.markProcessExited(event.Process)
 				if event.Err != nil {
-					if err := session.beginStopping(fmt.Sprintf("%s exited with error: %v", event.Process.Label, event.Err), StateFailed); err != nil {
+					if err := beginStopping(session, fmt.Sprintf("%s exited with error: %v", event.Process.Label, event.Err), StateFailed, emit); err != nil {
 						cancelProducers()
 						_ = group.Wait()
 						return nil, err
@@ -186,7 +186,7 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 				}
 				if options.MaxDuration > 0 {
 					if session.remainingProcesses() == 0 {
-						if err := session.transition(StateFinished, "all bounded workers exited cleanly"); err != nil {
+						if err := transitionSession(session, StateFinished, "all bounded workers exited cleanly", emit); err != nil {
 							cancelProducers()
 							_ = group.Wait()
 							return nil, err
@@ -203,21 +203,21 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 					}
 					continue
 				}
-				if err := session.beginStopping(fmt.Sprintf("%s exited before shutdown", event.Process.Label), StateFailed); err != nil {
+				if err := beginStopping(session, fmt.Sprintf("%s exited before shutdown", event.Process.Label), StateFailed, emit); err != nil {
 					cancelProducers()
 					_ = group.Wait()
 					return nil, err
 				}
 				startStop()
 			case eventCancelRequested:
-				if err := session.beginStopping("cancellation requested: "+event.Reason, StateFinished); err != nil {
+				if err := beginStopping(session, "cancellation requested: "+event.Reason, StateFinished, emit); err != nil {
 					cancelProducers()
 					_ = group.Wait()
 					return nil, err
 				}
 				startStop()
 			case eventHardTimeout:
-				if err := session.beginStopping(event.Reason, StateFailed); err != nil {
+				if err := beginStopping(session, event.Reason, StateFailed, emit); err != nil {
 					cancelProducers()
 					_ = group.Wait()
 					return nil, err
@@ -234,19 +234,19 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 				}
 			case eventStopCompleted:
 				if event.Err != nil {
-					if err := session.transition(StateFailed, fmt.Sprintf("graceful stop failed: %v", event.Err)); err != nil {
+					if err := transitionSession(session, StateFailed, fmt.Sprintf("graceful stop failed: %v", event.Err), emit); err != nil {
 						cancelProducers()
 						_ = group.Wait()
 						return nil, err
 					}
 				} else if session.finalTarget == StateFailed {
-					if err := session.transition(StateFailed, session.reason); err != nil {
+					if err := transitionSession(session, StateFailed, session.reason, emit); err != nil {
 						cancelProducers()
 						_ = group.Wait()
 						return nil, err
 					}
 				} else {
-					if err := session.transition(StateFinished, session.reason); err != nil {
+					if err := transitionSession(session, StateFinished, session.reason, emit); err != nil {
 						cancelProducers()
 						_ = group.Wait()
 						return nil, err
@@ -292,72 +292,130 @@ func stopProcesses(processes []*ManagedProcess, timeout time.Duration) error {
 	return errors.New(strings.Join(errs, "; "))
 }
 
-func startManagedProcess(label string, args []string, outputPath string, logger func(string, ...any)) (*ManagedProcess, error) {
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return nil, errors.Wrap(err, "create output directory")
+func newManagedProcess(label string, args []string, outputPath string) *ManagedProcess {
+	return &ManagedProcess{
+		Label:      label,
+		OutputPath: outputPath,
+		Args:       append([]string(nil), args...),
+	}
+}
+
+func (p *ManagedProcess) Run(ctx context.Context, logger func(string, ...any), emit func(RunEvent)) error {
+	if p == nil {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(p.OutputPath), 0o755); err != nil {
+		return errors.Wrap(err, "create output directory")
 	}
 
-	logger("%s argv: ffmpeg %s", label, strings.Join(args, " "))
+	logger("%s argv: ffmpeg %s", p.Label, strings.Join(p.Args, " "))
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command("ffmpeg", p.Args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "open ffmpeg stdin")
+		return errors.Wrap(err, "open ffmpeg stdin")
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "open ffmpeg stdout")
+		return errors.Wrap(err, "open ffmpeg stdout")
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "open ffmpeg stderr")
+		return errors.Wrap(err, "open ffmpeg stderr")
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, errors.Wrap(err, "start ffmpeg")
+		return errors.Wrap(err, "start ffmpeg")
 	}
 
-	proc := &ManagedProcess{
-		Label:      label,
-		OutputPath: outputPath,
-		Cmd:        cmd,
-		Stdin:      stdin,
-		done:       make(chan struct{}),
+	p.mu.Lock()
+	if p.done != nil {
+		p.mu.Unlock()
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return errors.New("managed process already running")
 	}
-	go drainScanner(stderr, func(line string) {
-		if strings.TrimSpace(line) != "" {
-			logger("%s stderr: %s", label, line)
-		}
+	p.Cmd = cmd
+	p.Stdin = stdin
+	p.done = make(chan struct{})
+	p.waitErr = nil
+	p.mu.Unlock()
+
+	emit(RunEvent{
+		Type:         RunEventProcessStarted,
+		ProcessLabel: p.Label,
+		OutputPath:   p.OutputPath,
 	})
-	go drainScanner(stdout, func(line string) {
-		if strings.TrimSpace(line) != "" {
-			logger("%s stdout: %s", label, line)
-		}
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.Go(func() error {
+		return drainScanner(groupCtx, stderr, func(line string) {
+			if strings.TrimSpace(line) != "" {
+				logger("%s stderr: %s", p.Label, line)
+				emit(RunEvent{
+					Type:         RunEventProcessLog,
+					ProcessLabel: p.Label,
+					OutputPath:   p.OutputPath,
+					Stream:       "stderr",
+					Message:      line,
+				})
+			}
+		})
 	})
-	go func() {
-		proc.mu.Lock()
-		proc.waitErr = cmd.Wait()
-		proc.mu.Unlock()
-		close(proc.done)
-	}()
-	return proc, nil
+	group.Go(func() error {
+		return drainScanner(groupCtx, stdout, func(line string) {
+			if strings.TrimSpace(line) != "" {
+				logger("%s stdout: %s", p.Label, line)
+				emit(RunEvent{
+					Type:         RunEventProcessLog,
+					ProcessLabel: p.Label,
+					OutputPath:   p.OutputPath,
+					Stream:       "stdout",
+					Message:      line,
+				})
+			}
+		})
+	})
+	group.Go(func() error {
+		return cmd.Wait()
+	})
+
+	runErr := group.Wait()
+
+	p.mu.Lock()
+	p.waitErr = runErr
+	p.Cmd = nil
+	p.Stdin = nil
+	close(p.done)
+	p.mu.Unlock()
+
+	return runErr
 }
 
 func (p *ManagedProcess) Stop(timeout time.Duration) error {
 	if p == nil {
 		return nil
 	}
-	if p.Stdin != nil {
-		_, _ = io.WriteString(p.Stdin, "q\n")
-		_ = p.Stdin.Close()
+	p.mu.RLock()
+	stdin := p.Stdin
+	cmd := p.Cmd
+	done := p.done
+	p.mu.RUnlock()
+
+	if stdin != nil {
+		_, _ = io.WriteString(stdin, "q\n")
+		_ = stdin.Close()
+	}
+	if done == nil {
+		return nil
 	}
 	select {
-	case <-p.done:
+	case <-done:
 		return p.waitResult()
 	case <-time.After(timeout):
-		if p.Cmd != nil && p.Cmd.Process != nil {
-			_ = p.Cmd.Process.Kill()
+		if cmd != nil && cmd.Process != nil {
+			_ = cmd.Process.Kill()
 		}
-		<-p.done
+		<-done
 		return p.waitResult()
 	}
 }
@@ -366,7 +424,13 @@ func (p *ManagedProcess) Wait() error {
 	if p == nil {
 		return nil
 	}
-	<-p.done
+	p.mu.RLock()
+	done := p.done
+	p.mu.RUnlock()
+	if done == nil {
+		return nil
+	}
+	<-done
 	return p.waitResult()
 }
 
@@ -376,11 +440,21 @@ func (p *ManagedProcess) waitResult() error {
 	return p.waitErr
 }
 
-func drainScanner(r io.Reader, fn func(string)) {
+func drainScanner(ctx context.Context, r io.ReadCloser, fn func(string)) error {
+	defer r.Close()
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		fn(scanner.Text())
 	}
+	if err := scanner.Err(); err != nil && ctx.Err() == nil {
+		return err
+	}
+	return nil
 }
 
 func publishEvent(ctx context.Context, events chan<- sessionEvent, event sessionEvent) {
@@ -396,4 +470,31 @@ func boundedRunHardTimeout(maxDuration, gracePeriod time.Duration) time.Duration
 		return gracePeriod
 	}
 	return timeout
+}
+
+func transitionSession(session *Session, next SessionState, reason string, emit func(RunEvent)) error {
+	if err := session.transition(next, reason); err != nil {
+		return err
+	}
+	emit(RunEvent{
+		Type:   RunEventStateChanged,
+		State:  session.state,
+		Reason: session.reason,
+	})
+	return nil
+}
+
+func beginStopping(session *Session, reason string, finalTarget SessionState, emit func(RunEvent)) error {
+	previous := session.state
+	if err := session.beginStopping(reason, finalTarget); err != nil {
+		return err
+	}
+	if session.state != previous {
+		emit(RunEvent{
+			Type:   RunEventStateChanged,
+			State:  session.state,
+			Reason: session.reason,
+		})
+	}
+	return nil
 }
