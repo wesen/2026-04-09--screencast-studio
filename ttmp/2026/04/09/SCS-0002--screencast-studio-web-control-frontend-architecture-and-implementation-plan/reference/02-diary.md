@@ -545,3 +545,101 @@ cd ui && pnpm install && pnpm dev
 pnpm storybook
 # Open http://localhost:6006
 ```
+
+---
+
+## Step 7: Add Comprehensive Storybook Stories
+
+### Prompt Context
+
+**User prompt (verbatim):** "did you add stories for all the widgets? Add copious stories."
+
+**Assistant interpretation:** Add Storybook stories for all UI components with multiple variants covering different states.
+
+**Inferred user intent:** Ensure comprehensive test coverage via Storybook for all components.
+
+**Commit (code):** `9416d44` — "ui: add comprehensive Storybook stories for all components"
+
+### What I did
+
+Added stories for all components:
+
+1. **Primitives**:
+   - Button (Default, Active, Accent, Disabled)
+   - Radio (On, Off)
+   - Sel (Default, Narrow, Wide, FpsOptions, AudioOptions, SaveLocation, Interactive)
+   - Slider (Default, Low, High, Quality, Gain, Interactive)
+   - WinBar (Default, WithClose, Sources, Output, Microphone, Status)
+   - Win (Default, Sources, Output, Closable)
+
+2. **Source Components**:
+   - FakeScreen (Display 1/2, Window Terminal/Finder/Browser/CodeEditor, Region Top/Bottom/Custom, Camera Built-in/USB/FaceTime)
+   - MicMeter (Silence, Low, Medium, High, Clipping)
+   - Waveform (Inactive, Active)
+
+3. **SourceCard**:
+   - Display Armed/Disarmed/Solo
+   - Window Terminal/Finder/Browser/CodeEditor
+   - Region TopHalf/BottomHalf/Custom
+   - Camera Builtin/USB/FaceTime
+   - WhileRecording Armed/Disarmed
+
+4. **AddSourceButton**
+
+5. **SourceGrid**:
+   - Empty, SingleSource, MultipleSources, AllSourceTypes, WhileRecording
+
+6. **OutputPanel**:
+   - Default, Recording, Paused, LowQuality, LongRecording
+
+7. **MicPanel**:
+   - Default, Recording, RecordingHighLevel, ExternalMic, LineIn, LowGain, HighGain
+
+8. **StatusPanel**:
+   - Ready, ReadyLowDisk, Recording, RecordingMultipleSources, Paused, NoArmedSources, DiskAlmostFull
+
+9. **MenuBar**:
+   - Default, MultipleArmed, NoArmed, Recording, Paused
+
+10. **StudioApp**:
+    - Default, Recording
+
+### Why
+
+Storybook provides component documentation and visual regression testing. Copious stories ensure all states are documented and can be reviewed.
+
+### What worked
+
+- All stories compile with TypeScript strict mode
+- Storybook build succeeds
+- ~60 story variants covering all component states
+
+### What didn't work
+
+Had to simplify some interactive stories (Slider, Sel) to avoid complex state management in decorators.
+
+### What I learned
+
+- Storybook args need all required props (onChange handlers)
+- Decorators for complex state need proper Redux typing
+- Use `name: 'Foo'` to override story display name
+
+### What was tricky to build
+
+StudioApp decorator needed proper Redux store typing to pass session state.
+
+### What should be done in the future
+
+- Add interaction tests for components
+- Add a11y tests
+- Add visual regression tests
+
+### Code review instructions
+
+Review `ui/src/stories/` directory for completeness.
+
+Validate with:
+```bash
+cd ui && pnpm storybook
+# Open http://localhost:6006
+```
