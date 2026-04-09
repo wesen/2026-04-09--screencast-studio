@@ -426,3 +426,95 @@ sed -n '1,260p' ui/src/stories/OutputPanel.stories.tsx
 pnpm --dir ui build
 pnpm --dir ui build-storybook
 ```
+
+## Step 5: Wire Real Compile And Recording Controls
+
+This step replaced the remaining no-op control behavior for the raw DSL compile button and the record button. The page now uses the backend mutations instead of pretending those actions exist.
+
+The important idea in this step was to keep the scope narrow:
+
+- compile the current DSL via the real compile endpoint
+- start and stop recording via the real recording endpoints
+- surface compile warnings and compile errors in the editor
+- surface recording-start and recording-stop failures in the log panel
+
+This slice does not yet solve preview acquisition or the synthetic source model. It only makes the existing top-level controls stop lying.
+
+### What I did
+
+- Extended `ui/src/features/editor/editorSlice.ts` to track:
+  - compile warnings
+  - compile errors
+  - compile in-flight state
+- Updated `ui/src/pages/StudioPage.tsx` to use:
+  - `useCompileSetupMutation`
+  - `useStartRecordingMutation`
+  - `useStopRecordingMutation`
+- Changed the record button handler so it:
+  - starts recording with the current DSL when idle
+  - stops the current session when active
+  - dispatches backend session envelopes back into the store
+- Changed the compile button handler so it:
+  - calls the real compile endpoint
+  - records warnings on success
+  - records error messages on failure
+- Updated `ui/src/components/studio/OutputPanel.tsx` to support a `transportBusy` flag so the record button can be disabled while a transition is in flight.
+- Kept the page error path simple by pushing backend mutation errors into the session log view as `ui/stderr` entries.
+- Ran:
+  - `pnpm --dir ui build`
+  - `pnpm --dir ui build-storybook`
+
+### Why
+
+- The existing buttons still represented fake functionality.
+- Backend-aligned transport without real control wiring still leaves the page misleading.
+- This slice improves correctness without requiring the preview or source-model cleanup to land first.
+
+### What worked
+
+- The compile and recording mutations integrated cleanly with the current page structure.
+- Editor warnings and errors are now represented explicitly instead of being mixed with recording-session warnings.
+- The UI build and Storybook build both remained green after the control integration.
+
+### What didn't work
+
+- Nothing failed structurally in this slice.
+- Storybook still emits its existing `eval` and chunk-size warnings, which remain unrelated to this feature work.
+
+### What I learned
+
+- The page is now at a much better point for manual smoke testing because its main controls actually exercise backend endpoints.
+- The next major architectural blocker is no longer “buttons are fake.” It is “the source and preview model is still synthetic.”
+
+### What warrants a second pair of eyes
+
+- Whether compile warnings should stay in the editor slice or move into a more general setup slice later.
+- Whether recording-mutation errors should stay in the log panel or also be shown more visibly in the transport panel.
+
+### What should be done in the future
+
+- Replace the synthetic source model with backend-aligned source and preview state.
+- Wire preview lifecycle into the page and source cards.
+- Add a manual smoke test against the real Go server now that compile and record controls are live.
+
+### Code review instructions
+
+- Review:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx`
+- Verify these calls against:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/setupApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/recordingApi.ts`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+sed -n '1,260p' ui/src/components/dsl-editor/DSLEditor.tsx
+sed -n '1,260p' ui/src/features/session/sessionSlice.ts
+sed -n '1,240p' ui/src/components/studio/OutputPanel.tsx
+pnpm --dir ui build
+pnpm --dir ui build-storybook
+```

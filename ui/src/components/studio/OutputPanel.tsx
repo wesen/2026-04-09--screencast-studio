@@ -10,6 +10,7 @@ interface OutputPanelProps {
   isRecording: boolean;
   isPaused: boolean;
   pauseSupported?: boolean;
+  transportBusy?: boolean;
   elapsed: number;
   armedCount: number;
   onFormatChange: (format: 'MOV' | 'AVI' | 'MP4') => void;
@@ -42,6 +43,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
   isRecording,
   isPaused,
   pauseSupported = true,
+  transportBusy = false,
   elapsed,
   armedCount,
   onFormatChange,
@@ -117,9 +119,10 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
           accent={!isRecording}
           active={isRecording}
           onClick={onToggleRecording}
+          disabled={transportBusy}
           style={!isRecording ? { color: 'var(--studio-cream)', background: 'var(--studio-red)' } : {}}
         >
-          {isRecording ? '◼ Stop' : '● Rec'}
+          {transportBusy ? '…' : isRecording ? '◼ Stop' : '● Rec'}
         </Btn>
         <Btn
           active={isPaused}

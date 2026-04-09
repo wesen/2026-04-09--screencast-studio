@@ -1,7 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useGetCurrentSessionQuery } from '@/api/recordingApi';
+import {
+  useGetCurrentSessionQuery,
+  useStartRecordingMutation,
+  useStopRecordingMutation,
+} from '@/api/recordingApi';
+import { useCompileSetupMutation } from '@/api/setupApi';
+import type { ApiErrorResponse, ProcessLog } from '@/api/types';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { selectDslText, setDslText } from '@/features/editor/editorSlice';
+import {
+  compileFailed,
+  compileStarted,
+  compileSucceeded,
+  selectCompileErrors,
+  selectCompileWarnings,
+  selectDslText,
+  selectIsCompiling,
+  setDslText,
+} from '@/features/editor/editorSlice';
 import {
   addSource,
   removeSource,
@@ -18,6 +33,7 @@ import {
 } from '@/features/studio-draft/studioDraftSlice';
 import { selectActiveTab, setActiveTab, type StudioTab } from '@/features/studio-ui/studioUiSlice';
 import {
+  addLog,
   selectSession,
   selectLogs,
   setSession,
@@ -44,6 +60,24 @@ const parseTimestamp = (value?: string): number | null => {
   return parsed;
 };
 
+const errorMessageFromUnknown = (error: unknown): string => {
+  if (typeof error === 'object' && error !== null && 'data' in error) {
+    const data = (error as { data?: unknown }).data;
+    if (
+      typeof data === 'object' &&
+      data !== null &&
+      'error' in data &&
+      typeof (data as ApiErrorResponse).error?.message === 'string'
+    ) {
+      return (data as ApiErrorResponse).error.message;
+    }
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'unknown error';
+};
+
 export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const dispatch = useAppDispatch();
   const sources = useAppSelector(selectSources);
@@ -53,12 +87,23 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const wsConnected = useAppSelector(selectWsConnected);
   const activeTab = useAppSelector(selectActiveTab);
   const dslText = useAppSelector(selectDslText);
+  const compileWarnings = useAppSelector(selectCompileWarnings);
+  const compileErrors = useAppSelector(selectCompileErrors);
+  const isCompiling = useAppSelector(selectIsCompiling);
   const [now, setNow] = useState(() => Date.now());
   const { data: currentSessionData } = useGetCurrentSessionQuery();
+  const [startRecording, startRecordingState] = useStartRecordingMutation();
+  const [stopRecording, stopRecordingState] = useStopRecordingMutation();
+  const [compileSetup] = useCompileSetupMutation();
 
-  const isRecording = session.active && session.state === 'running';
+  const isRecording = session.active;
   const isPaused = false;
   const diskPercent = 8;
+  const transportBusy =
+    startRecordingState.isLoading ||
+    stopRecordingState.isLoading ||
+    session.state === 'starting' ||
+    session.state === 'stopping';
 
   useEffect(() => {
     if (currentSessionData?.session) {
@@ -114,9 +159,39 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   }));
 
   const handleToggleRecording = () => {
-    if (isRecording) {
-      return;
-    }
+    void (async () => {
+      try {
+        if (isRecording) {
+          const response = await stopRecording().unwrap();
+          dispatch(setSession(response.session));
+          return;
+        }
+
+        const response = await startRecording({
+          dsl: dslText,
+        }).unwrap();
+        dispatch(setSession(response.session));
+      } catch (error) {
+        dispatch(addLog({
+          timestamp: new Date().toISOString(),
+          process_label: 'ui',
+          stream: 'stderr',
+          message: errorMessageFromUnknown(error),
+        } satisfies ProcessLog));
+      }
+    })();
+  };
+
+  const handleCompile = () => {
+    void (async () => {
+      dispatch(compileStarted());
+      try {
+        const response = await compileSetup({ dsl: dslText }).unwrap();
+        dispatch(compileSucceeded(response.warnings));
+      } catch (error) {
+        dispatch(compileFailed([errorMessageFromUnknown(error)]));
+      }
+    })();
   };
 
   return (
@@ -185,6 +260,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                 isRecording={isRecording}
                 isPaused={isPaused}
                 pauseSupported={false}
+                transportBusy={transportBusy}
                 elapsed={elapsed}
                 armedCount={armedSources.length}
                 onFormatChange={(value) => dispatch(setFormat(value))}
@@ -225,9 +301,10 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
           <DSLEditor
             value={dslText}
             onChange={(value) => dispatch(setDslText(value))}
-            onCompile={() => console.log('compile', dslText)}
-            isCompiling={false}
-            warnings={session.warnings}
+            onCompile={handleCompile}
+            isCompiling={isCompiling}
+            warnings={compileWarnings}
+            errors={compileErrors}
           />
         )}
       </div>

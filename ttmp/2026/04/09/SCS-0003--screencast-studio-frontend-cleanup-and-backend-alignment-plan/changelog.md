@@ -50,3 +50,13 @@ Started the deeper state cleanup by moving DSL text and page tab state into expl
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/app/store.ts — Store now includes the new page-level state slices
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Page now uses backend-seeded session state and explicit slices instead of local timers
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx — Pause control can now be explicitly disabled when unsupported
+
+## 2026-04-09
+
+Wired the page’s compile and recording controls to the real backend mutations so the raw DSL editor and transport controls no longer use placeholder behavior.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Page now compiles DSL and starts or stops recording through RTK Query mutations
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts — Editor slice now tracks compile warnings, compile errors, and compile loading state
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx — Transport controls now support a busy state during start and stop transitions

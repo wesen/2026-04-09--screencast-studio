@@ -25,10 +25,16 @@ audio_sources:
 
 export interface EditorState {
   dslText: string;
+  compileWarnings: string[];
+  compileErrors: string[];
+  isCompiling: boolean;
 }
 
 const initialState: EditorState = {
   dslText: DEFAULT_DSL_TEXT,
+  compileWarnings: [],
+  compileErrors: [],
+  isCompiling: false,
 };
 
 const editorSlice = createSlice({
@@ -38,11 +44,35 @@ const editorSlice = createSlice({
     setDslText(state, action: PayloadAction<string>) {
       state.dslText = action.payload;
     },
+    compileStarted(state) {
+      state.isCompiling = true;
+      state.compileErrors = [];
+    },
+    compileSucceeded(state, action: PayloadAction<string[]>) {
+      state.isCompiling = false;
+      state.compileWarnings = action.payload;
+      state.compileErrors = [];
+    },
+    compileFailed(state, action: PayloadAction<string[]>) {
+      state.isCompiling = false;
+      state.compileErrors = action.payload;
+    },
   },
 });
 
-export const { setDslText } = editorSlice.actions;
+export const {
+  setDslText,
+  compileStarted,
+  compileSucceeded,
+  compileFailed,
+} = editorSlice.actions;
 export const editorReducer = editorSlice.reducer;
 
 export const selectDslText = (state: { editor: EditorState }) =>
   state.editor.dslText;
+export const selectCompileWarnings = (state: { editor: EditorState }) =>
+  state.editor.compileWarnings;
+export const selectCompileErrors = (state: { editor: EditorState }) =>
+  state.editor.compileErrors;
+export const selectIsCompiling = (state: { editor: EditorState }) =>
+  state.editor.isCompiling;
