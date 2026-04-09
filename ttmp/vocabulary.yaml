@@ -5,6 +5,16 @@ topics:
       description: Backend services
     - slug: websocket
       description: WebSocket lifecycle & events
+    - slug: frontend
+      description: Web frontend surfaces
+    - slug: video
+      description: Video capture and preview pipelines
+    - slug: audio
+      description: Audio capture, metering, and mixing
+    - slug: dsl
+      description: Configuration DSLs and normalization layers
+    - slug: cli
+      description: Command-line UX and glazed-based commands
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes
