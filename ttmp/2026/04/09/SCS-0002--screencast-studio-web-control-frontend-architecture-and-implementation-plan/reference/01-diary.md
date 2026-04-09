@@ -39,7 +39,7 @@ RelatedFiles:
       Note: Imported mock used as the visual and product target for the web ticket
 ExternalSources: []
 Summary: Chronological record of how the second ticket for the web control frontend was created and documented.
-LastUpdated: 2026-04-09T16:24:00-04:00
+LastUpdated: 2026-04-09T16:41:00-04:00
 WhatFor: Track how the web-control frontend ticket was assembled, what evidence was used, and how to review the resulting design deliverables.
 WhenToUse: Read when continuing the frontend ticket, reviewing design provenance, or checking the exact repo evidence behind the recommendations.
 ---
@@ -361,3 +361,81 @@ Files updated in this step:
 
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/run.go`
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/app/application.go`
+
+## Step 5: Implement Phases 2 Through 4 With Stable APIs And A Web Recording Coordinator
+
+This step added the first real business endpoints to the new server shell. The work covered three linked concerns:
+
+1. expose discovery and current-session state as stable HTTP payloads,
+2. expose normalize and compile operations for browser-driven DSL editing,
+3. add a web-owned recording session coordinator that can start, stop, and report on one active recording at a time.
+
+The architectural goal was to keep the transport layer thin while still making the session lifecycle observable. The cleanest way to do that was:
+
+- add a web-layer application interface so handlers stay testable,
+- add explicit API payload types instead of returning internal structs directly,
+- add a `RecordingManager` that owns the currently active web-triggered recording session,
+- reuse the runtime event hook added in the previous step to keep session state and logs synchronized.
+
+### What I did
+
+- Added `internal/web/application.go` to define the web-layer application boundary.
+- Added `internal/web/api_types.go` for stable HTTP payloads and mapping helpers.
+- Added `internal/web/event_hub.go` as the server-side event publication backbone.
+- Added `internal/web/session_manager.go` as a single-session recording coordinator.
+- Added `internal/web/handlers_api.go` for:
+  - `GET /api/discovery`
+  - `GET /api/session`
+  - `POST /api/setup/normalize`
+  - `POST /api/setup/compile`
+  - `POST /api/recordings/start`
+  - `POST /api/recordings/stop`
+  - `GET /api/recordings/current`
+- Updated route registration in `internal/web/routes.go`.
+- Replaced the basic server test with fake-application endpoint and lifecycle tests.
+- Verified:
+  - `go test ./internal/web ./pkg/recording ./pkg/app`
+  - `go build ./...`
+
+### Why
+
+- The browser needs a stable read model before it can render real UI state.
+- The setup editor flow depends on normalize and compile APIs long before the UI exists.
+- Recording control from HTTP requires a long-lived server-side owner for the active session; it cannot be implemented as a simple request-scoped call.
+
+### What worked
+
+- Splitting stable transport payloads into their own file made the handlers much easier to read.
+- The fake application interface made it possible to test session start/stop/current flows without touching real system discovery or FFmpeg.
+- The event hub gives phase 5 a direct bridge into WebSocket publication without forcing the handler layer to know about subscribers yet.
+
+### What didn't work
+
+- The first build failed because the web layer accidentally referenced a CLI-only duration helper. That was corrected by moving the conversion into `internal/web`.
+- The testable recording manager currently uses the event hub for publication but does not yet expose `/ws`; that remains phase 5 work.
+
+### What I learned
+
+- The most important HTTP abstraction here is not “request handler.” It is “session owner.” Once that exists, the handlers become very small.
+- The runtime event sink added during the process refactor pays off immediately: it keeps the web session model honest without duplicating state transitions in the transport layer.
+
+### What warrants a second pair of eyes
+
+- Whether `RecordingManager` should store explicit ownership metadata for its background `errgroup` beyond the current cancel function and active snapshot.
+- Whether the current session payload should eventually separate “runtime logs” from “operator-facing warnings” more aggressively once the UI consumes both.
+
+### Technical details
+
+Files added in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/application.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/api_types.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/event_hub.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go`
+
+Files updated in this step:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/routes.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`

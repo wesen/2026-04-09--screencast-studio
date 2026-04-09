@@ -71,15 +71,15 @@ Acceptance criteria:
 
 ## Phase 2: Expose Read-Only Discovery And Session APIs
 
-- [ ] Add JSON endpoints for discovery:
+- [x] Add JSON endpoints for discovery:
   - displays
   - windows, if supported by the current platform
   - cameras
   - audio devices
-- [ ] Add an endpoint for fetching current runtime session state, even if no session is running.
-- [ ] Normalize all HTTP responses into stable payload structs instead of returning internal structs directly.
-- [ ] Add API request and response types in a dedicated package or file set.
-- [ ] Add tests for handler success and failure paths.
+- [x] Add an endpoint for fetching current runtime session state, even if no session is running.
+- [x] Normalize all HTTP responses into stable payload structs instead of returning internal structs directly.
+- [x] Add API request and response types in a dedicated package or file set.
+- [x] Add tests for handler success and failure paths.
 
 Suggested endpoints:
 
@@ -94,11 +94,11 @@ Acceptance criteria:
 
 ## Phase 3: Add DSL Draft, Normalize, And Compile APIs
 
-- [ ] Implement an endpoint that accepts a DSL document and returns normalized setup data.
-- [ ] Implement an endpoint that accepts a DSL document and returns compile output, warnings, and derived outputs.
-- [ ] Keep the canonical compile logic in the backend domain packages.
-- [ ] Avoid adding frontend-specific compilation shortcuts.
-- [ ] Include useful error locations and messages for invalid DSL.
+- [x] Implement an endpoint that accepts a DSL document and returns normalized setup data.
+- [x] Implement an endpoint that accepts a DSL document and returns compile output, warnings, and derived outputs.
+- [x] Keep the canonical compile logic in the backend domain packages.
+- [x] Avoid adding frontend-specific compilation shortcuts.
+- [x] Include useful error locations and messages for invalid DSL.
 - [ ] Add round-trip fixtures for valid and invalid setups.
 
 Suggested endpoints:
@@ -114,12 +114,12 @@ Acceptance criteria:
 
 ## Phase 4: Add Recording Control APIs
 
-- [ ] Implement a backend session coordinator for the web server that owns one active recording session at a time for version 1.
-- [ ] Add `start` and `stop` endpoints that operate on the existing recording runtime.
+- [x] Implement a backend session coordinator for the web server that owns one active recording session at a time for version 1.
+- [x] Add `start` and `stop` endpoints that operate on the existing recording runtime.
 - [ ] Map runtime state transitions into stable API responses and WebSocket events.
-- [ ] Ensure concurrent start attempts fail clearly.
-- [ ] Ensure stop requests are idempotent.
-- [ ] Add integration-style tests that start a fake or test-double session coordinator where appropriate.
+- [x] Ensure concurrent start attempts fail clearly.
+- [x] Ensure stop requests are idempotent.
+- [x] Add integration-style tests that start a fake or test-double session coordinator where appropriate.
 
 Suggested endpoints:
 

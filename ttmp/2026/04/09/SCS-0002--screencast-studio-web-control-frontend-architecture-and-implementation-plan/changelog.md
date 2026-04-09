@@ -47,6 +47,19 @@ Refactored the recording runtime so `ManagedProcess.Run(ctx, ...)` is the blocki
 
 ## 2026-04-09
 
+Implemented phases 2 through 4 of the web ticket: added read-only discovery/session APIs, setup normalize and compile endpoints, and a web recording session manager with start/stop/current handlers and fake-app tests.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/application.go — Web-layer application interface for testable transport code
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/api_types.go — Stable transport payloads and response mappers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/event_hub.go — Event publication backbone for later WebSocket delivery
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go — Single-session recording coordinator for the web server
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go — Discovery, setup, and recording HTTP handlers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — Handler and lifecycle tests using a fake application
+
+## 2026-04-09
+
 Implemented Phase 7 (scaffold the React frontend): created ui/ workspace with Vite, TypeScript, React 18, Redux Toolkit, RTK Query, Storybook, and MSW. Implemented all base primitives (Btn, Radio, Sel, Slider, Win, WinBar), composite components (FakeScreen, MicMeter, Waveform), source cards, and studio panels matching the screencast-studio-v2.jsx.jsx visual language. Added RTK Query API layer and MSW mock handlers.
 
 ### Commit

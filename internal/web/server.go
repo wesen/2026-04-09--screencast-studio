@@ -10,8 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/wesen/2026-04-09--screencast-studio/pkg/app"
 )
 
 type Config struct {
@@ -22,12 +20,14 @@ type Config struct {
 }
 
 type Server struct {
-	app    *app.Application
-	config Config
-	mux    *http.ServeMux
+	app        ApplicationService
+	config     Config
+	mux        *http.ServeMux
+	events     *EventHub
+	recordings *RecordingManager
 }
 
-func NewServer(application *app.Application, cfg Config) *Server {
+func NewServer(application ApplicationService, cfg Config) *Server {
 	if cfg.Addr == "" {
 		cfg.Addr = ":8080"
 	}
@@ -38,10 +38,13 @@ func NewServer(application *app.Application, cfg Config) *Server {
 		cfg.ShutdownTimeout = 5 * time.Second
 	}
 
+	events := NewEventHub()
 	server := &Server{
-		app:    application,
-		config: cfg,
-		mux:    http.NewServeMux(),
+		app:        application,
+		config:     cfg,
+		mux:        http.NewServeMux(),
+		events:     events,
+		recordings: NewRecordingManager(application, events.Publish),
 	}
 	server.registerRoutes()
 	return server
@@ -104,14 +107,14 @@ func withLogging(next http.Handler) http.Handler {
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":            true,
-		"service":       "screencast-studio",
-		"preview_limit": s.config.PreviewLimit,
+	writeJSON(w, http.StatusOK, apiHealthResponse{
+		OK:           true,
+		Service:      "screencast-studio",
+		PreviewLimit: s.config.PreviewLimit,
 	})
 }
 
