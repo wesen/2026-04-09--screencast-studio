@@ -46,3 +46,13 @@ Added the root Go module and CLI skeleton with discovery, setup compile, setup v
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/record.go — Record verb introduced in the CLI surface
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/root.go — Root command tree introduced
 
+
+## 2026-04-09
+
+Implemented real platform discovery for displays, windows, cameras, and audio inputs behind the discovery CLI (commit cd94620).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/discovery/service.go — Command-backed discovery implementation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/discovery/types.go — Discovery descriptor definitions
+

@@ -31,6 +31,10 @@ RelatedFiles:
       Note: Top-level record command wiring
     - Path: pkg/cli/root.go
       Note: Root Glazed/Cobra command tree
+    - Path: pkg/discovery/service.go
+      Note: Concrete command-backed discovery for displays
+    - Path: pkg/discovery/types.go
+      Note: Typed discovery descriptors used by the CLI milestone
     - Path: ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/sources/local/screencast-studio-v2.jsx.jsx
       Note: Imported UI mock defining the target control surface
 ExternalSources: []
@@ -39,6 +43,7 @@ LastUpdated: 2026-04-09T13:12:49.178772118-04:00
 WhatFor: Exhaustive architecture and implementation guide for the screencast studio backend, DSL, discovery, compile, and capture runtime, with web explicitly deferred.
 WhenToUse: Use when implementing the CLI-first recorder, reviewing the proposed architecture, or onboarding a new engineer to the project.
 ---
+
 
 
 

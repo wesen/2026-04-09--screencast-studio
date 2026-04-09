@@ -27,6 +27,10 @@ RelatedFiles:
       Note: Discovery list command skeleton added in Step 3
     - Path: pkg/cli/root.go
       Note: CLI skeleton added in Step 3
+    - Path: pkg/discovery/service.go
+      Note: Discovery implementation added in Step 4
+    - Path: pkg/discovery/types.go
+      Note: Discovery descriptor types added in Step 4
     - Path: ttmp/2026/04/09/SCS-0001--screencast-studio-architecture-and-implementation-plan/sources/local/screencast-studio-v2.jsx.jsx
       Note: Imported UI mock inspected during documentation
 ExternalSources: []
@@ -35,6 +39,7 @@ LastUpdated: 2026-04-09T13:12:49.194734392-04:00
 WhatFor: Chronological record of how the screencast studio architecture ticket was assembled and what evidence shaped the design.
 WhenToUse: Read when reviewing this ticket, continuing the documentation work, or checking what commands and sources were used.
 ---
+
 
 
 
@@ -327,4 +332,101 @@ screencast-studio --help            -> works
 screencast-studio discovery list    -> wired, returns not implemented
 screencast-studio setup compile     -> wired
 screencast-studio record            -> wired
+```
+
+## Step 4: Implement Real Platform Discovery
+
+This step replaced the placeholder discovery method with actual source enumeration backed by the local machine. The new implementation shells out to the platform tools that are already available in the environment and turns their output into structured rows for displays, windows, cameras, and audio inputs.
+
+This is the first slice where the CLI starts returning real user-facing data instead of just plumbing. That matters because discovery is one half of the compile problem: if the runtime cannot enumerate concrete sources reliably, there is nothing useful to compile a setup against.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 2)
+
+**Assistant interpretation:** Keep working through the CLI-first task list and implement discovery as a concrete, usable command.
+
+**Inferred user intent:** Prove the platform primitives on the real machine before moving on to compile and record.
+
+**Commit (code):** `cd94620` — "feat: implement platform discovery commands"
+
+### What I did
+
+- Added `pkg/discovery/types.go`.
+- Added `pkg/discovery/service.go`.
+- Implemented display discovery using `xrandr --listmonitors`.
+- Implemented window discovery using `xprop -root _NET_CLIENT_LIST`, `xprop -id`, and `xwininfo -id`.
+- Implemented camera discovery using `v4l2-ctl --list-devices`.
+- Implemented audio-input discovery using `pactl list short sources`.
+- Updated `pkg/app/application.go` so `discovery list` returns structured rows by kind.
+- Verified:
+  - `go build ./...`
+  - `go run ./cmd/screencast-studio discovery list --kind display --output json`
+  - `go run ./cmd/screencast-studio discovery list --kind audio --output json`
+
+### Why
+
+- Discovery had to become real before `setup compile` could do anything meaningful.
+- Using the existing platform utilities is the fastest way to validate the runtime model before deciding whether any direct X11 bindings are worth adding later.
+- Filtering by kind now avoids making audio discovery depend on X11, which is the right command behavior.
+
+### What worked
+
+- The environment already had `DISPLAY=:0`, `xrandr`, `xprop`, `xwininfo`, `v4l2-ctl`, `pactl`, and `ffmpeg`.
+- The display, window, camera, and audio enumeration commands all returned real data.
+- The command now emits useful JSON rows that can feed later compile work.
+
+### What didn't work
+
+- The first `xrandr` parser was wrong because it treated the monitor connector token as the geometry token. The failure was:
+
+```text
+Error: unexpected monitor geometry token "eDP-1"
+```
+
+- I fixed that by parsing the monitor line as fields and extracting geometry from the dedicated geometry token instead of from the connector token.
+
+### What I learned
+
+- The CLI-first sequence is already paying off. The parser bug was easy to spot and fix from a direct command invocation, and it would have been noisier to diagnose through a future web layer.
+- For discovery, command-level isolation matters. `--kind audio` should succeed even if the X11 side is unavailable.
+
+### What was tricky to build
+
+- The tricky part was not discovering the existence of the tools. It was designing the parsing logic so that it is strict enough to catch malformed output but not so brittle that one token-layout change causes the entire command to fail unexpectedly.
+
+### What warrants a second pair of eyes
+
+- Whether command-backed discovery is sufficient for version 1 or whether some parts should move to native bindings later.
+- Whether the window titles and geometries should include frame extents in addition to client bounds.
+
+### What should be done in the future
+
+- Add parser-focused tests for the discovery package.
+- Start the DSL extraction immediately so `setup compile` can resolve against these discovery results.
+- Consider fallback behavior when one platform tool is missing but others are present.
+
+### Code review instructions
+
+- Start with:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/discovery/service.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/discovery/types.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/app/application.go`
+- Validate with:
+  - `go build ./...`
+  - `go run ./cmd/screencast-studio discovery list --kind display --output json`
+  - `go run ./cmd/screencast-studio discovery list --kind audio --output json`
+
+### Technical details
+
+Observed platform primitives during implementation:
+
+```text
+DISPLAY=:0
+/usr/bin/xrandr
+/usr/bin/xwininfo
+/usr/bin/xprop
+/usr/bin/v4l2-ctl
+/usr/bin/pactl
+/usr/bin/ffmpeg
 ```
