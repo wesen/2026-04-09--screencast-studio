@@ -1,0 +1,5 @@
+version: v2
+name: buf.build/local/screencast-studio
+
+deps:
+  - buf.build/googleapis/googleapis

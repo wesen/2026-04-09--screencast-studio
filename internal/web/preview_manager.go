@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 )
 
@@ -123,11 +124,12 @@ func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID st
 		err := m.runner.Run(groupCtx, source, func(frame []byte) {
 			m.storePreviewFrame(preview.id, frame)
 		}, func(stream, line string) {
+			logTimestamp := time.Now()
 			m.publish(ServerEvent{
 				Type:      "preview.log",
-				Timestamp: time.Now(),
-				Payload: apiProcessLog{
-					Timestamp:    formatTimestamp(time.Now()),
+				Timestamp: logTimestamp,
+				Payload: &studiov1.ProcessLog{
+					Timestamp:    formatTimestamp(logTimestamp),
 					ProcessLabel: preview.id,
 					Stream:       stream,
 					Message:      line,

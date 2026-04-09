@@ -3,7 +3,6 @@ package web
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,10 +12,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 	apppkg "github.com/wesen/2026-04-09--screencast-studio/pkg/app"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/discovery"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/recording"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeApplication struct {
@@ -30,6 +32,13 @@ type fakeApplication struct {
 type fakePreviewRunner struct {
 	started chan struct{}
 	runs    atomic.Int32
+}
+
+func decodeProtoResponse(t *testing.T, body []byte, msg proto.Message) {
+	t.Helper()
+	if err := protojson.Unmarshal(body, msg); err != nil {
+		t.Fatalf("unmarshal proto response: %v", err)
+	}
 }
 
 func (f *fakeApplication) DiscoverySnapshot(ctx context.Context) (*discovery.Snapshot, error) {
@@ -121,10 +130,8 @@ func TestHealthz(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var payload apiHealthResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
+	payload := &studiov1.HealthResponse{}
+	decodeProtoResponse(t, rec.Body.Bytes(), payload)
 	if payload.Service != "screencast-studio" {
 		t.Fatalf("service = %q, want screencast-studio", payload.Service)
 	}
@@ -153,14 +160,12 @@ func TestDiscoveryEndpoint(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var payload apiDiscoveryResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-	if len(payload.Displays) != 1 || payload.Displays[0].ID != "display-1" {
+	payload := &studiov1.DiscoveryResponse{}
+	decodeProtoResponse(t, rec.Body.Bytes(), payload)
+	if len(payload.Displays) != 1 || payload.Displays[0].Id != "display-1" {
 		t.Fatalf("unexpected displays payload: %+v", payload.Displays)
 	}
-	if len(payload.Windows) != 1 || payload.Windows[0].ID != "0x01" {
+	if len(payload.Windows) != 1 || payload.Windows[0].Id != "0x01" {
 		t.Fatalf("unexpected windows payload: %+v", payload.Windows)
 	}
 }
@@ -198,12 +203,10 @@ func TestNormalizeAndCompileEndpoints(t *testing.T) {
 		t.Fatalf("compile status = %d, want %d", compileRec.Code, http.StatusOK)
 	}
 
-	var compilePayload apiCompileResponse
-	if err := json.Unmarshal(compileRec.Body.Bytes(), &compilePayload); err != nil {
-		t.Fatalf("unmarshal compile response: %v", err)
-	}
-	if compilePayload.SessionID != "session-1" {
-		t.Fatalf("session_id = %q, want session-1", compilePayload.SessionID)
+	compilePayload := &studiov1.CompileResponse{}
+	decodeProtoResponse(t, compileRec.Body.Bytes(), compilePayload)
+	if compilePayload.SessionId != "session-1" {
+		t.Fatalf("sessionId = %q, want session-1", compilePayload.SessionId)
 	}
 }
 
@@ -241,15 +244,13 @@ func TestRecordingLifecycleEndpoints(t *testing.T) {
 		t.Fatalf("current status = %d, want %d", currentRec.Code, http.StatusOK)
 	}
 
-	var currentPayload apiSessionEnvelope
-	if err := json.Unmarshal(currentRec.Body.Bytes(), &currentPayload); err != nil {
-		t.Fatalf("unmarshal current response: %v", err)
-	}
+	currentPayload := &studiov1.SessionEnvelope{}
+	decodeProtoResponse(t, currentRec.Body.Bytes(), currentPayload)
 	if !currentPayload.Session.Active {
 		t.Fatalf("expected active session, got %+v", currentPayload.Session)
 	}
-	if currentPayload.Session.SessionID != "session-2" {
-		t.Fatalf("session_id = %q, want session-2", currentPayload.Session.SessionID)
+	if currentPayload.Session.SessionId != "session-2" {
+		t.Fatalf("sessionId = %q, want session-2", currentPayload.Session.SessionId)
 	}
 
 	stopReq := httptest.NewRequest(http.MethodPost, "/api/recordings/stop", nil)
@@ -267,9 +268,7 @@ func TestRecordingLifecycleEndpoints(t *testing.T) {
 		if currentRec.Code != http.StatusOK {
 			t.Fatalf("session status = %d, want %d", currentRec.Code, http.StatusOK)
 		}
-		if err := json.Unmarshal(currentRec.Body.Bytes(), &currentPayload); err != nil {
-			t.Fatalf("unmarshal session response: %v", err)
-		}
+		decodeProtoResponse(t, currentRec.Body.Bytes(), currentPayload)
 		if !currentPayload.Session.Active {
 			break
 		}
@@ -301,8 +300,8 @@ func TestPreviewLifecycleEndpoints(t *testing.T) {
 					Target: dsl.VideoTarget{
 						Display: ":0.0",
 					},
-					Capture: dsl.VideoCaptureSettings{FPS: 5},
-					Output:  dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
+					Capture:             dsl.VideoCaptureSettings{FPS: 5},
+					Output:              dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
 					DestinationTemplate: "default",
 				},
 			},
@@ -312,7 +311,7 @@ func TestPreviewLifecycleEndpoints(t *testing.T) {
 	server := NewServer(fakeApp, Config{PreviewLimit: 2})
 	server.previews = NewPreviewManager(fakeApp, server.events.Publish, 2, runner)
 
-	ensureReq := httptest.NewRequest(http.MethodPost, "/api/previews/ensure", bytes.NewBufferString(`{"dsl":"test","source_id":"display-1"}`))
+	ensureReq := httptest.NewRequest(http.MethodPost, "/api/previews/ensure", bytes.NewBufferString(`{"dsl":"test","sourceId":"display-1"}`))
 	ensureRec := httptest.NewRecorder()
 	server.Handler().ServeHTTP(ensureRec, ensureReq)
 	if ensureRec.Code != http.StatusOK {
@@ -325,10 +324,8 @@ func TestPreviewLifecycleEndpoints(t *testing.T) {
 		t.Fatal("timed out waiting for preview to start")
 	}
 
-	var ensurePayload apiPreviewEnvelope
-	if err := json.Unmarshal(ensureRec.Body.Bytes(), &ensurePayload); err != nil {
-		t.Fatalf("unmarshal ensure response: %v", err)
-	}
+	ensurePayload := &studiov1.PreviewEnvelope{}
+	decodeProtoResponse(t, ensureRec.Body.Bytes(), ensurePayload)
 
 	listReq := httptest.NewRequest(http.MethodGet, "/api/previews", nil)
 	listRec := httptest.NewRecorder()
@@ -337,15 +334,13 @@ func TestPreviewLifecycleEndpoints(t *testing.T) {
 		t.Fatalf("list status = %d, want %d", listRec.Code, http.StatusOK)
 	}
 
-	var listPayload apiPreviewListResponse
-	if err := json.Unmarshal(listRec.Body.Bytes(), &listPayload); err != nil {
-		t.Fatalf("unmarshal preview list: %v", err)
-	}
+	listPayload := &studiov1.PreviewListResponse{}
+	decodeProtoResponse(t, listRec.Body.Bytes(), listPayload)
 	if len(listPayload.Previews) != 1 {
 		t.Fatalf("expected one preview, got %+v", listPayload.Previews)
 	}
 
-	releaseReq := httptest.NewRequest(http.MethodPost, "/api/previews/release", bytes.NewBufferString(`{"preview_id":"`+ensurePayload.Preview.ID+`"}`))
+	releaseReq := httptest.NewRequest(http.MethodPost, "/api/previews/release", bytes.NewBufferString(`{"previewId":"`+ensurePayload.Preview.Id+`"}`))
 	releaseRec := httptest.NewRecorder()
 	server.Handler().ServeHTTP(releaseRec, releaseReq)
 	if releaseRec.Code != http.StatusOK {
@@ -363,13 +358,13 @@ func TestPreviewMJPEGStream(t *testing.T) {
 			DestinationTemplates: map[string]string{"default": "/tmp/out.mkv"},
 			VideoSources: []dsl.EffectiveVideoSource{
 				{
-					ID:      "display-1",
-					Name:    "Display 1",
-					Type:    "display",
-					Enabled: true,
-					Target:  dsl.VideoTarget{Display: ":0.0"},
-					Capture: dsl.VideoCaptureSettings{FPS: 5},
-					Output:  dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
+					ID:                  "display-1",
+					Name:                "Display 1",
+					Type:                "display",
+					Enabled:             true,
+					Target:              dsl.VideoTarget{Display: ":0.0"},
+					Capture:             dsl.VideoCaptureSettings{FPS: 5},
+					Output:              dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
 					DestinationTemplate: "default",
 				},
 			},
@@ -382,17 +377,19 @@ func TestPreviewMJPEGStream(t *testing.T) {
 	ts := httptest.NewServer(server.Handler())
 	defer ts.Close()
 
-	ensureReqBody := bytes.NewBufferString(`{"dsl":"test","source_id":"display-1"}`)
+	ensureReqBody := bytes.NewBufferString(`{"dsl":"test","sourceId":"display-1"}`)
 	ensureResp, err := http.Post(ts.URL+"/api/previews/ensure", "application/json", ensureReqBody)
 	if err != nil {
 		t.Fatalf("ensure request: %v", err)
 	}
 	defer ensureResp.Body.Close()
 
-	var ensurePayload apiPreviewEnvelope
-	if err := json.NewDecoder(ensureResp.Body).Decode(&ensurePayload); err != nil {
-		t.Fatalf("decode ensure response: %v", err)
+	ensurePayload := &studiov1.PreviewEnvelope{}
+	body, err := io.ReadAll(ensureResp.Body)
+	if err != nil {
+		t.Fatalf("read ensure response: %v", err)
 	}
+	decodeProtoResponse(t, body, ensurePayload)
 
 	select {
 	case <-runner.started:
@@ -400,7 +397,7 @@ func TestPreviewMJPEGStream(t *testing.T) {
 		t.Fatal("timed out waiting for preview runner")
 	}
 
-	req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/previews/"+ensurePayload.Preview.ID+"/mjpeg", nil)
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/previews/"+ensurePayload.Preview.Id+"/mjpeg", nil)
 	if err != nil {
 		t.Fatalf("create mjpeg request: %v", err)
 	}
@@ -414,9 +411,9 @@ func TestPreviewMJPEGStream(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	if !strings.Contains(string(body), "--frame") {
-		t.Fatalf("expected mjpeg boundary in body, got %q", string(body))
+	streamBody, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(streamBody), "--frame") {
+		t.Fatalf("expected mjpeg boundary in body, got %q", string(streamBody))
 	}
 }
 
@@ -434,19 +431,23 @@ func TestWebsocketEndpoint(t *testing.T) {
 	}
 	defer conn.Close()
 
-	var sessionEvent ServerEvent
-	if err := conn.ReadJSON(&sessionEvent); err != nil {
+	_, sessionMessage, err := conn.ReadMessage()
+	if err != nil {
 		t.Fatalf("read session event: %v", err)
 	}
-	if sessionEvent.Type != "session.state" {
-		t.Fatalf("first websocket event = %q, want session.state", sessionEvent.Type)
+	sessionEvent := &studiov1.ServerEvent{}
+	decodeProtoResponse(t, sessionMessage, sessionEvent)
+	if sessionEvent.GetSessionState() == nil {
+		t.Fatalf("first websocket event = %+v, want sessionState", sessionEvent)
 	}
 
-	var previewEvent ServerEvent
-	if err := conn.ReadJSON(&previewEvent); err != nil {
+	_, previewMessage, err := conn.ReadMessage()
+	if err != nil {
 		t.Fatalf("read preview event: %v", err)
 	}
-	if previewEvent.Type != "preview.list" {
-		t.Fatalf("second websocket event = %q, want preview.list", previewEvent.Type)
+	previewEvent := &studiov1.ServerEvent{}
+	decodeProtoResponse(t, previewMessage, previewEvent)
+	if previewEvent.GetPreviewList() == nil {
+		t.Fatalf("second websocket event = %+v, want previewList", previewEvent)
 	}
 }

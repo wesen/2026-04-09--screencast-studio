@@ -113,11 +113,7 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiHealthResponse{
-		OK:           true,
-		Service:      "screencast-studio",
-		PreviewLimit: s.config.PreviewLimit,
-	})
+	writeProtoJSON(w, http.StatusOK, mapHealthResponse(s.config.PreviewLimit))
 }
 
 func (s *Server) handleWebsocketPlaceholder(w http.ResponseWriter, r *http.Request) {

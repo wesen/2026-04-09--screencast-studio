@@ -28,16 +28,16 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	events, unsubscribe := s.events.Subscribe(64)
 	defer unsubscribe()
 
-	if err := conn.WriteJSON(ServerEvent{
+	if err := writeProtoWebsocketJSON(conn, mapServerEvent(ServerEvent{
 		Type:    "session.state",
-		Payload: mapRecordingSessionResponse(s.recordings.Current()),
-	}); err != nil {
+		Payload: mapRecordingSession(s.recordings.Current()),
+	})); err != nil {
 		return
 	}
-	if err := conn.WriteJSON(ServerEvent{
+	if err := writeProtoWebsocketJSON(conn, mapServerEvent(ServerEvent{
 		Type:    "preview.list",
-		Payload: mapPreviewListPayload(s.previews.List()),
-	}); err != nil {
+		Payload: mapPreviewListResponse(s.previews.List()),
+	})); err != nil {
 		return
 	}
 
@@ -58,7 +58,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				if !ok {
 					return nil
 				}
-				if err := conn.WriteJSON(event); err != nil {
+				if err := writeProtoWebsocketJSON(conn, mapServerEvent(event)); err != nil {
 					return err
 				}
 			}
@@ -66,14 +66,4 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	})
 
 	_ = group.Wait()
-}
-
-func mapPreviewListPayload(previews []previewSnapshot) apiPreviewListResponse {
-	response := apiPreviewListResponse{
-		Previews: make([]apiPreviewResponse, 0, len(previews)),
-	}
-	for _, preview := range previews {
-		response.Previews = append(response.Previews, mapPreviewResponse(preview))
-	}
-	return response
 }

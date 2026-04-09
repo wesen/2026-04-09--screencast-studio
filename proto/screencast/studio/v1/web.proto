@@ -1,0 +1,231 @@
+syntax = "proto3";
+
+package screencast.studio.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1;studiov1";
+
+message HealthResponse {
+  bool ok = 1;
+  string service = 2;
+  int32 preview_limit = 3;
+}
+
+message DisplayDescriptor {
+  string id = 1;
+  string name = 2;
+  bool primary = 3;
+  int32 x = 4;
+  int32 y = 5;
+  int32 width = 6;
+  int32 height = 7;
+  string connector = 8;
+}
+
+message WindowDescriptor {
+  string id = 1;
+  string title = 2;
+  int32 x = 3;
+  int32 y = 4;
+  int32 width = 5;
+  int32 height = 6;
+}
+
+message CameraDescriptor {
+  string id = 1;
+  string label = 2;
+  string device = 3;
+  string card_name = 4;
+}
+
+message AudioInputDescriptor {
+  string id = 1;
+  string name = 2;
+  string driver = 3;
+  string sample_spec = 4;
+  string state = 5;
+}
+
+message DiscoveryResponse {
+  repeated DisplayDescriptor displays = 1;
+  repeated WindowDescriptor windows = 2;
+  repeated CameraDescriptor cameras = 3;
+  repeated AudioInputDescriptor audio = 4;
+}
+
+message DslRequest {
+  string dsl = 1;
+}
+
+message Rect {
+  int32 x = 1;
+  int32 y = 2;
+  int32 w = 3;
+  int32 h = 4;
+}
+
+message VideoTarget {
+  string display = 1;
+  string window_id = 2;
+  string device = 3;
+  optional Rect rect = 4;
+}
+
+message VideoCaptureSettings {
+  int32 fps = 1;
+  optional bool cursor = 2;
+  optional bool follow_resize = 3;
+  optional bool mirror = 4;
+  optional string size = 5;
+}
+
+message VideoOutputSettings {
+  string container = 1;
+  string video_codec = 2;
+  int32 quality = 3;
+}
+
+message AudioOutputSettings {
+  string codec = 1;
+  int32 sample_rate_hz = 2;
+  int32 channels = 3;
+}
+
+message AudioSourceSettings {
+  double gain = 1;
+  bool noise_gate = 2;
+  bool denoise = 3;
+}
+
+message EffectiveVideoSource {
+  string id = 1;
+  string name = 2;
+  string type = 3;
+  bool enabled = 4;
+  VideoTarget target = 5;
+  VideoCaptureSettings capture = 6;
+  VideoOutputSettings output = 7;
+  string destination_template = 8;
+}
+
+message EffectiveAudioSource {
+  string id = 1;
+  string name = 2;
+  bool enabled = 3;
+  string device = 4;
+  AudioSourceSettings settings = 5;
+}
+
+message EffectiveConfig {
+  string schema = 1;
+  string session_id = 2;
+  map<string, string> destination_templates = 3;
+  string audio_mix_template = 4;
+  AudioOutputSettings audio_output = 5;
+  repeated EffectiveVideoSource video_sources = 6;
+  repeated EffectiveAudioSource audio_sources = 7;
+}
+
+message NormalizeResponse {
+  string session_id = 1;
+  repeated string warnings = 2;
+  EffectiveConfig config = 3;
+}
+
+message PlannedOutput {
+  string kind = 1;
+  string source_id = 2;
+  string name = 3;
+  string path = 4;
+}
+
+message VideoJob {
+  EffectiveVideoSource source = 1;
+  string output_path = 2;
+}
+
+message AudioMixJob {
+  string name = 1;
+  repeated EffectiveAudioSource sources = 2;
+  AudioOutputSettings output = 3;
+  string output_path = 4;
+}
+
+message CompileResponse {
+  string session_id = 1;
+  repeated string warnings = 2;
+  repeated PlannedOutput outputs = 3;
+  repeated VideoJob video_jobs = 4;
+  repeated AudioMixJob audio_jobs = 5;
+}
+
+message RecordingStartRequest {
+  string dsl = 1;
+  optional int32 max_duration_seconds = 2;
+  optional int32 grace_period_seconds = 3;
+}
+
+message ProcessLog {
+  string timestamp = 1;
+  string process_label = 2;
+  string stream = 3;
+  string message = 4;
+}
+
+message RecordingSession {
+  bool active = 1;
+  string session_id = 2;
+  string state = 3;
+  string reason = 4;
+  string started_at = 5;
+  string finished_at = 6;
+  repeated string warnings = 7;
+  repeated PlannedOutput outputs = 8;
+  repeated ProcessLog logs = 9;
+}
+
+message SessionEnvelope {
+  RecordingSession session = 1;
+}
+
+message PreviewEnsureRequest {
+  string dsl = 1;
+  string source_id = 2;
+}
+
+message PreviewReleaseRequest {
+  string preview_id = 1;
+}
+
+message PreviewDescriptor {
+  string id = 1;
+  string source_id = 2;
+  string name = 3;
+  string source_type = 4;
+  string state = 5;
+  string reason = 6;
+  int32 leases = 7;
+  bool has_frame = 8;
+  string last_frame_at = 9;
+}
+
+message PreviewEnvelope {
+  PreviewDescriptor preview = 1;
+}
+
+message PreviewListResponse {
+  repeated PreviewDescriptor previews = 1;
+}
+
+message ServerEvent {
+  google.protobuf.Timestamp timestamp = 1;
+
+  oneof kind {
+    RecordingSession session_state = 10;
+    ProcessLog session_log = 11;
+    PreviewListResponse preview_list = 12;
+    PreviewDescriptor preview_state = 13;
+    ProcessLog preview_log = 14;
+  }
+}

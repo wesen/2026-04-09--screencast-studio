@@ -1,9 +1,9 @@
 package web
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
+
+	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 )
 
 func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
@@ -18,7 +18,7 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, mapDiscoveryResponse(snapshot))
+	writeProtoJSON(w, http.StatusOK, mapDiscoveryResponse(snapshot))
 }
 
 func (s *Server) handleSessionCurrent(w http.ResponseWriter, r *http.Request) {
@@ -27,9 +27,7 @@ func (s *Server) handleSessionCurrent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiSessionEnvelope{
-		Session: mapRecordingSessionResponse(s.recordings.Current()),
-	})
+	writeProtoJSON(w, http.StatusOK, mapSessionEnvelope(s.recordings.Current()))
 }
 
 func (s *Server) handleNormalizeSetup(w http.ResponseWriter, r *http.Request) {
@@ -43,17 +41,13 @@ func (s *Server) handleNormalizeSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := s.app.NormalizeDSL(r.Context(), []byte(request.DSL))
+	cfg, err := s.app.NormalizeDSL(r.Context(), []byte(request.GetDsl()))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_dsl", err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiNormalizeResponse{
-		SessionID: cfg.SessionID,
-		Warnings:  append([]string(nil), cfg.Warnings...),
-		Config:    mapEffectiveConfig(cfg),
-	})
+	writeProtoJSON(w, http.StatusOK, mapNormalizeResponse(cfg))
 }
 
 func (s *Server) handleCompileSetup(w http.ResponseWriter, r *http.Request) {
@@ -67,13 +61,13 @@ func (s *Server) handleCompileSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plan, err := s.app.CompileDSL(r.Context(), []byte(request.DSL))
+	plan, err := s.app.CompileDSL(r.Context(), []byte(request.GetDsl()))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "compile_failed", err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, mapCompileResponse(plan))
+	writeProtoJSON(w, http.StatusOK, mapCompileResponse(plan))
 }
 
 func (s *Server) handleRecordingStart(w http.ResponseWriter, r *http.Request) {
@@ -82,34 +76,30 @@ func (s *Server) handleRecordingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request apiRecordingStartRequest
-	if !decodeJSON(w, r, &request) {
+	var request studiov1.RecordingStartRequest
+	if !decodeProtoJSON(w, r, &request) {
 		return
 	}
-	if request.DSL == "" {
+	if request.GetDsl() == "" {
 		writeError(w, http.StatusBadRequest, "missing_dsl", "dsl is required")
 		return
 	}
 
 	state, err := s.recordings.Start(
-		[]byte(request.DSL),
-		durationFromSeconds(request.GracePeriodSeconds),
-		durationFromSeconds(request.MaxDurationSeconds),
+		[]byte(request.GetDsl()),
+		durationFromSeconds(int(request.GetGracePeriodSeconds())),
+		durationFromSeconds(int(request.GetMaxDurationSeconds())),
 	)
 	if err != nil {
 		if err == ErrRecordingAlreadyActive {
-			writeJSON(w, http.StatusConflict, apiSessionEnvelope{
-				Session: mapRecordingSessionResponse(state),
-			})
+			writeProtoJSON(w, http.StatusConflict, mapSessionEnvelope(state))
 			return
 		}
 		writeError(w, http.StatusBadRequest, "recording_start_failed", err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiSessionEnvelope{
-		Session: mapRecordingSessionResponse(state),
-	})
+	writeProtoJSON(w, http.StatusOK, mapSessionEnvelope(state))
 }
 
 func (s *Server) handleRecordingStop(w http.ResponseWriter, r *http.Request) {
@@ -118,32 +108,17 @@ func (s *Server) handleRecordingStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiSessionEnvelope{
-		Session: mapRecordingSessionResponse(s.recordings.Stop()),
-	})
+	writeProtoJSON(w, http.StatusOK, mapSessionEnvelope(s.recordings.Stop()))
 }
 
-func decodeDSLRequest(w http.ResponseWriter, r *http.Request) (*apiDSLRequest, bool) {
-	var request apiDSLRequest
-	if !decodeJSON(w, r, &request) {
+func decodeDSLRequest(w http.ResponseWriter, r *http.Request) (*studiov1.DslRequest, bool) {
+	var request studiov1.DslRequest
+	if !decodeProtoJSON(w, r, &request) {
 		return nil, false
 	}
-	if request.DSL == "" {
+	if request.GetDsl() == "" {
 		writeError(w, http.StatusBadRequest, "missing_dsl", "dsl is required")
 		return nil, false
 	}
 	return &request, true
-}
-
-func decodeJSON(w http.ResponseWriter, r *http.Request, out any) bool {
-	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_body", err.Error())
-		return false
-	}
-	if err := json.Unmarshal(body, out); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_json", err.Error())
-		return false
-	}
-	return true
 }

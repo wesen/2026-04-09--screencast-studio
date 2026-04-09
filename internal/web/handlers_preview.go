@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 )
 
 func (s *Server) handlePreviewEnsure(w http.ResponseWriter, r *http.Request) {
@@ -15,16 +17,16 @@ func (s *Server) handlePreviewEnsure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request apiPreviewEnsureRequest
-	if !decodeJSON(w, r, &request) {
+	var request studiov1.PreviewEnsureRequest
+	if !decodeProtoJSON(w, r, &request) {
 		return
 	}
-	if request.DSL == "" || request.SourceID == "" {
+	if request.GetDsl() == "" || request.GetSourceId() == "" {
 		writeError(w, http.StatusBadRequest, "invalid_preview_request", "dsl and source_id are required")
 		return
 	}
 
-	preview, err := s.previews.Ensure(r.Context(), []byte(request.DSL), request.SourceID)
+	preview, err := s.previews.Ensure(r.Context(), []byte(request.GetDsl()), request.GetSourceId())
 	if err != nil {
 		switch err {
 		case ErrPreviewLimitExceeded:
@@ -37,7 +39,7 @@ func (s *Server) handlePreviewEnsure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiPreviewEnvelope{Preview: mapPreviewResponse(preview)})
+	writeProtoJSON(w, http.StatusOK, &studiov1.PreviewEnvelope{Preview: mapPreviewResponse(preview)})
 }
 
 func (s *Server) handlePreviewRelease(w http.ResponseWriter, r *http.Request) {
@@ -46,22 +48,22 @@ func (s *Server) handlePreviewRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request apiPreviewReleaseRequest
-	if !decodeJSON(w, r, &request) {
+	var request studiov1.PreviewReleaseRequest
+	if !decodeProtoJSON(w, r, &request) {
 		return
 	}
-	if request.PreviewID == "" {
+	if request.GetPreviewId() == "" {
 		writeError(w, http.StatusBadRequest, "missing_preview_id", "preview_id is required")
 		return
 	}
 
-	preview, err := s.previews.Release(request.PreviewID)
+	preview, err := s.previews.Release(request.GetPreviewId())
 	if err != nil {
 		writeError(w, http.StatusNotFound, "preview_not_found", err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiPreviewEnvelope{Preview: mapPreviewResponse(preview)})
+	writeProtoJSON(w, http.StatusOK, &studiov1.PreviewEnvelope{Preview: mapPreviewResponse(preview)})
 }
 
 func (s *Server) handlePreviewList(w http.ResponseWriter, r *http.Request) {
@@ -71,13 +73,7 @@ func (s *Server) handlePreviewList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	previews := s.previews.List()
-	response := apiPreviewListResponse{
-		Previews: make([]apiPreviewResponse, 0, len(previews)),
-	}
-	for _, preview := range previews {
-		response.Previews = append(response.Previews, mapPreviewResponse(preview))
-	}
-	writeJSON(w, http.StatusOK, response)
+	writeProtoJSON(w, http.StatusOK, mapPreviewListResponse(previews))
 }
 
 func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {

@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
+	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/app"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/recording"
@@ -167,7 +168,7 @@ func (m *RecordingManager) applyRunEvent(sessionID string, event recording.RunEv
 		m.publish(ServerEvent{
 			Type:      "session.log",
 			Timestamp: event.Timestamp,
-			Payload: apiProcessLog{
+			Payload: &studiov1.ProcessLog{
 				Timestamp:    formatTimestamp(event.Timestamp),
 				ProcessLabel: event.ProcessLabel,
 				Stream:       event.Stream,
@@ -210,7 +211,7 @@ func (m *RecordingManager) publishState(state recordingSessionState) {
 	m.publish(ServerEvent{
 		Type:      "session.state",
 		Timestamp: time.Now(),
-		Payload:   mapRecordingSessionResponse(state),
+		Payload:   mapRecordingSession(state),
 	})
 }
 
