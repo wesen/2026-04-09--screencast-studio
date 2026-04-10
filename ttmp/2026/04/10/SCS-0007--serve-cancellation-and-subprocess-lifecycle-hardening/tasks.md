@@ -63,21 +63,21 @@ Acceptance criteria:
 
 ## Phase 2: Add Explicit Manager Shutdown APIs
 
-- [ ] Add `Shutdown(ctx)` to `RecordingManager`.
-- [ ] Implement `RecordingManager.Shutdown(ctx)` so it:
+- [x] Add `Shutdown(ctx)` to `RecordingManager`.
+- [x] Implement `RecordingManager.Shutdown(ctx)` so it:
   - detects whether a recording is active
   - logs shutdown intent
   - cancels the active session
   - waits for the session `done` channel
   - respects the shutdown deadline
-- [ ] Add `Shutdown(ctx)` to `PreviewManager`.
-- [ ] Implement `PreviewManager.Shutdown(ctx)` so it:
+- [x] Add `Shutdown(ctx)` to `PreviewManager`.
+- [x] Implement `PreviewManager.Shutdown(ctx)` so it:
   - snapshots active previews under lock
   - cancels all active preview contexts
   - waits for all preview `done` channels outside the lock
   - aggregates timeout/failure information
 - [ ] Decide whether `TelemetryManager` needs a formal `Shutdown(ctx)` method or whether `Run(ctx)` is sufficient once ownership is corrected.
-- [ ] Ensure manager shutdown paths never block while holding mutable state locks.
+- [x] Ensure manager shutdown paths never block while holding mutable state locks.
 
 Acceptance criteria:
 
@@ -184,7 +184,7 @@ Acceptance criteria:
 
 - [x] Commit 1: lifecycle logging only
 - [ ] Commit 2: manager parent-context ownership refactor
-- [ ] Commit 3: recording/preview manager `Shutdown(ctx)` implementations
+- [x] Commit 3: recording/preview manager `Shutdown(ctx)` implementations
 - [ ] Commit 4: server supervisor shutdown sequence refactor
 - [ ] Commit 5: subprocess lifecycle helper/process-group hardening
 - [ ] Commit 6: tests and manual validation docs

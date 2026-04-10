@@ -68,3 +68,15 @@ Refactored Phase 1 to use constructor-time parent-context injection for the serv
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/serve.go — Serve runtime context is now created before server construction
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/reference/01-investigation-diary.md — Recorded the deadlock
 
+
+## 2026-04-10
+
+Added explicit `Shutdown(ctx)` APIs to the recording and preview managers in commit `34493fb`, with focused success/timeout tests in `internal/web/manager_shutdown_test.go`. This phase keeps shutdown contracts local to the managers and deliberately defers the top-level server orchestration change to a later step.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/manager_shutdown_test.go — Added focused manager shutdown tests covering success and timeout paths
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go — Added PreviewManager.Shutdown(ctx) with per-preview cancellation and timeout reporting
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go — Added RecordingManager.Shutdown(ctx) with bounded wait semantics
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/reference/01-investigation-diary.md — Recorded the implementation and validation details for Phase 2
+

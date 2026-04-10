@@ -489,3 +489,101 @@ go test ./internal/web -v -count=1 -timeout 30s
 gofmt -w pkg/cli/serve.go internal/web/server.go internal/web/session_manager.go internal/web/preview_manager.go internal/web/server_test.go
 go test ./...
 ```
+
+## Step 6: Add explicit `Shutdown(ctx)` APIs to the recording and preview managers with focused tests
+
+With constructor-time parent-context ownership in place, I moved to Phase 2: add explicit `Shutdown(ctx)` methods to the managers that actually own long-lived serve work. I deliberately kept this separate from the later `Server.ListenAndServe` orchestration change. In other words, this step adds the shutdown contracts and validates them in isolation, but it does not yet wire the server to invoke them as the top-level shutdown sequence.
+
+I also took the opportunity to add focused manager-level tests rather than jumping straight to OS-process integration tests. That kept the risk low and matched the user’s instruction to stop rather than bluff if the cancellation tests became too complex or unreliable. These tests are simple and deterministic because they operate on fake applications, fake preview runners, and in-memory manager state instead of trying to prove full process-tree cleanup yet.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 4)
+
+**Assistant interpretation:** Continue the next ticket phase, keep the work incremental, and prefer trustworthy tests over ambitious but flaky runtime tests.
+
+**Inferred user intent:** Build the cancellation system from clean abstractions outward: first ownership, then explicit shutdown contracts, then later full server orchestration.
+
+**Commit (code):** pending at the time of this diary entry; this step records the implementation and validation work before the Phase 2 commit is created.
+
+### What I did
+- Added `RecordingManager.Shutdown(ctx)` in `internal/web/session_manager.go`.
+- Implemented recording manager shutdown so it:
+  - snapshots the current session without holding the lock while waiting,
+  - logs shutdown begin/cancel/done/timeout,
+  - cancels the active recording session when needed,
+  - waits on the session `done` channel,
+  - respects the supplied shutdown context deadline.
+- Added `PreviewManager.Shutdown(ctx)` in `internal/web/preview_manager.go`.
+- Implemented preview manager shutdown so it:
+  - snapshots active previews under lock,
+  - marks previews as stopping with a shutdown reason,
+  - publishes updated preview state after unlocking,
+  - cancels each preview worker,
+  - waits on each preview `done` channel outside the lock,
+  - returns a contextual timeout error that includes pending preview IDs.
+- Added a dedicated manager shutdown test file:
+  - `internal/web/manager_shutdown_test.go`
+- Added focused tests for:
+  - successful recording manager shutdown while a fake recording is active,
+  - recording manager shutdown timeout when a session never finishes,
+  - successful preview manager shutdown while a fake preview is active,
+  - preview manager shutdown timeout when a preview never finishes.
+- Validated first with an isolated package run and then with the full suite:
+
+```bash
+go test ./internal/web -v -count=1 -timeout 45s
+go test ./...
+```
+
+### Why
+- The design doc explicitly calls for deterministic manager shutdown contracts.
+- These methods are the missing API layer between manager ownership and future server-wide shutdown orchestration.
+- Focused tests at this phase are strong enough to prove the contracts without getting lost in flaky process-runtime behavior too early.
+
+### What worked
+- The manager shutdown implementations were straightforward once the ownership model was cleaned up in Phase 1.
+- The timeout tests were easy to make deterministic by manually constructing manager state with `done` channels that never close.
+- The active-session/active-preview tests remained lightweight because the existing fake app and fake preview runner were already good enough for this layer.
+
+### What didn't work
+- Nothing fundamentally failed in this phase after the design boundaries were respected.
+- The only care point was making sure the shutdown waits happen **outside** the manager lock, which I handled explicitly while implementing both methods.
+
+### What I learned
+- The manager-level API boundary is a good place to encode timeout semantics. It lets later server orchestration stay simpler because it can treat managers as shutdown-capable components instead of knowing their internal channel/cancel details.
+- The preview shutdown path benefits from returning pending preview IDs on timeout. That kind of context will be valuable when the top-level server shutdown sequence eventually aggregates errors.
+- The user’s warning about test complexity is still valid, but this phase confirmed that we can get meaningful coverage without yet touching the harder process-runtime scenarios.
+
+### What was tricky to build
+- The subtle part in `PreviewManager.Shutdown(ctx)` was preserving the lock discipline from the Phase 1 deadlock lesson. I needed to mutate preview state under lock, but publish state, cancel workers, and wait on `done` channels only after unlocking.
+- Another subtle part was deciding how much information to include in timeout errors. I chose to include pending preview IDs in the returned error string because that is specific enough to debug but still cheap to compute.
+
+### What warrants a second pair of eyes
+- Whether `PreviewManager.Shutdown(ctx)` should also reduce leases or leave lease accounting untouched during shutdown. Right now it leaves lease counts as historical state and relies on worker completion for cleanup.
+- Whether `RecordingManager.Shutdown(ctx)` should distinguish more explicitly between “inactive but still draining” and “no current session.”
+- The future server orchestration phase, where these manager shutdown calls will be composed with HTTP shutdown and telemetry exit.
+
+### What should be done in the future
+- Commit the Phase 2 code and docs as separate checkpoints.
+- Next implement Phase 4-style server wiring later so `ListenAndServe` actually invokes the new shutdown APIs.
+- Revisit telemetry to decide whether it also needs a formal `Shutdown(ctx)` method or whether `Run(ctx)` remains the right shape.
+
+### Code review instructions
+- Review `internal/web/session_manager.go` and `internal/web/preview_manager.go` first; focus on the new `Shutdown(ctx)` methods and lock discipline.
+- Then review `internal/web/manager_shutdown_test.go` to see the intended contract behavior in success and timeout cases.
+- Validate with:
+
+```bash
+go test ./internal/web -v -count=1 -timeout 45s
+go test ./...
+```
+
+### Technical details
+- Commands run in this step:
+
+```bash
+gofmt -w internal/web/session_manager.go internal/web/preview_manager.go internal/web/manager_shutdown_test.go
+go test ./internal/web -v -count=1 -timeout 45s
+go test ./...
+```
