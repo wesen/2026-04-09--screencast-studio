@@ -102,6 +102,14 @@ If the UI cannot answer those questions clearly, it is still a prototype, not a 
 
 Extend the existing recording configuration model so the backend can compute and expose user-facing recording details before recording begins, and add real runtime telemetry over the websocket channel.
 
+The implementation should stay simple: use the structured DSL draft as the source of truth for recording configuration wherever possible, and avoid creating a second parallel config model unless the data genuinely lives outside DSL. In practice that means:
+
+- recording name is the structured draft `session_id`
+- destination naming stays anchored in `destination_templates`
+- microphone choice and gain live on the structured audio source model
+- output preview comes from the existing compile path
+- protobuf expansion is primarily for live telemetry and future runtime-only state
+
 The solution has five parts:
 
 1. Add a product-level recording configuration model.
@@ -124,6 +132,31 @@ Open Studio
   -> Record
   -> See recording runtime status update live
 ```
+
+### Current Reality Audit
+
+Before implementing anything, it is important to record what is real today versus what only looks real.
+
+- `ui/src/components/studio/OutputPanel.tsx`
+  - `Format`, `Framerate`, `Quality`, `Audio`, and `Multi-track` are backed by the `studioDraft` Redux slice, but the recording mutation still sends only `dsl`.
+  - `Save to` is completely fake and hardcoded.
+  - the rendered size estimate is also fake UI math.
+- `ui/src/components/studio/MicPanel.tsx`
+  - the panel shape is good, but input choices are hardcoded and `gain` does not drive the DSL or backend today.
+  - meter rendering is intentionally unavailable because fake telemetry was removed.
+- `ui/src/components/studio/StatusPanel.tsx`
+  - recording state and armed-source labels are real enough.
+  - disk telemetry is not real yet.
+- backend capabilities that already exist:
+  - normalize DSL into an effective config
+  - compile DSL into concrete planned outputs
+  - resolve real output paths using `destination_templates`
+  - discover audio devices
+  - stream session/log websocket events
+- backend gaps that still exist:
+  - no audio-meter event stream
+  - no disk telemetry event stream
+  - no productized destination-root control in the mounted UI
 
 ### Proposed Product Model
 
@@ -152,6 +185,24 @@ The product model should distinguish between three categories of data.
 
 This separation is important. The UI should not derive final file paths on its own. It should ask the backend for them.
 
+### Ownership Decision
+
+The simplest maintainable model for this ticket is:
+
+- Structured builder state owns editable recording configuration.
+- Raw DSL remains the advanced escape hatch.
+- Compile output remains the authoritative preview of what files will be written.
+
+More concretely:
+
+- `setupDraft.sessionId` is the recording name in structured mode.
+- `setupDraft.destinationTemplates` remains the canonical output-naming source.
+- the mounted destination-root field is a convenience editor for the builder-supported template shape, not a new hidden transport format.
+- `setupDraft.audioSources[0]` is the primary microphone control surface in v1.
+- live telemetry does not belong in DSL and must flow over websocket.
+
+This is preferable to adding a second overlay request model because the application already has a structured draft, raw DSL synchronization rules, and a working compile preview endpoint. Reusing that path keeps code volume and conceptual surface smaller.
+
 ## Detailed Design
 
 ## 1. Recording Name
@@ -161,8 +212,8 @@ The UI needs a real “name” field. This should not just be decorative. It sho
 ### Proposed Semantics
 
 - The field is user-editable in the main recording controls area.
-- It becomes part of the data used to render destination templates.
-- It is sent to the backend as part of the recording-config input surface.
+- In structured mode it maps directly to `session_id` in the generated DSL.
+- It therefore becomes part of the data used to render destination templates without any special-case backend path.
 
 ### Example
 
@@ -186,6 +237,13 @@ The existing `Save to` selector is not real. The productized version should expo
 
 Use one editable destination-root field in the UI. This can begin as a plain text field if no cross-platform directory-picker is available in the browser context.
 
+In structured mode, this field should rewrite the builder-supported default templates rather than introducing a new runtime-only destination model. For example:
+
+- `per_source: <root>/{session_id}/{source_name}.{ext}`
+- `audio_mix: <root>/{session_id}/audio-mix.{ext}`
+
+This keeps the actual compile/runtime path unchanged. The UI remains a convenience editor for the canonical DSL representation.
+
 The backend should validate:
 
 - empty path
@@ -199,19 +257,7 @@ The backend should validate:
 - show validation state
 - show resolved outputs below it
 
-Pseudocode:
-
-```ts
-const preview = await previewRecordingConfig({
-  dsl,
-  recordingName,
-  destinationRoot,
-  audioInputId,
-  gain,
-});
-
-render(preview.outputs);
-```
+If the current advanced DSL does not match the builder-supported template shape, the field should lock with a clear explanation instead of trying to rewrite arbitrary templates.
 
 ## 3. Resolved Output Preview
 
@@ -227,11 +273,7 @@ The backend should expose a resolved preview of:
 - final filename
 - full path
 
-This can likely fit best into:
-
-- normalize response, if normalize is extended to include recording-config inputs
-- or compile response, if compile is treated as the authoritative preview
-- or a dedicated `preview recording config` endpoint if separation is cleaner
+This should come from the existing compile response first. The system already has an authoritative compilation path that resolves output names and full paths. Reusing it keeps implementation simple and prevents drift between “preview” and “record”.
 
 ### Suggested JSON/Protobuf Shape
 

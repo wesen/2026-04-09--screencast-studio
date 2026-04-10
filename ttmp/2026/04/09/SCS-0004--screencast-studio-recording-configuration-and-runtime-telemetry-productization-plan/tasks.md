@@ -6,9 +6,9 @@ Make the recording configuration and telemetry parts of the web UI real: destina
 
 ## Phase 1: Freeze The Current Product Gap
 
-- [ ] Audit the current controls in `ui/src/components/studio/OutputPanel.tsx`, `ui/src/components/studio/MicPanel.tsx`, and `ui/src/pages/StudioPage.tsx`.
-- [ ] Record which controls are presentation-only versus backend-driven.
-- [ ] Enumerate exactly which values must become first-class runtime configuration:
+- [x] Audit the current controls in `ui/src/components/studio/OutputPanel.tsx`, `ui/src/components/studio/MicPanel.tsx`, and `ui/src/pages/StudioPage.tsx`.
+- [x] Record which controls are presentation-only versus backend-driven.
+- [x] Enumerate exactly which values must become first-class runtime configuration:
   - recording name
   - destination root directory
   - per-source filename preview
@@ -16,7 +16,15 @@ Make the recording configuration and telemetry parts of the web UI real: destina
   - gain
   - meter levels
   - disk telemetry
-- [ ] Record the current backend capabilities and limits so the intern does not design imaginary behavior.
+- [x] Record the current backend capabilities and limits so the intern does not design imaginary behavior.
+
+Current-vs-target summary:
+
+- `OutputPanel` is mostly presentation-only today. `format`, `fps`, `quality`, `audio`, and `multiTrack` are driven by `studioDraft`, but `record` still sends only `dsl`, so those controls do not affect the runtime. `Save to` is fully fake.
+- `MicPanel` renders a real control shell, but input choices are hardcoded and `gain` is only local Redux UI state. Live meter data is not connected.
+- `StatusPanel` is mostly honest after cleanup, but disk telemetry is still absent and explicitly rendered as unavailable.
+- The backend already knows how to normalize DSL, compile a real output plan, resolve concrete output paths, discover audio inputs, and stream session/log events over websocket.
+- The backend does not yet publish audio-meter or disk-telemetry events.
 
 Acceptance criteria:
 
@@ -25,16 +33,25 @@ Acceptance criteria:
 
 ## Phase 2: Define The Product Model
 
-- [ ] Define the user-facing recording configuration model:
+- [x] Define the user-facing recording configuration model:
   - session or recording name
   - output root directory
   - resolved output files
   - audio input selection
   - gain
   - telemetry feed
-- [ ] Decide which values live in DSL, which live in a runtime request, and which are derived read-only display values.
-- [ ] Decide whether the UI should mutate raw DSL directly, maintain a structured draft model, or send an overlay config to the backend.
-- [ ] Document the canonical resolution flow for output filenames before recording begins.
+- [x] Decide which values live in DSL, which live in a runtime request, and which are derived read-only display values.
+- [x] Decide whether the UI should mutate raw DSL directly, maintain a structured draft model, or send an overlay config to the backend.
+- [x] Document the canonical resolution flow for output filenames before recording begins.
+
+Chosen product model:
+
+- `setupDraft.sessionId` is the recording name in structured mode.
+- `setupDraft.destinationTemplates` remains the canonical naming template source. The mounted UI will expose a simplified destination-root field only for the builder-supported template shape and will rewrite the canonical templates, not bypass them.
+- `setupDraft.audioSources[0]` is the primary microphone control surface in v1. Device selection and gain update the structured draft and therefore the rendered DSL.
+- The compile endpoint remains the authority for output preview. The UI should display `CompileResponse.outputs`, not guess filenames.
+- Raw DSL remains the advanced override. If the active DSL shape is not builder-compatible, the structured recording controls should lock rather than pretending they still own the configuration.
+- Protobuf expansion is required for runtime telemetry events, not for the initial recording-name or output-preview slice because those can flow through the existing DSL + compile contract.
 
 Acceptance criteria:
 
@@ -43,7 +60,7 @@ Acceptance criteria:
 
 ## Phase 3: Extend The Shared Contract
 
-- [ ] Add protobuf messages or fields for any missing recording-configuration inputs.
+- [ ] Add protobuf messages or fields for telemetry and any later recording-configuration inputs that cannot cleanly flow through DSL.
 - [ ] Add protobuf messages or events for runtime telemetry:
   - audio meter samples
   - disk telemetry
