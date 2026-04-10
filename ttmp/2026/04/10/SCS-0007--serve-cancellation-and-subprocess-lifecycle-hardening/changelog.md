@@ -54,3 +54,17 @@ Implemented the first runtime observability pass in commit e2fce73 (serve: add r
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/run.go — Added recording ffmpeg process lifecycle logging
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/reference/01-investigation-diary.md — Recorded the step
 
+
+## 2026-04-10
+
+Refactored Phase 1 to use constructor-time parent-context injection for the server, recording manager, and preview manager. During validation this introduced a lock-order self-deadlock in the manager context accessors; isolated  testing exposed it and the fix was to stop taking the manager lock when reading immutable constructor-owned parent contexts.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go — Preview manager now receives its parent context at construction time
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go — NewServer now receives the runtime context and passes it into managers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — Updated tests to construct servers/managers with explicit parent contexts
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go — Recording manager now receives its parent context at construction time
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/serve.go — Serve runtime context is now created before server construction
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/reference/01-investigation-diary.md — Recorded the deadlock
+

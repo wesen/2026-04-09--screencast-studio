@@ -369,3 +369,123 @@ go test ./...
 git add internal/web/server.go internal/web/session_manager.go internal/web/preview_manager.go internal/web/preview_runner.go internal/web/telemetry_manager.go pkg/recording/run.go pkg/cli/serve.go
 git commit -m "serve: add runtime lifecycle logging"
 ```
+
+## Step 5: Convert manager ownership to constructor-time parent-context injection and fix the resulting deadlock
+
+After finishing the logging pass, I moved to Phase 1: make recording and preview runtime ownership explicit by passing a parent context at construction time instead of mutating the managers later with `SetParentContext(...)`. This matches the user’s architectural feedback and produces a cleaner ownership story: the serve command now creates the runtime context before constructing the server, and the server passes that parent context into the recording and preview managers immediately.
+
+I did hit a real regression during this refactor. My first version stored the constructor-provided parent context on the managers, but `Start()` / `Ensure()` still called a helper that took an `RLock` while those methods already held the manager `Lock`. That created a self-deadlock in tests. I stopped, isolated the failing package, read the goroutine dump, found the recursive lock usage, and fixed it before moving on. This is exactly the kind of issue the user warned about for cancellation/runtime work, so I’m documenting it in detail.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 4)
+
+**Assistant interpretation:** Refine the Phase 1 implementation so that parent context ownership is injected at creation time, keep progress incremental, and verify the runtime changes carefully.
+
+**Inferred user intent:** Prefer the cleaner API design even if it requires revisiting the initial implementation, but do not paper over test failures or deadlocks.
+
+**Commit (code):** pending at the time of this diary entry; this step records the implementation and validation work before the Phase 1 commit is created.
+
+### What I did
+- Changed `pkg/cli/serve.go` so the signal-derived serve runtime context is created **before** server construction and passed into `web.NewServer(...)`.
+- Changed `internal/web/server.go` so `NewServer(...)` accepts a parent context and passes it directly into:
+  - `NewRecordingManager(...)`
+  - `NewPreviewManager(...)`
+- Changed `internal/web/session_manager.go` so `RecordingManager` receives its `parentCtx` in the constructor.
+- Changed `internal/web/preview_manager.go` so `PreviewManager` receives its `parentCtx` in the constructor.
+- Removed the need for the runtime-time mutator approach in this Phase 1 path.
+- Updated `internal/web/server_test.go` call sites to construct servers and preview managers with explicit parent contexts.
+- Ran a narrowed package test first, because an earlier broad run had timed out.
+- Investigated the timeout with:
+
+```bash
+go test ./internal/web -v -count=1 -timeout 30s
+```
+
+- Identified the deadlock in the goroutine dump:
+  - `RecordingManager.parentContext()` acquired `RLock` while `Start()` already held `Lock`
+  - `PreviewManager.parentContext()` acquired `RLock` while `Ensure()` already held `Lock`
+- Fixed both helper methods so they no longer take the manager lock when reading `parentCtx`.
+- Re-ran the isolated package and then the full suite successfully:
+
+```bash
+go test ./internal/web -v -count=1 -timeout 30s
+go test ./...
+```
+
+### Why
+- Constructor-time injection is a better API than mutating managers after `NewServer(...)` returns.
+- It makes the ownership model obvious in code and matches the design doc more closely.
+- The isolated-package test loop was the right risk-control tactic after the initial timeout.
+
+### What worked
+- The refactor itself was structurally small: only a few constructors and call sites had to change.
+- The verbose `internal/web` test run gave a precise enough goroutine dump to localize the deadlock quickly.
+- After the lock fix, both the focused package run and the full suite passed.
+
+### What didn't work
+- My first implementation of constructor injection introduced a self-deadlock.
+- The failing diagnostic run was:
+
+```text
+go test ./internal/web -v -count=1 -timeout 30s
+panic: test timed out after 30s
+running tests:
+    TestPreviewLifecycleEndpoints (30s)
+    TestPreviewMJPEGStream (30s)
+    TestRecordingLifecycleEndpoints (30s)
+```
+
+- The goroutine dump showed the problem clearly:
+
+```text
+github.com/wesen/2026-04-09--screencast-studio/internal/web.(*RecordingManager).parentContext(...)
+/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go:69
+...
+github.com/wesen/2026-04-09--screencast-studio/internal/web.(*PreviewManager).parentContext(...)
+/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go:86
+```
+
+- Root cause: `parentContext()` tried to acquire an `RLock` while `Start()` / `Ensure()` already held the same manager’s write lock.
+
+### What I learned
+- This refactor validated the user’s warning: cancellation/runtime work is easy to make superficially “cleaner” while accidentally creating subtle lock-order bugs.
+- Constructor injection is still the right design, but only if immutable constructor-owned fields are treated as immutable and not routed through lock-heavy accessors in hot paths.
+- When runtime-oriented tests appear to “just hang,” an explicit small-timeout focused package run is much more effective than re-running the entire suite blindly.
+
+### What was tricky to build
+- The hardest part was not the API change itself; it was preserving the incremental discipline. I could have rolled the lock fix, constructor refactor, and later shutdown API work into one large patch, but that would have made the regression much harder to understand.
+- Another subtlety was test strategy. The full-suite run had previously timed out at 120 seconds, but once I narrowed it to `internal/web -v -timeout 30s`, the failure became obvious and actionable.
+
+### What warrants a second pair of eyes
+- The remaining `context.Background()` uses in serve-owned code, especially outside the exact manager constructor paths.
+- The assumption that `parentCtx` is immutable after construction; if that changes later, the no-lock accessor would need to be revisited.
+- The next phase, where explicit `Shutdown(ctx)` methods will introduce more blocking/waiting logic into the managers.
+
+### What should be done in the future
+- Commit this Phase 1 constructor-injection refactor as its own checkpoint.
+- Update the ticket task list to reflect that constructor-time parent-context wiring is complete.
+- Move next to Phase 2: explicit `Shutdown(ctx)` APIs for recording and preview managers.
+
+### Code review instructions
+- Review `pkg/cli/serve.go` first to see where the runtime context is now created.
+- Then review `internal/web/server.go` to see that `NewServer(...)` now receives the parent context.
+- Then review `internal/web/session_manager.go` and `internal/web/preview_manager.go` for the constructor changes and the deadlock fix.
+- Then confirm the updated tests in `internal/web/server_test.go` still construct the server and preview manager explicitly with parent contexts.
+- Validate with:
+
+```bash
+go test ./internal/web -v -count=1 -timeout 30s
+go test ./...
+```
+
+### Technical details
+- Key commands run in this step:
+
+```bash
+rg -n "NewServer\(" -S cmd internal pkg | sed -n '1,120p'
+rg -n "NewRecordingManager\(|NewPreviewManager\(" internal/web pkg -S
+go test ./internal/web -v -count=1 -timeout 30s
+gofmt -w pkg/cli/serve.go internal/web/server.go internal/web/session_manager.go internal/web/preview_manager.go internal/web/server_test.go
+go test ./...
+```

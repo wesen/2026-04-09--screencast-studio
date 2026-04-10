@@ -50,10 +50,10 @@ Acceptance criteria:
 ## Phase 1: Make Runtime Ownership Explicit
 
 - [ ] Audit every remaining `context.Background()` use in serve-owned runtime paths.
-- [ ] Pass a server-owned parent context into `RecordingManager`.
-- [ ] Pass a server-owned parent context into `PreviewManager`.
+- [x] Pass a server-owned parent context into `RecordingManager`.
+- [x] Pass a server-owned parent context into `PreviewManager`.
 - [ ] Decide whether `TelemetryManager` also needs explicit constructor-level parent ownership for symmetry.
-- [ ] Refactor manager constructors and call sites in `internal/web/server.go` accordingly.
+- [x] Refactor manager constructors and call sites in `internal/web/server.go` accordingly.
 - [ ] Document the new runtime ownership tree in comments near the server/manager wiring.
 
 Acceptance criteria:
