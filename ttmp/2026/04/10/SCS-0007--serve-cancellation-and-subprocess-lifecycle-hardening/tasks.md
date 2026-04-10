@@ -76,7 +76,7 @@ Acceptance criteria:
   - cancels all active preview contexts
   - waits for all preview `done` channels outside the lock
   - aggregates timeout/failure information
-- [ ] Decide whether `TelemetryManager` needs a formal `Shutdown(ctx)` method or whether `Run(ctx)` is sufficient once ownership is corrected.
+- [x] Decide whether `TelemetryManager` needs a formal `Shutdown(ctx)` method or whether `Run(ctx)` is sufficient once ownership is corrected. (Current decision: keep telemetry context-driven via `Run(ctx)` and explicitly wait for the telemetry goroutine in `ListenAndServe`.)
 - [x] Ensure manager shutdown paths never block while holding mutable state locks.
 
 Acceptance criteria:

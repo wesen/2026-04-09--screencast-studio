@@ -753,6 +753,7 @@ Command exited with code 124
   - active recording + `Ctrl-C`
   - mixed preview + recording + `Ctrl-C`
 - Decide later whether browser auto-open should be configurable for testing and debugging.
+- Keep telemetry context-driven for now; no separate `TelemetryManager.Shutdown(ctx)` method is needed yet because `Run(ctx)` already exits on runtime cancellation and the server now waits explicitly for the telemetry goroutine.
 
 ### Code review instructions
 - Review the new shutdown-order comment in `internal/web/server.go`.
