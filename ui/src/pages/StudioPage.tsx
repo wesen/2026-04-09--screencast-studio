@@ -268,10 +268,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const previewsById = useAppSelector(selectPreviewsById);
   const ownedPreviewIdBySourceId = useAppSelector(selectOwnedPreviewIdBySourceId);
   const [now, setNow] = useState(() => Date.now());
+  const [bootstrapReady, setBootstrapReady] = useState(false);
   const ownedPreviewIdBySourceIdRef = useRef<Record<string, string>>({});
   const pendingPreviewEnsuresRef = useRef<Set<string>>(new Set());
   const pendingPreviewReleasesRef = useRef<Map<string, string>>(new Map());
   const previewGenerationRef = useRef<Record<string, number>>({});
+  const bootstrapAppliedRef = useRef(false);
   const { data: healthData } = useGetHealthQuery();
   const { data: discoveryData } = useGetDiscoveryQuery();
   const { data: currentSessionData } = useGetCurrentSessionQuery();
@@ -329,6 +331,18 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   );
 
   useEffect(() => {
+    if (!healthData || bootstrapAppliedRef.current) {
+      return;
+    }
+
+    if (healthData.initialDsl) {
+      dispatch(setDslText(healthData.initialDsl));
+    }
+    bootstrapAppliedRef.current = true;
+    setBootstrapReady(true);
+  }, [dispatch, healthData]);
+
+  useEffect(() => {
     if (currentSessionData?.session) {
       dispatch(setSession(currentSessionData.session));
     }
@@ -376,6 +390,9 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   }, [isRecording, session.startedAt]);
 
   useEffect(() => {
+    if (!bootstrapReady) {
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         dispatch(normalizeStarted());
@@ -408,7 +425,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [compileSetup, dispatch, dslText, normalizeSetup]);
+  }, [bootstrapReady, compileSetup, dispatch, dslText, normalizeSetup]);
 
   useEffect(() => {
     ownedPreviewIdBySourceIdRef.current = ownedPreviewIdBySourceId;

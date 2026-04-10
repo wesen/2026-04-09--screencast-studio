@@ -9,12 +9,19 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func mapHealthResponse(previewLimit int) *studiov1.HealthResponse {
-	return &studiov1.HealthResponse{
+func mapHealthResponse(previewLimit int, initialDSL, initialDSLPath string) *studiov1.HealthResponse {
+	response := &studiov1.HealthResponse{
 		Ok:           true,
 		Service:      "screencast-studio",
 		PreviewLimit: int32(previewLimit),
 	}
+	if initialDSL != "" {
+		response.InitialDsl = &initialDSL
+	}
+	if initialDSLPath != "" {
+		response.InitialDslPath = &initialDSLPath
+	}
+	return response
 }
 
 func mapDiscoveryResponse(snapshot *discovery.Snapshot) *studiov1.DiscoveryResponse {

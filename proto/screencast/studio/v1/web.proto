@@ -10,6 +10,8 @@ message HealthResponse {
   bool ok = 1;
   string service = 2;
   int32 preview_limit = 3;
+  optional string initial_dsl = 4;
+  optional string initial_dsl_path = 5;
 }
 
 message DisplayDescriptor {

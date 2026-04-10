@@ -17,6 +17,8 @@ import (
 )
 
 type Config struct {
+	InitialDSL      string
+	InitialDSLPath  string
 	Addr            string
 	StaticDir       string
 	PreviewLimit    int
@@ -186,6 +188,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			Str("event", "runtime.http.start").
 			Str("addr", s.config.Addr).
 			Str("static_dir", s.config.StaticDir).
+			Str("initial_dsl_path", s.config.InitialDSLPath).
 			Int("preview_limit", s.config.PreviewLimit).
 			Dur("shutdown_timeout", s.config.ShutdownTimeout).
 			Msg("web server starting")
@@ -436,7 +439,7 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeProtoJSON(w, http.StatusOK, mapHealthResponse(s.config.PreviewLimit))
+	writeProtoJSON(w, http.StatusOK, mapHealthResponse(s.config.PreviewLimit, s.config.InitialDSL, s.config.InitialDSLPath))
 }
 
 func (s *Server) handleWebsocketPlaceholder(w http.ResponseWriter, r *http.Request) {

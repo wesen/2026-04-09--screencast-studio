@@ -23,12 +23,14 @@ const (
 )
 
 type HealthResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
-	Service       string                 `protobuf:"bytes,2,opt,name=service,proto3" json:"service,omitempty"`
-	PreviewLimit  int32                  `protobuf:"varint,3,opt,name=preview_limit,json=previewLimit,proto3" json:"preview_limit,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Ok             bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Service        string                 `protobuf:"bytes,2,opt,name=service,proto3" json:"service,omitempty"`
+	PreviewLimit   int32                  `protobuf:"varint,3,opt,name=preview_limit,json=previewLimit,proto3" json:"preview_limit,omitempty"`
+	InitialDsl     *string                `protobuf:"bytes,4,opt,name=initial_dsl,json=initialDsl,proto3,oneof" json:"initial_dsl,omitempty"`
+	InitialDslPath *string                `protobuf:"bytes,5,opt,name=initial_dsl_path,json=initialDslPath,proto3,oneof" json:"initial_dsl_path,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *HealthResponse) Reset() {
@@ -80,6 +82,20 @@ func (x *HealthResponse) GetPreviewLimit() int32 {
 		return x.PreviewLimit
 	}
 	return 0
+}
+
+func (x *HealthResponse) GetInitialDsl() string {
+	if x != nil && x.InitialDsl != nil {
+		return *x.InitialDsl
+	}
+	return ""
+}
+
+func (x *HealthResponse) GetInitialDslPath() string {
+	if x != nil && x.InitialDslPath != nil {
+		return *x.InitialDslPath
+	}
+	return ""
 }
 
 type DisplayDescriptor struct {
@@ -2428,11 +2444,16 @@ var File_proto_screencast_studio_v1_web_proto protoreflect.FileDescriptor
 
 const file_proto_screencast_studio_v1_web_proto_rawDesc = "" +
 	"\n" +
-	"$proto/screencast/studio/v1/web.proto\x12\x14screencast.studio.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"_\n" +
+	"$proto/screencast/studio/v1/web.proto\x12\x14screencast.studio.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd9\x01\n" +
 	"\x0eHealthResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
 	"\aservice\x18\x02 \x01(\tR\aservice\x12#\n" +
-	"\rpreview_limit\x18\x03 \x01(\x05R\fpreviewLimit\"\xb9\x01\n" +
+	"\rpreview_limit\x18\x03 \x01(\x05R\fpreviewLimit\x12$\n" +
+	"\vinitial_dsl\x18\x04 \x01(\tH\x00R\n" +
+	"initialDsl\x88\x01\x01\x12-\n" +
+	"\x10initial_dsl_path\x18\x05 \x01(\tH\x01R\x0einitialDslPath\x88\x01\x01B\x0e\n" +
+	"\f_initial_dslB\x13\n" +
+	"\x11_initial_dsl_path\"\xb9\x01\n" +
 	"\x11DisplayDescriptor\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -2739,6 +2760,7 @@ func file_proto_screencast_studio_v1_web_proto_init() {
 	if File_proto_screencast_studio_v1_web_proto != nil {
 		return
 	}
+	file_proto_screencast_studio_v1_web_proto_msgTypes[0].OneofWrappers = []any{}
 	file_proto_screencast_studio_v1_web_proto_msgTypes[8].OneofWrappers = []any{}
 	file_proto_screencast_studio_v1_web_proto_msgTypes[9].OneofWrappers = []any{}
 	file_proto_screencast_studio_v1_web_proto_msgTypes[21].OneofWrappers = []any{}

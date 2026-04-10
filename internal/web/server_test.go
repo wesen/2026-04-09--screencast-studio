@@ -221,6 +221,41 @@ func TestHealthz(t *testing.T) {
 	if payload.PreviewLimit != 7 {
 		t.Fatalf("preview_limit = %d, want 7", payload.PreviewLimit)
 	}
+	if payload.InitialDsl != nil {
+		t.Fatalf("initial_dsl = %q, want nil", payload.GetInitialDsl())
+	}
+	if payload.InitialDslPath != nil {
+		t.Fatalf("initial_dsl_path = %q, want nil", payload.GetInitialDslPath())
+	}
+}
+
+func TestHealthzIncludesInitialDSL(t *testing.T) {
+	t.Parallel()
+
+	server := NewServer(context.Background(), &fakeApplication{}, Config{
+		Addr:           ":0",
+		PreviewLimit:   4,
+		InitialDSL:     "schema: recorder.config/v1\nsession_id: preload\n",
+		InitialDSLPath: "./examples/preload.yaml",
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/healthz", nil)
+	rec := httptest.NewRecorder()
+
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	payload := &studiov1.HealthResponse{}
+	decodeProtoResponse(t, rec.Body.Bytes(), payload)
+	if payload.GetInitialDsl() != "schema: recorder.config/v1\nsession_id: preload\n" {
+		t.Fatalf("initial_dsl = %q", payload.GetInitialDsl())
+	}
+	if payload.GetInitialDslPath() != "./examples/preload.yaml" {
+		t.Fatalf("initial_dsl_path = %q", payload.GetInitialDslPath())
+	}
 }
 
 func TestDiscoveryEndpoint(t *testing.T) {
