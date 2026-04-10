@@ -80,3 +80,14 @@ Added explicit `Shutdown(ctx)` APIs to the recording and preview managers in com
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go — Added RecordingManager.Shutdown(ctx) with bounded wait semantics
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/reference/01-investigation-diary.md — Recorded the implementation and validation details for Phase 2
 
+
+## 2026-04-10
+
+Refactored `ListenAndServe` into a staged runtime shutdown in commit `070e6eb`, so serve now stops HTTP intake, explicitly drains recording and preview managers, waits for HTTP/telemetry goroutines to exit, and logs a final runtime component summary before returning.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go — Orchestrates staged runtime shutdown and waits for manager/goroutine completion
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/reference/01-investigation-diary.md — Recorded the server orchestration phase and validation details
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/tasks.md — Marked the completed Phase 4 shutdown orchestration items
+

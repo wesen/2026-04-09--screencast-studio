@@ -101,13 +101,13 @@ Acceptance criteria:
 
 ## Phase 4: Refactor `Server.ListenAndServe` Into A Full Runtime Supervisor
 
-- [ ] Refactor `internal/web/server.go` so shutdown is a staged runtime operation rather than only HTTP shutdown.
-- [ ] Stop accepting new HTTP traffic before draining background managers.
-- [ ] Trigger manager shutdown explicitly during serve shutdown.
-- [ ] Wait for telemetry exit as part of the same shutdown sequence.
-- [ ] Aggregate shutdown errors from HTTP server, recording manager, preview manager, and telemetry manager.
+- [x] Refactor `internal/web/server.go` so shutdown is a staged runtime operation rather than only HTTP shutdown.
+- [x] Stop accepting new HTTP traffic before draining background managers.
+- [x] Trigger manager shutdown explicitly during serve shutdown.
+- [x] Wait for telemetry exit as part of the same shutdown sequence.
+- [x] Aggregate shutdown errors from HTTP server, recording manager, preview manager, and telemetry manager.
 - [ ] Decide on the final shutdown order and encode it clearly in code comments.
-- [ ] Add a final success/failure summary log before `ListenAndServe` returns.
+- [x] Add a final success/failure summary log before `ListenAndServe` returns.
 
 Acceptance criteria:
 
@@ -185,7 +185,7 @@ Acceptance criteria:
 - [x] Commit 1: lifecycle logging only
 - [ ] Commit 2: manager parent-context ownership refactor
 - [x] Commit 3: recording/preview manager `Shutdown(ctx)` implementations
-- [ ] Commit 4: server supervisor shutdown sequence refactor
+- [x] Commit 4: server supervisor shutdown sequence refactor
 - [ ] Commit 5: subprocess lifecycle helper/process-group hardening
 - [ ] Commit 6: tests and manual validation docs
 

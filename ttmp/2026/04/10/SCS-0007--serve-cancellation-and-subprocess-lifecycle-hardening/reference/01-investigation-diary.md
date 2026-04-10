@@ -587,3 +587,92 @@ gofmt -w internal/web/session_manager.go internal/web/preview_manager.go interna
 go test ./internal/web -v -count=1 -timeout 45s
 go test ./...
 ```
+
+## Step 7: Wire manager shutdown into `ListenAndServe` and make serve shutdown a staged orchestration
+
+With the manager `Shutdown(ctx)` APIs in place, I moved to the server-level orchestration phase. The goal of this step was to stop `ListenAndServe` from behaving like “just HTTP shutdown plus whatever context cancellation happens to do.” Instead, the server now treats shutdown as an ordered runtime operation: begin shutdown, stop new HTTP traffic, explicitly drain recordings and previews, wait for HTTP/telemetry goroutines to exit, and emit a component summary before returning.
+
+I intentionally did **not** try to add a browser-opening or real-OS-process integration test at this point. The current suite already gave good signal for the manager contracts, and the server change itself stayed testable through the existing package tests. That keeps us on the right side of the user’s warning about not disappearing into unreliable cancellation/runtime test work too early.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 4)
+
+**Assistant interpretation:** Keep executing the next phase of the cancellation plan, but stay disciplined about complexity and only add test scope that remains trustworthy.
+
+**Inferred user intent:** Make `serve` itself understand manager shutdown sequencing, while still avoiding heroics around brittle runtime tests.
+
+**Commit (code):** `070e6eb` — `serve: orchestrate manager shutdown in server`
+
+### What I did
+- Refactored `internal/web/server.go` so `ListenAndServe` now:
+  - creates `httpDone` and `telemetryDone` channels,
+  - closes them when the corresponding goroutines exit,
+  - triggers a staged shutdown when `groupCtx.Done()` fires,
+  - calls `httpServer.Shutdown(...)` first,
+  - then calls `s.recordings.Shutdown(...)`,
+  - then calls `s.previews.Shutdown(...)`,
+  - then waits for the HTTP and telemetry goroutines to finish,
+  - logs a final runtime component summary (`recording_active`, `recording_session_id`, `remaining_previews`),
+  - aggregates shutdown errors into one returned error when needed.
+- Added a helper in `server.go` to wait for runtime participants with timeout-aware logging.
+- Re-ran:
+
+```bash
+go test ./internal/web -v -count=1 -timeout 45s
+go test ./...
+```
+
+### Why
+- The manager shutdown APIs are only half the story until the top-level server actually uses them.
+- This change is the first point where `serve` becomes an explicit runtime supervisor instead of a loose container for background work.
+- The staged shutdown sequence matches the order documented in the design doc closely enough to validate the architecture in code.
+
+### What worked
+- The refactor fit cleanly into `server.go` without forcing changes across the rest of the codebase.
+- Existing tests remained green after the orchestration change.
+- The shutdown summary log now gives a simple, high-level postcondition that will be useful once we start doing more realistic manual cancellation runs.
+
+### What didn't work
+- I still did not add a dedicated `ListenAndServe` interrupt integration test in this phase. That was a conscious choice, not an accidental omission, because the browser-opening side effect and real socket lifecycle make that test more expensive to stabilize than the current phase required.
+- One task in Phase 4 remains only partially done: I have encoded the shutdown order in the code structure itself, but I have **not** yet added a dedicated explanatory code comment documenting that final order as prose.
+
+### What I learned
+- Wiring the manager shutdown methods into `ListenAndServe` made the runtime shape much easier to read. The server now has a visible orchestration spine instead of relying on implicit cancellation alone.
+- Waiting explicitly for the HTTP and telemetry goroutines after initiating shutdown is useful even when `errgroup` would eventually wait anyway, because it makes the shutdown phases observable and gives us a place to emit timeouts tied to named participants.
+
+### What was tricky to build
+- The delicate part was making sure the shutdown goroutine did not try to outsmart `errgroup`. I wanted explicit waits and logs for HTTP/telemetry participants, but I also needed the existing goroutines to stay under `errgroup` so final error propagation remained straightforward.
+- Another subtlety was deciding how much to aggregate. I chose string aggregation for shutdown errors in this phase because it is simple and sufficient for logs and top-level failure reporting; we can always refine that representation later if the error handling needs to become more structured.
+
+### What warrants a second pair of eyes
+- Whether the shutdown goroutine should also log a stronger distinction between external cancellation (`SIGINT`/`SIGTERM`) and internal runtime failure (for example, HTTP listener error) when both end up flowing through `groupCtx.Done()`.
+- Whether the final shutdown summary should eventually include richer per-manager details once a subprocess registry exists.
+- Whether telemetry should get a first-class `Shutdown(ctx)` method for API symmetry, even if the current `Run(ctx)` shape is still workable.
+
+### What should be done in the future
+- Add the missing explanatory comment about the chosen shutdown order in `server.go`.
+- Revisit telemetry shutdown symmetry later.
+- Move next to the subprocess-hardening phase, or to manual validation if we want to observe the new shutdown logs before changing more process behavior.
+
+### Code review instructions
+- Review commit `070e6eb`.
+- Focus entirely on `internal/web/server.go`.
+- Read the shutdown goroutine in order and compare it against the Phase 4 task list.
+- Validate with:
+
+```bash
+go test ./internal/web -v -count=1 -timeout 45s
+go test ./...
+```
+
+### Technical details
+- Commands run in this step:
+
+```bash
+gofmt -w internal/web/server.go
+go test ./internal/web -v -count=1 -timeout 45s
+go test ./...
+git add internal/web/server.go
+git commit -m "serve: orchestrate manager shutdown in server"
+```
