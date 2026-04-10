@@ -23,6 +23,8 @@ topics:
       description: Productization and end-user workflow topics
     - slug: recording
       description: Recording session lifecycle and output topics
+    - slug: screencast-studio
+      description: Documentation related to the screencast-studio repository and runtime.
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes

@@ -1,0 +1,371 @@
+---
+Title: Investigation diary
+Ticket: SCS-0007
+Status: active
+Topics:
+    - screencast-studio
+    - backend
+DocType: reference
+Intent: long-term
+Owners: []
+RelatedFiles:
+    - Path: internal/web/preview_manager.go
+      Note: Preview ownership gap captured in the diary
+    - Path: internal/web/server.go
+      Note: Central shutdown and manager ownership investigation target
+    - Path: internal/web/session_manager.go
+      Note: Recording cancellation path reviewed during investigation
+    - Path: internal/web/telemetry_manager.go
+      Note: Ad hoc telemetry cancellation attempt and build error context
+    - Path: pkg/cli/serve.go
+      Note: Prompted the investigation into serve signal handling
+    - Path: pkg/recording/run.go
+      Note: ffmpeg lifecycle behavior that motivated the ticket
+ExternalSources: []
+Summary: Chronological diary of the cancellation/shutdown investigation, including evidence gathering, partial failed implementation attempts, and documentation handoff.
+LastUpdated: 2026-04-10T09:31:48.138740639-04:00
+WhatFor: Capture what was investigated, what failed, what was learned, and how to continue the cancellation hardening work safely.
+WhenToUse: Use when resuming the cancellation ticket or reviewing how the current design guide was produced.
+---
+
+
+# Investigation diary
+
+## Goal
+
+Capture the work that led to ticket `SCS-0007`, including the user-reported shutdown problem, the code paths inspected, the partial implementation attempt that motivated a step back, and the final documentation artifacts created for a more disciplined follow-up.
+
+## Step 1: Inspect the current serve cancellation shape and identify likely leak paths
+
+The user first reported that `Ctrl-C` seemed to hang and that `ffmpeg` could remain running in the background after exiting. I started by inspecting the serve path, the server lifecycle, and the subprocess-heavy managers to understand whether shutdown ownership was centralized or fragmented. The result of that inspection was that runtime ownership is currently fragmented across server, telemetry, preview, and recording layers.
+
+That finding changed the direction of the work. Instead of applying another local fix in one file, it became clear that the repository needed a ticket and a design-level explanation of the runtime model, because the problem is architectural rather than a single missing `cancel()` call.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Create a new ticket to add proper cancellation, and reate a detailed analysis / design / implementation guide that is very detailed for a new intern, explaining all the parts of the system needed to understand what it is, with prose paragraphs and bullet point sand pseudocode and diagrams and api references and file
+  references.
+  It should be very clear and detailed. Store in the ticket and the nupload to remarkable."
+
+**Assistant interpretation:** Create a dedicated docmgr ticket for cancellation hardening, document the current runtime and the proposed shutdown architecture in depth, keep a diary of the investigation, validate the docs, and upload the result to reMarkable.
+
+**Inferred user intent:** Avoid more speculative shutdown patches, preserve the current repo state, and leave behind a high-quality onboarding document so a future engineer can implement robust cancellation safely.
+
+**Commit (code):** N/A — this ticket deliverable documents the work and does not land a code fix.
+
+### What I did
+- Inspected the serve command signal hookup in `pkg/cli/serve.go`.
+- Inspected `internal/web/server.go` for top-level lifecycle ownership.
+- Inspected `internal/web/session_manager.go`, `internal/web/preview_manager.go`, and `internal/web/telemetry_manager.go` to trace manager-owned contexts.
+- Inspected `pkg/recording/run.go` and `internal/web/preview_runner.go` to compare how recording and preview subprocesses are launched and stopped.
+- Searched the test suite for shutdown- and stop-related coverage.
+
+### Why
+- The user explicitly wanted a step back and a new ticket rather than another rushed fix.
+- Cancellation bugs are usually ownership bugs, not just signal bugs.
+- I needed line-anchored evidence before writing design guidance.
+
+### What worked
+- `rg`-based codebase search quickly identified all relevant cancellation sites.
+- Reading the managers in parallel made the inconsistency obvious:
+  - recording manager roots work in `context.Background()`;
+  - preview manager also roots work in `context.Background()`;
+  - telemetry is comparatively closer to a server-owned context model.
+- Existing tests gave enough signal to conclude that the repo lacks serve-process interruption coverage.
+
+### What didn't work
+- An earlier ad hoc attempt tried to change shutdown behavior directly before the user asked to step back.
+- A validation build during that attempt failed with:
+
+```text
+go build ./cmd/screencast-studio/...
+# github.com/wesen/2026-04-09--screencast-studio/internal/web
+internal/web/telemetry_manager.go:18:2: "github.com/rs/zerolog/log" imported and not used
+```
+
+- A subsequent build attempt was interrupted and returned:
+
+```text
+Command aborted
+```
+
+- Those failed iterations reinforced the user’s point: the runtime needs deliberate design and better observability before more code churn.
+
+### What I learned
+- The server structurally owns the managers but does not yet act as a complete runtime supervisor.
+- The biggest conceptual bug is detached background ownership, not just missing signal handling.
+- The recording path is the riskiest subprocess path because it uses plain `exec.Command(...)` and relies on higher-level orchestration to stop workers.
+
+### What was tricky to build
+- The tricky part was separating **observed facts** from **likely failure modes**. The user observed that `ffmpeg` remained in the background, but I did not reproduce that exact leak in this documentation task. Instead, I had to build the design guide from code evidence showing why such a leak is plausible.
+- Another tricky part was distinguishing three similar but different runtime models:
+  - serve-level cancellation,
+  - manager-level cancellation,
+  - OS subprocess termination and reaping.
+- These layers can appear equivalent when reading casually, but they are not. The design doc therefore spends time on ownership diagrams and file-level references so a future engineer does not conflate them.
+
+### What warrants a second pair of eyes
+- Any future implementation that touches `pkg/recording/run.go`, because it controls real ffmpeg processes and output finalization.
+- Any attempt to add process-group killing, because that is powerful but platform-sensitive.
+- Any shutdown refactor that waits on channels while holding locks in the managers.
+
+### What should be done in the future
+- Add the logging and shutdown APIs described in the design doc.
+- Add integration tests that prove `SIGINT` reaps helper subprocesses.
+- Revisit the current in-progress serve/telemetry edits in the working tree in light of the documented architecture before merging anything.
+
+### Code review instructions
+- Start with `pkg/cli/serve.go`, then `internal/web/server.go`, then the three managers.
+- Read `pkg/recording/run.go` carefully after `internal/web/session_manager.go`; that is where the real process lifecycle lives.
+- Compare detached `context.Background()` usage in recording and preview managers against the desired ownership tree in the design doc.
+
+### Technical details
+- Key search used:
+
+```bash
+rg -n "ListenAndServe|signal.NotifyContext|exec.CommandContext|cmd\.Wait\(|context\.WithCancel\(|Shutdown\(|Kill\(|Signal\(|PreviewManager|TelemetryManager|RecordingManager|parec|ffmpeg" cmd internal pkg -S
+```
+
+- Key files inspected:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/serve.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_runner.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/telemetry_manager.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/run.go`
+
+## Step 2: Create the ticket workspace and write the intern-oriented implementation guide
+
+After the architectural picture was clear, I created a dedicated ticket workspace, added the primary design doc and diary doc, and wrote a detailed design guide aimed at a new intern. The guide explains what the product is, which files matter, how the current runtime is stitched together, where the cancellation holes are, and how to implement a proper solution in phases.
+
+The emphasis in this step was on clarity and continuation-friendliness. The user explicitly asked for prose, bullet points, pseudocode, diagrams, API references, and file references. I therefore wrote the design doc as an onboarding artifact rather than a terse engineering note.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 1)
+
+**Assistant interpretation:** Turn the cancellation investigation into a formal ticket deliverable with enough context that a new engineer can continue the work without replaying the entire investigation.
+
+**Inferred user intent:** Reduce future confusion and make cancellation work reviewable, teachable, and easy to resume.
+
+**Commit (code):** N/A
+
+### What I did
+- Created ticket `SCS-0007` with docmgr.
+- Added a design doc and a diary document.
+- Added explicit tasks to the ticket.
+- Wrote a long-form design doc with:
+  - executive summary,
+  - problem statement,
+  - current-state architecture,
+  - gap analysis,
+  - proposed solution,
+  - pseudocode,
+  - diagrams,
+  - implementation phases,
+  - testing strategy,
+  - risks and open questions,
+  - file-by-file reading guide.
+- Wrote this diary to preserve the investigation path.
+
+### Why
+- The repo already contains enough moving parts that an undocumented fix would be hard to review and maintain.
+- A ticket-local doc set is the right place to preserve line-anchored evidence and implementation guidance.
+
+### What worked
+- `docmgr ticket create-ticket` and `docmgr doc add` created the workspace cleanly.
+- Ticket tasks provide a concrete checklist for future implementation and validation.
+- The design doc format was well suited to an intern-oriented explanation because the system has clear layers and file boundaries.
+
+### What didn't work
+- N/A in the ticket-creation step itself.
+
+### What I learned
+- The existing codebase is already decomposed into useful conceptual seams: CLI, app service, server, recording manager, preview manager, telemetry manager, subprocess runners.
+- That decomposition makes the documentation stronger, because the eventual fix can likely be implemented incrementally instead of as a rewrite.
+
+### What was tricky to build
+- The main difficulty was preserving enough detail to be genuinely useful to a new engineer without turning the guide into an unreadable dump of code excerpts.
+- I handled that by using stable section ordering, short diagrams, and explicit file reading order.
+
+### What warrants a second pair of eyes
+- Whether the proposed process-group recommendation should be in phase 1 or phase 2 of implementation.
+- Whether the subprocess helper should live under `internal/web`, `internal/process`, or `pkg/recording`.
+
+### What should be done in the future
+- Once implementation begins, update this diary with concrete commits, runtime reproduction steps, and any log traces gathered from the new instrumentation.
+
+### Code review instructions
+- Review the design doc first.
+- Then compare its “Current-State Architecture” section with the code to confirm every claim is evidence-backed.
+- Then review the task list and decide how to split the implementation across PRs.
+
+### Technical details
+- Ticket commands used:
+
+```bash
+docmgr ticket create-ticket --ticket SCS-0007 --title "Serve cancellation and subprocess lifecycle hardening" --topics screencast-studio,backend
+docmgr doc add --ticket SCS-0007 --doc-type design-doc --title "Serve cancellation, subprocess shutdown, and observability implementation guide"
+docmgr doc add --ticket SCS-0007 --doc-type reference --title "Investigation diary"
+docmgr task add --ticket SCS-0007 --text "Map current serve/record/preview/telemetry cancellation paths and subprocess ownership"
+docmgr task add --ticket SCS-0007 --text "Write intern-oriented design and implementation guide for proper cancellation"
+docmgr task add --ticket SCS-0007 --text "Write investigation diary with exact commands, failures, and next steps"
+docmgr task add --ticket SCS-0007 --text "Relate key code files to the design and diary docs"
+docmgr task add --ticket SCS-0007 --text "Validate ticket with docmgr doctor and upload bundle to reMarkable"
+```
+
+## Step 3: Validate and publish the ticket deliverables
+
+The final step is operational rather than architectural: relate the relevant code files to the docs, run `docmgr doctor`, and upload the design bundle to reMarkable. This matters because the user did not just ask for local markdown files; they asked for a durable ticket artifact and a published copy on the tablet.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 1)
+
+**Assistant interpretation:** Finish the documentation workflow completely, including validation and delivery.
+
+**Inferred user intent:** Ensure the work is discoverable later and convenient to read away from the terminal.
+
+**Commit (code):** N/A
+
+### What I did
+- Prepared the ticket docs for relation, validation, and upload.
+- Left the design doc written in a bundle-friendly format so it can render well to PDF.
+
+### Why
+- A good design doc is not fully delivered until it is validated and published to the requested destination.
+
+### What worked
+- The ticket structure created by docmgr is already suitable for upload bundling.
+
+### What didn't work
+- N/A at the time of writing this step; validation and upload are tracked as the next operational actions in this same ticket workflow.
+
+### What I learned
+- Ticket-local documentation scales well when the repo already uses docmgr conventions.
+
+### What was tricky to build
+- The main challenge here is making sure the markdown remains readable both in Git and in a bundled PDF. That is why the guide uses plain Markdown headings and ASCII diagrams instead of more tooling-dependent syntax.
+
+### What warrants a second pair of eyes
+- The final rendered PDF on reMarkable, to ensure the headings and diagrams remain legible.
+
+### What should be done in the future
+- If this ticket leads to implementation, add a second diary step for the code change itself with exact commit hashes and validation logs.
+
+### Code review instructions
+- After validation and upload, review the final ticket paths and confirm the related-files metadata is correct.
+
+### Technical details
+- Validation target command:
+
+```bash
+docmgr doctor --ticket SCS-0007 --stale-after 30
+```
+
+- Upload target pattern:
+
+```bash
+remarquee upload bundle <docs...> --name "SCS-0007 cancellation design bundle" --remote-dir "/ai/2026/04/10/SCS-0007" --toc-depth 2
+```
+
+## Step 4: Implement the first lifecycle-logging pass without changing the documented ownership model
+
+After the ticket docs were in place, the user asked me to execute the task list one phase at a time, commit at sensible boundaries, and keep the diary current. I started with Phase 0, which is the observability pass. Importantly, I first backed out the earlier ad hoc cancellation changes in `internal/web/server.go` and `internal/web/telemetry_manager.go` so that the first implementation step would match the design doc’s premise: add logging first, then change ownership and shutdown behavior in later phases.
+
+The practical outcome of this step is the first code commit for the ticket: `e2fce73` (`serve: add runtime lifecycle logging`). That commit adds structured lifecycle logs across the serve runtime, recording manager, preview manager, preview runner, telemetry manager, and recording subprocess runner. The logging is intentionally verbose enough to reconstruct process start, wait, stop, and final-summary behavior from logs, but it stops short of introducing the manager shutdown APIs or parent-context refactor described in later phases.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, work on these task one by one, commit at appropriate intervals, keep a detailed diary as you work. If your tests get too complex or you struggle getting them to run reliably (it's always hard to test this kind of cancellation subroutine runtime behavior), then tell me and stop."
+
+**Assistant interpretation:** Start executing the ticket phases incrementally, prefer small reviewable commits, keep the diary current, and stop rather than bluff if cancellation testing becomes too flaky to trust.
+
+**Inferred user intent:** Make visible, disciplined progress on the cancellation ticket without burying architectural changes inside a large risky patch.
+
+**Commit (code):** `e2fce73` — `serve: add runtime lifecycle logging`
+
+### What I did
+- Checked the working tree and current test baseline:
+  - `git status --short`
+  - `go test ./...`
+- Reverted the earlier ad hoc cancellation edits in:
+  - `internal/web/server.go`
+  - `internal/web/telemetry_manager.go`
+- Added a first structured logging pass to:
+  - `internal/web/server.go`
+  - `internal/web/session_manager.go`
+  - `internal/web/preview_manager.go`
+  - `internal/web/preview_runner.go`
+  - `internal/web/telemetry_manager.go`
+  - `pkg/recording/run.go`
+- Kept the earlier serve UX changes in place where already requested by the user:
+  - default serve port remains `7777`
+  - browser auto-open remains enabled from `server.go`
+- Formatted and revalidated the code:
+  - `gofmt -w internal/web/server.go internal/web/session_manager.go internal/web/preview_manager.go internal/web/preview_runner.go internal/web/telemetry_manager.go pkg/recording/run.go`
+  - `go test ./...`
+- Created the first code commit for the runtime work:
+  - `git commit -m "serve: add runtime lifecycle logging"`
+
+### Why
+- The design doc explicitly recommends an observability-first pass before more shutdown refactors.
+- Logging is the lowest-risk way to learn where the runtime actually spends time during cancellation.
+- Reverting the earlier ad hoc cancellation changes kept this step honest: it is a logging phase, not a stealth behavior-change phase.
+
+### What worked
+- The repository already had enough architectural seams that logging could be added without a cross-cutting rewrite.
+- Existing tests remained green after the logging pass:
+
+```text
+go test ./...
+?    github.com/wesen/2026-04-09--screencast-studio/cmd/build-web [no test files]
+?    github.com/wesen/2026-04-09--screencast-studio/cmd/screencast-studio [no test files]
+ok   github.com/wesen/2026-04-09--screencast-studio/internal/web 0.505s
+ok   github.com/wesen/2026-04-09--screencast-studio/pkg/dsl (cached)
+ok   github.com/wesen/2026-04-09--screencast-studio/pkg/recording 0.003s
+```
+
+- The commit boundary is reasonably clean: the first runtime commit is a logging-focused pass and does not yet introduce the larger ownership changes.
+
+### What didn't work
+- The working tree still contains separate uncommitted ticket-doc updates (`ttmp/...` and `ttmp/vocabulary.yaml`) at the time of this step because I chose to land the code commit first and then update the diary with the exact commit hash.
+- I intentionally did **not** start the harder shutdown-behavior changes yet, because mixing them into the same commit would have violated the phase boundary.
+
+### What I learned
+- The logging pass is already enough to expose a major asymmetry: recording, preview, and telemetry all have different subprocess lifecycle styles, so later normalization work will likely touch several files even if the public behavior stays the same.
+- Reverting the earlier cancellation edits before adding logs was the right call. It kept the mental model aligned with the docs and avoided having to reason about two moving targets at once.
+
+### What was tricky to build
+- The subtle part was deciding how much to log in `pkg/recording/run.go`. That file already had a generic `logger` callback for ffmpeg stdout/stderr lines, but Phase 0 needed something different: explicit lifecycle events for start, wait, graceful stop, timeout, and forced kill. I solved that by adding direct structured logs alongside the existing textual logger path instead of trying to overload one mechanism for both responsibilities.
+- Another tricky part was not overclaiming task completion. The logging pass is substantial, but it does **not** mean the shutdown architecture is fixed. For example, we still do not have explicit `Shutdown(ctx)` methods for the managers, and the runtime still lacks a final authoritative subprocess registry.
+
+### What warrants a second pair of eyes
+- The log volume in `pkg/recording/run.go`, because it is the most subprocess-heavy path and the easiest place to either under-log or over-log.
+- The current split between server-level logs and manager-level logs, to make sure the resulting traces are readable rather than noisy.
+- The remaining distinction between “process log lines” and “lifecycle log events,” which is conceptually correct but may need refinement after manual validation.
+
+### What should be done in the future
+- Update the ticket task checklist to reflect exactly which Phase 0 items are now complete vs still pending.
+- Manually run `serve` and inspect the new logs before changing ownership or cancellation behavior.
+- Move to Phase 1 next: parent-context ownership for recording and preview managers.
+
+### Code review instructions
+- Review commit `e2fce73`.
+- Start with `internal/web/server.go` to see the top-level runtime events.
+- Then review `pkg/recording/run.go` for subprocess lifecycle logs.
+- Then review the manager files (`session_manager.go`, `preview_manager.go`, `telemetry_manager.go`) to see how identifiers like session ID, preview ID, source ID, and device ID flow into the logs.
+- Validate by running `go test ./...`.
+
+### Technical details
+- Commands run in this step:
+
+```bash
+git status --short
+go test ./...
+gofmt -w internal/web/server.go internal/web/session_manager.go internal/web/preview_manager.go internal/web/preview_runner.go internal/web/telemetry_manager.go pkg/recording/run.go
+go test ./...
+git add internal/web/server.go internal/web/session_manager.go internal/web/preview_manager.go internal/web/preview_runner.go internal/web/telemetry_manager.go pkg/recording/run.go pkg/cli/serve.go
+git commit -m "serve: add runtime lifecycle logging"
+```
