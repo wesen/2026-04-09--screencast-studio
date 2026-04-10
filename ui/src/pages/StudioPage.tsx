@@ -590,11 +590,29 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       ? 'Advanced destination templates are active. Edit Raw DSL to change output paths.'
       : undefined;
   const micOptions = useMemo(
-    () => (discoveryData?.audio ?? []).map((input) => ({
-      value: input.id,
-      label: input.name || input.id,
-    })),
-    [discoveryData?.audio]
+    () => {
+      const options = (discoveryData?.audio ?? [])
+        .filter((input) => !input.id.endsWith('.monitor'))
+        .map((input) => ({
+          value: input.id,
+          label: input.name || input.id,
+        }));
+
+      if (primaryAudioSource?.deviceId) {
+        const hasCurrent = options.some((option) => option.value === primaryAudioSource.deviceId);
+        if (!hasCurrent) {
+          options.unshift({
+            value: primaryAudioSource.deviceId,
+            label: primaryAudioSource.name
+              ? `${primaryAudioSource.name} (${primaryAudioSource.deviceId})`
+              : primaryAudioSource.deviceId,
+          });
+        }
+      }
+
+      return options;
+    },
+    [discoveryData?.audio, primaryAudioSource?.deviceId, primaryAudioSource?.name]
   );
   const diskPercent = diskStatus?.available ? diskStatus.usedPercent : undefined;
 
