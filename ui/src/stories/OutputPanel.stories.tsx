@@ -12,6 +12,13 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
+    recordingName: 'demo',
+    destinationRoot: 'recordings',
+    destinationRootEditable: true,
+    outputs: [
+      { kind: 'video', sourceId: 'desktop-1', name: 'Full Desktop', path: 'recordings/demo/Full-Desktop.mov' },
+      { kind: 'audio', sourceId: '', name: 'audio-mix', path: 'recordings/demo/audio-mix.wav' },
+    ],
     format: 'MOV',
     fps: '24 fps',
     quality: 75,
@@ -21,6 +28,8 @@ export const Default: Story = {
     isPaused: false,
     elapsed: 0,
     armedCount: 1,
+    onRecordingNameChange: () => {},
+    onDestinationRootChange: () => {},
     onFormatChange: () => {},
     onFpsChange: () => {},
     onQualityChange: () => {},
@@ -33,6 +42,14 @@ export const Default: Story = {
 
 export const Recording: Story = {
   args: {
+    recordingName: 'interview-01',
+    destinationRoot: '/tmp/captures',
+    destinationRootEditable: true,
+    outputs: [
+      { kind: 'video', sourceId: 'desktop-1', name: 'Full Desktop', path: '/tmp/captures/interview-01/Full-Desktop.mov' },
+      { kind: 'video', sourceId: 'cam-1', name: 'Camera', path: '/tmp/captures/interview-01/Camera.mov' },
+      { kind: 'audio', sourceId: '', name: 'audio-mix', path: '/tmp/captures/interview-01/audio-mix.wav' },
+    ],
     format: 'MOV',
     fps: '30 fps',
     quality: 85,
@@ -42,6 +59,8 @@ export const Recording: Story = {
     isPaused: false,
     elapsed: 125,
     armedCount: 2,
+    onRecordingNameChange: () => {},
+    onDestinationRootChange: () => {},
     onFormatChange: () => {},
     onFpsChange: () => {},
     onQualityChange: () => {},
@@ -54,6 +73,12 @@ export const Recording: Story = {
 
 export const Paused: Story = {
   args: {
+    recordingName: 'paused-demo',
+    destinationRoot: 'recordings',
+    destinationRootEditable: true,
+    outputs: [
+      { kind: 'video', sourceId: 'desktop-1', name: 'Full Desktop', path: 'recordings/paused-demo/Full-Desktop.mp4' },
+    ],
     format: 'MP4',
     fps: '24 fps',
     quality: 75,
@@ -63,6 +88,8 @@ export const Paused: Story = {
     isPaused: true,
     elapsed: 3600,
     armedCount: 1,
+    onRecordingNameChange: () => {},
+    onDestinationRootChange: () => {},
     onFormatChange: () => {},
     onFpsChange: () => {},
     onQualityChange: () => {},
@@ -75,6 +102,12 @@ export const Paused: Story = {
 
 export const LowQuality: Story = {
   args: {
+    recordingName: 'quick-demo',
+    destinationRoot: 'recordings',
+    destinationRootEditable: true,
+    outputs: [
+      { kind: 'video', sourceId: 'desktop-1', name: 'Full Desktop', path: 'recordings/quick-demo/Full-Desktop.avi' },
+    ],
     format: 'AVI',
     fps: '15 fps',
     quality: 30,
@@ -84,6 +117,8 @@ export const LowQuality: Story = {
     isPaused: false,
     elapsed: 0,
     armedCount: 1,
+    onRecordingNameChange: () => {},
+    onDestinationRootChange: () => {},
     onFormatChange: () => {},
     onFpsChange: () => {},
     onQualityChange: () => {},
@@ -96,6 +131,14 @@ export const LowQuality: Story = {
 
 export const LongRecording: Story = {
   args: {
+    recordingName: 'long-session',
+    destinationRoot: '/srv/recordings',
+    destinationRootEditable: true,
+    outputs: [
+      { kind: 'video', sourceId: 'desktop-1', name: 'Display 1', path: '/srv/recordings/long-session/Display-1.mov' },
+      { kind: 'video', sourceId: 'camera-1', name: 'Camera 1', path: '/srv/recordings/long-session/Camera-1.mov' },
+      { kind: 'audio', sourceId: '', name: 'audio-mix', path: '/srv/recordings/long-session/audio-mix.wav' },
+    ],
     format: 'MOV',
     fps: '24 fps',
     quality: 75,
@@ -105,6 +148,8 @@ export const LongRecording: Story = {
     isPaused: false,
     elapsed: 3665, // 1 hour, 1 minute, 5 seconds
     armedCount: 3,
+    onRecordingNameChange: () => {},
+    onDestinationRootChange: () => {},
     onFormatChange: () => {},
     onFpsChange: () => {},
     onQualityChange: () => {},
@@ -112,5 +157,14 @@ export const LongRecording: Story = {
     onMultiTrackChange: () => {},
     onToggleRecording: () => {},
     onTogglePause: () => {},
+  },
+};
+
+export const AdvancedTemplatesLocked: Story = {
+  args: {
+    ...Default.args,
+    destinationRoot: '',
+    destinationRootEditable: false,
+    destinationRootReason: 'Advanced destination templates are active. Edit Raw DSL to change output paths.',
   },
 };

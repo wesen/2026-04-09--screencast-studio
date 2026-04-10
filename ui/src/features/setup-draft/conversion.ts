@@ -19,6 +19,9 @@ import type {
 
 const DEFAULT_SCHEMA = 'recorder.config/v1';
 const DEFAULT_DISPLAY_TARGET = ':0.0';
+const DEFAULT_DESTINATION_ROOT = 'recordings';
+const PER_SOURCE_SUFFIX = '/{session_id}/{source_name}.{ext}';
+const AUDIO_MIX_SUFFIX = '/{session_id}/audio-mix.{ext}';
 
 const normalizeVideoSourceKind = (value: string): SetupDraftVideoSourceKind => {
   const normalized = value.trim().toLowerCase();
@@ -472,4 +475,37 @@ export const renderSetupDraftAsDsl = (draft: SetupDraftDocument): string => {
   }
 
   return `${lines.join('\n')}\n`;
+};
+
+const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/g, '');
+
+export const destinationRootFromTemplates = (
+  templates: Record<string, string>
+): string | null => {
+  const perSource = templates.per_source;
+  const audioMix = templates.audio_mix;
+  if (!perSource || !audioMix) {
+    return null;
+  }
+  if (!perSource.endsWith(PER_SOURCE_SUFFIX) || !audioMix.endsWith(AUDIO_MIX_SUFFIX)) {
+    return null;
+  }
+  const perSourceRoot = trimTrailingSlashes(perSource.slice(0, -PER_SOURCE_SUFFIX.length));
+  const audioMixRoot = trimTrailingSlashes(audioMix.slice(0, -AUDIO_MIX_SUFFIX.length));
+  if (perSourceRoot !== audioMixRoot) {
+    return null;
+  }
+  return perSourceRoot || DEFAULT_DESTINATION_ROOT;
+};
+
+export const applyDestinationRootToTemplates = (
+  destinationRoot: string,
+  templates: Record<string, string>
+): Record<string, string> => {
+  const root = trimTrailingSlashes(destinationRoot.trim()) || DEFAULT_DESTINATION_ROOT;
+  return {
+    ...templates,
+    per_source: `${root}${PER_SOURCE_SUFFIX}`,
+    audio_mix: `${root}${AUDIO_MIX_SUFFIX}`,
+  };
 };

@@ -4,6 +4,8 @@ import type { StudioSource } from '@/components/source-card';
 
 interface StatusPanelProps {
   diskPercent?: number;
+  destinationRoot?: string;
+  outputCount?: number;
   isRecording: boolean;
   isPaused: boolean;
   armedSources: StudioSource[];
@@ -24,6 +26,8 @@ const getStatusText = (
 
 export const StatusPanel: React.FC<StatusPanelProps> = ({
   diskPercent,
+  destinationRoot,
+  outputCount = 0,
   isRecording,
   isPaused,
   armedSources,
@@ -60,6 +64,14 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
         </div>
         <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
           Armed: {armedSources.map((s) => s.label).join(', ') || 'None'}
+        </div>
+        {destinationRoot ? (
+          <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
+            Destination: {destinationRoot}
+          </div>
+        ) : null}
+        <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
+          Planned outputs: {outputCount}
         </div>
       </div>
     </Win>

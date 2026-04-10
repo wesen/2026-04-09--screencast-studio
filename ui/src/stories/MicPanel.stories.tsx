@@ -13,7 +13,11 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     micLevel: 0.12,
-    micInput: 'Built-in Mic',
+    micInput: 'default',
+    micOptions: [
+      { value: 'default', label: 'Built-in Mic' },
+      { value: 'usb', label: 'USB Interface' },
+    ],
     gain: 55,
     isRecording: false,
     onMicInputChange: () => {},
@@ -24,7 +28,11 @@ export const Default: Story = {
 export const Recording: Story = {
   args: {
     micLevel: 0.45,
-    micInput: 'Built-in Mic',
+    micInput: 'default',
+    micOptions: [
+      { value: 'default', label: 'Built-in Mic' },
+      { value: 'usb', label: 'USB Interface' },
+    ],
     gain: 55,
     isRecording: true,
     onMicInputChange: () => {},
@@ -35,7 +43,11 @@ export const Recording: Story = {
 export const RecordingHighLevel: Story = {
   args: {
     micLevel: 0.78,
-    micInput: 'Built-in Mic',
+    micInput: 'default',
+    micOptions: [
+      { value: 'default', label: 'Built-in Mic' },
+      { value: 'usb', label: 'USB Interface' },
+    ],
     gain: 75,
     isRecording: true,
     onMicInputChange: () => {},
@@ -46,7 +58,11 @@ export const RecordingHighLevel: Story = {
 export const ExternalMic: Story = {
   args: {
     micLevel: 0.35,
-    micInput: 'External',
+    micInput: 'usb',
+    micOptions: [
+      { value: 'default', label: 'Built-in Mic' },
+      { value: 'usb', label: 'USB Interface' },
+    ],
     gain: 60,
     isRecording: true,
     onMicInputChange: () => {},
@@ -57,7 +73,11 @@ export const ExternalMic: Story = {
 export const LineIn: Story = {
   args: {
     micLevel: 0.5,
-    micInput: 'Line In',
+    micInput: 'line-in',
+    micOptions: [
+      { value: 'default', label: 'Built-in Mic' },
+      { value: 'line-in', label: 'Line In' },
+    ],
     gain: 50,
     isRecording: true,
     onMicInputChange: () => {},
@@ -68,7 +88,11 @@ export const LineIn: Story = {
 export const LowGain: Story = {
   args: {
     micLevel: 0.15,
-    micInput: 'Built-in Mic',
+    micInput: 'default',
+    micOptions: [
+      { value: 'default', label: 'Built-in Mic' },
+      { value: 'usb', label: 'USB Interface' },
+    ],
     gain: 20,
     isRecording: true,
     onMicInputChange: () => {},
@@ -79,7 +103,11 @@ export const LowGain: Story = {
 export const HighGain: Story = {
   args: {
     micLevel: 0.92,
-    micInput: 'Built-in Mic',
+    micInput: 'default',
+    micOptions: [
+      { value: 'default', label: 'Built-in Mic' },
+      { value: 'usb', label: 'USB Interface' },
+    ],
     gain: 95,
     isRecording: true,
     onMicInputChange: () => {},

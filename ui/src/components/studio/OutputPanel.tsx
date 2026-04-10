@@ -1,7 +1,21 @@
 import React from 'react';
 import { Win, Radio, Sel, Slider, Btn } from '../primitives';
 
+interface OutputPreview {
+  kind: string;
+  sourceId?: string;
+  name: string;
+  path: string;
+}
+
 interface OutputPanelProps {
+  recordingName: string;
+  destinationRoot: string;
+  destinationRootEditable: boolean;
+  destinationRootReason?: string;
+  outputs: OutputPreview[];
+  outputPreviewBusy?: boolean;
+  outputPreviewErrors?: string[];
   format: 'MOV' | 'AVI' | 'MP4';
   fps: string;
   quality: number;
@@ -13,6 +27,8 @@ interface OutputPanelProps {
   transportBusy?: boolean;
   elapsed: number;
   armedCount: number;
+  onRecordingNameChange: (value: string) => void;
+  onDestinationRootChange: (value: string) => void;
   onFormatChange: (format: 'MOV' | 'AVI' | 'MP4') => void;
   onFpsChange: (fps: string) => void;
   onQualityChange: (quality: number) => void;
@@ -30,11 +46,16 @@ const formatTime = (seconds: number): string => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
-const formatSize = (seconds: number, armedCount: number): string => {
-  return `~${(seconds * 0.4 * armedCount).toFixed(1)} MB`;
-};
+const formatSize = (seconds: number, armedCount: number): string => `~${(seconds * 0.4 * armedCount).toFixed(1)} MB`;
 
 export const OutputPanel: React.FC<OutputPanelProps> = ({
+  recordingName,
+  destinationRoot,
+  destinationRootEditable,
+  destinationRootReason,
+  outputs,
+  outputPreviewBusy = false,
+  outputPreviewErrors = [],
   format,
   fps,
   quality,
@@ -46,6 +67,8 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
   transportBusy = false,
   elapsed,
   armedCount,
+  onRecordingNameChange,
+  onDestinationRootChange,
   onFormatChange,
   onFpsChange,
   onQualityChange,
@@ -58,6 +81,13 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
   return (
     <Win title="Output Parameters" className={className}>
       <div className="studio-output-grid">
+        <span className="studio-output-label">Name:</span>
+        <input
+          value={recordingName}
+          onChange={(event) => onRecordingNameChange(event.target.value)}
+          className="studio-source-card__editor-input"
+          style={{ width: 160 }}
+        />
         <span className="studio-output-label">Format:</span>
         <div style={{ display: 'flex', gap: 8 }}>
           {(['MOV', 'AVI', 'MP4'] as const).map((f) => (
@@ -71,6 +101,15 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
             </span>
           ))}
         </div>
+
+        <span className="studio-output-label">Save to:</span>
+        <input
+          value={destinationRoot}
+          onChange={(event) => onDestinationRootChange(event.target.value)}
+          disabled={!destinationRootEditable}
+          className="studio-source-card__editor-input"
+          style={{ width: 160 }}
+        />
         <span className="studio-output-label">Framerate:</span>
         <Sel
           value={fps}
@@ -104,16 +143,40 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
             {multiTrack ? '◉ Each source → own file' : '○ Merge all sources'}
           </Btn>
         </div>
-        <span className="studio-output-label">Save to:</span>
-        <Sel
-          value="Macintosh HD"
-          opts={['Macintosh HD', 'Desktop', 'Documents']}
-          onChange={() => {}}
-          width={120}
-        />
       </div>
 
-      {/* Transport */}
+      {destinationRootReason ? (
+        <div style={{ fontSize: '8px', color: 'var(--studio-amber)', marginBottom: 6 }}>
+          {destinationRootReason}
+        </div>
+      ) : null}
+
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: '9px', color: 'var(--studio-mid)', marginBottom: 4 }}>
+          Planned outputs {outputPreviewBusy ? '…refreshing' : ''}
+        </div>
+        {outputPreviewErrors.length > 0 ? (
+          <div style={{ fontSize: '8px', color: 'var(--studio-red)' }}>
+            {outputPreviewErrors.join(' ')}
+          </div>
+        ) : outputs.length === 0 ? (
+          <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
+            No planned outputs yet
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 96, overflowY: 'auto' }}>
+            {outputs.map((output) => (
+              <div key={`${output.kind}:${output.sourceId}:${output.path}`} style={{ fontSize: '8px', color: 'var(--studio-dark)' }}>
+                <span style={{ color: 'var(--studio-mid)', marginRight: 6 }}>
+                  {output.kind === 'audio' ? 'Audio' : output.name}
+                </span>
+                <code>{output.path}</code>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="studio-transport">
         <Btn
           accent={!isRecording}

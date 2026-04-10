@@ -3,7 +3,9 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { baseApi } from '../api/baseApi';
 import { editorReducer } from '../features/editor/editorSlice';
-import { studioDraftReducer } from '../features/studio-draft/studioDraftSlice';
+import { previewReducer } from '../features/previews/previewSlice';
+import { setupReducer } from '../features/setup/setupSlice';
+import { setupDraftReducer } from '../features/setup-draft/setupDraftSlice';
 import { studioUiReducer } from '../features/studio-ui/studioUiSlice';
 import { sessionReducer } from '../features/session/sessionSlice';
 import { StudioPage } from '../pages/StudioPage';
@@ -18,7 +20,9 @@ const meta = {
         reducer: {
           [baseApi.reducerPath]: baseApi.reducer,
           editor: editorReducer,
-          studioDraft: studioDraftReducer,
+          previews: previewReducer,
+          setup: setupReducer,
+          setupDraft: setupDraftReducer,
           studioUi: studioUiReducer,
           session: sessionReducer,
         },

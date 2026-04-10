@@ -10,7 +10,7 @@ import {
   useStartRecordingMutation,
   useStopRecordingMutation,
 } from '@/api/recordingApi';
-import { useNormalizeSetupMutation } from '@/api/setupApi';
+import { useCompileSetupMutation, useNormalizeSetupMutation } from '@/api/setupApi';
 import type {
   ApiErrorResponse,
   CameraDescriptor,
@@ -36,15 +36,6 @@ import {
   setDslText,
   setRawDslText,
 } from '@/features/editor/editorSlice';
-import {
-  setAudio,
-  setFormat,
-  setFps,
-  setGain,
-  setMicInput,
-  setMultiTrack,
-  setQuality,
-} from '@/features/studio-draft/studioDraftSlice';
 import { selectActiveTab, setActiveTab, type StudioTab } from '@/features/studio-ui/studioUiSlice';
 import {
   addLog,
@@ -55,16 +46,25 @@ import {
 } from '@/features/session/sessionSlice';
 import { WsClient } from '@/features/session/wsClient';
 import {
+  compilePreviewFailed,
+  compilePreviewStarted,
+  compilePreviewSucceeded,
   normalizeFailed,
   normalizeStarted,
   normalizeSucceeded,
+  selectCompiledOutputs,
+  selectCompilePreviewErrors,
+  selectCompilePreviewWarnings,
+  selectIsCompilingPreview,
   selectNormalizedConfig,
   selectNormalizeErrors,
   selectNormalizeWarnings,
 } from '@/features/setup/setupSlice';
 import {
+  applyDestinationRootToTemplates,
   createCameraSourceDraft,
   createDisplaySourceDraft,
+  destinationRootFromTemplates,
   effectiveConfigToSetupDraft,
   createRegionSourceDraft,
   createWindowSourceDraft,
@@ -75,12 +75,18 @@ import {
 } from '@/features/setup-draft/conversion';
 import { isBuilderCompatibleEffectiveConfig } from '@/features/setup-draft/compatibility';
 import {
+  addAudioSource,
   addVideoSource,
   hydrateFromEffectiveConfig,
   moveVideoSource,
   removeVideoSource,
+  replaceVideoSources,
   selectSetupDraftDocument,
+  setAudioOutput,
+  setSessionId,
+  replaceDestinationTemplates,
   setVideoSourceEnabled,
+  updateAudioSource,
   updateVideoSource,
 } from '@/features/setup-draft/setupDraftSlice';
 import {
@@ -166,6 +172,44 @@ const describeSource = (source: SetupDraftVideoSource): string => {
   }
 };
 
+const containerToFormat = (container?: string): 'MOV' | 'AVI' | 'MP4' => {
+  switch ((container ?? '').trim().toLowerCase()) {
+    case 'avi':
+      return 'AVI';
+    case 'mp4':
+      return 'MP4';
+    case 'mov':
+    default:
+      return 'MOV';
+  }
+};
+
+const formatToContainer = (format: 'MOV' | 'AVI' | 'MP4'): string => format.toLowerCase();
+
+const sampleRateLabel = (sampleRateHz?: number): string => {
+  switch (sampleRateHz) {
+    case 22050:
+      return '22 kHz, 8-bit';
+    case 44100:
+      return '44 kHz, 16-bit';
+    case 48000:
+    default:
+      return '48 kHz, 16-bit';
+  }
+};
+
+const labelToSampleRate = (label: string): number => {
+  switch (label) {
+    case '22 kHz, 8-bit':
+      return 22050;
+    case '44 kHz, 16-bit':
+      return 44100;
+    case '48 kHz, 16-bit':
+    default:
+      return 48000;
+  }
+};
+
 const toStudioSource = (
   source: SetupDraftVideoSource,
   preview?: PreviewDescriptor
@@ -211,8 +255,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const structuredEditingLocked = useAppSelector(selectStructuredEditingLocked);
   const structuredEditingLockReason = useAppSelector(selectStructuredEditingLockReason);
   const normalizedConfig = useAppSelector(selectNormalizedConfig);
+  const compiledOutputs = useAppSelector(selectCompiledOutputs);
+  const compilePreviewWarnings = useAppSelector(selectCompilePreviewWarnings);
+  const compilePreviewErrors = useAppSelector(selectCompilePreviewErrors);
   const normalizeWarnings = useAppSelector(selectNormalizeWarnings);
   const normalizeErrors = useAppSelector(selectNormalizeErrors);
+  const isCompilingPreview = useAppSelector(selectIsCompilingPreview);
   const previewsById = useAppSelector(selectPreviewsById);
   const ownedPreviewIdBySourceId = useAppSelector(selectOwnedPreviewIdBySourceId);
   const [now, setNow] = useState(() => Date.now());
@@ -226,6 +274,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const [startRecording, startRecordingState] = useStartRecordingMutation();
   const [stopRecording, stopRecordingState] = useStopRecordingMutation();
   const [normalizeSetup] = useNormalizeSetupMutation();
+  const [compileSetup] = useCompileSetupMutation();
   const [ensurePreview] = useEnsurePreviewMutation();
   const [releasePreview] = useReleasePreviewMutation();
   const [sourcePickerKind, setSourcePickerKind] = useState<StudioSource['kind'] | null>(null);
@@ -267,12 +316,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     [activeTab, previewLimit, sources]
   );
   const editorWarnings = useMemo(
-    () => [...normalizeWarnings, ...compileWarnings],
-    [compileWarnings, normalizeWarnings]
+    () => [...normalizeWarnings, ...compilePreviewWarnings, ...compileWarnings],
+    [compilePreviewWarnings, compileWarnings, normalizeWarnings]
   );
   const editorErrors = useMemo(
-    () => [...normalizeErrors, ...compileErrors],
-    [compileErrors, normalizeErrors]
+    () => [...normalizeErrors, ...compilePreviewErrors, ...compileErrors],
+    [compileErrors, compilePreviewErrors, normalizeErrors]
   );
 
   useEffect(() => {
@@ -326,18 +375,28 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         dispatch(normalizeStarted());
+        dispatch(compilePreviewStarted());
         try {
-          const response = await normalizeSetup({ dsl: dslText }).unwrap();
-          if (!response.config) {
+          const [normalizeResponse, compileResponse] = await Promise.all([
+            normalizeSetup({ dsl: dslText }).unwrap(),
+            compileSetup({ dsl: dslText }).unwrap(),
+          ]);
+          if (!normalizeResponse.config) {
             dispatch(normalizeFailed(['normalize response missing config']));
+            dispatch(compilePreviewFailed(['normalize response missing config']));
             return;
           }
           dispatch(normalizeSucceeded({
-            config: response.config,
-            warnings: response.warnings,
+            config: normalizeResponse.config,
+            warnings: normalizeResponse.warnings,
+          }));
+          dispatch(compilePreviewSucceeded({
+            outputs: compileResponse.outputs,
+            warnings: compileResponse.warnings,
           }));
         } catch (error) {
           dispatch(normalizeFailed([errorMessageFromUnknown(error)]));
+          dispatch(compilePreviewFailed([errorMessageFromUnknown(error)]));
         }
       })();
     }, 300);
@@ -345,7 +404,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [dispatch, dslText, normalizeSetup]);
+  }, [compileSetup, dispatch, dslText, normalizeSetup]);
 
   useEffect(() => {
     ownedPreviewIdBySourceIdRef.current = ownedPreviewIdBySourceId;
@@ -501,18 +560,38 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     return Math.max(0, Math.floor((end - startedAt) / 1000));
   }, [now, session.finishedAt, session.startedAt]);
 
-  const outputSettings = useAppSelector((state) => ({
-    format: state.studioDraft.format,
-    fps: state.studioDraft.fps,
-    quality: state.studioDraft.quality,
-    audio: state.studioDraft.audio,
-    multiTrack: state.studioDraft.multiTrack,
-  }));
+  const primaryVideoSource = setupDraft.videoSources[0];
+  const primaryAudioSource = setupDraft.audioSources[0];
+  const outputSettings = useMemo(() => ({
+    format: containerToFormat(primaryVideoSource?.output.container),
+    fps: `${primaryVideoSource?.capture.fps ?? 24} fps`,
+    quality: primaryVideoSource?.output.quality ?? 75,
+    audio: sampleRateLabel(setupDraft.audioOutput.sampleRateHz),
+    multiTrack: true,
+  }), [primaryVideoSource, setupDraft.audioOutput.sampleRateHz]);
 
-  const micSettings = useAppSelector((state) => ({
-    micInput: state.studioDraft.micInput,
-    gain: state.studioDraft.gain,
-  }));
+  const micSettings = useMemo(() => ({
+    micInput: primaryAudioSource?.deviceId ?? '',
+    gain: Math.round((primaryAudioSource?.gain ?? 1) * 100),
+  }), [primaryAudioSource]);
+
+  const destinationRoot = useMemo(
+    () => destinationRootFromTemplates(setupDraft.destinationTemplates),
+    [setupDraft.destinationTemplates]
+  );
+  const destinationRootEditable = !structuredEditingLocked && destinationRoot !== null;
+  const destinationRootReason = structuredEditingLocked
+    ? structuredEditingLockReason
+    : destinationRoot === null
+      ? 'Advanced destination templates are active. Edit Raw DSL to change output paths.'
+      : undefined;
+  const micOptions = useMemo(
+    () => (discoveryData?.audio ?? []).map((input) => ({
+      value: input.id,
+      label: input.name || input.id,
+    })),
+    [discoveryData?.audio]
+  );
 
   const handleToggleRecording = () => {
     void (async () => {
@@ -593,6 +672,10 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     })();
   };
 
+  const syncStructuredDraft = useCallback((nextDraft: typeof setupDraft) => {
+    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+  }, [dispatch]);
+
   const applyAddedSource = (source: ReturnType<typeof createDisplaySourceDraft>) => {
     if (structuredEditingLocked) {
       return;
@@ -602,7 +685,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       videoSources: [...setupDraft.videoSources, source],
     };
     dispatch(addVideoSource(source));
-    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+    syncStructuredDraft(nextDraft);
     setSourcePickerKind(null);
   };
 
@@ -620,7 +703,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       )),
     };
     dispatch(updateVideoSource(updatedSource));
-    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+    syncStructuredDraft(nextDraft);
     if (options?.restartPreview) {
       restartPreviewForSource(updatedSource.id);
     }
@@ -651,7 +734,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       )),
     };
     dispatch(setVideoSourceEnabled({ sourceId, enabled: !source.enabled }));
-    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+    syncStructuredDraft(nextDraft);
   };
 
   const handleRemoveSource = (sourceId: string) => {
@@ -660,7 +743,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       videoSources: setupDraft.videoSources.filter((source) => source.id !== sourceId),
     };
     dispatch(removeVideoSource(sourceId));
-    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+    syncStructuredDraft(nextDraft);
   };
 
   const handleMoveSource = (sourceId: string, direction: 'up' | 'down') => {
@@ -680,7 +763,157 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       videoSources: nextSources,
     };
     dispatch(moveVideoSource({ sourceId, direction }));
-    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleRecordingNameChange = (value: string) => {
+    if (structuredEditingLocked) {
+      return;
+    }
+    const nextDraft = {
+      ...setupDraft,
+      sessionId: value.trim(),
+    };
+    dispatch(setSessionId(nextDraft.sessionId));
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleDestinationRootChange = (value: string) => {
+    if (structuredEditingLocked || destinationRoot === null) {
+      return;
+    }
+    const nextTemplates = applyDestinationRootToTemplates(value, setupDraft.destinationTemplates);
+    const nextDraft = {
+      ...setupDraft,
+      destinationTemplates: nextTemplates,
+    };
+    dispatch(replaceDestinationTemplates(nextTemplates));
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleFormatChange = (value: 'MOV' | 'AVI' | 'MP4') => {
+    if (structuredEditingLocked) {
+      return;
+    }
+    const nextVideoSources = setupDraft.videoSources.map((source) => ({
+      ...source,
+      output: {
+        ...source.output,
+        container: formatToContainer(value),
+      },
+    }));
+    const nextDraft = {
+      ...setupDraft,
+      videoSources: nextVideoSources,
+    };
+    dispatch(replaceVideoSources(nextVideoSources));
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleFpsChange = (value: string) => {
+    if (structuredEditingLocked) {
+      return;
+    }
+    const fps = Number.parseInt(value, 10) || 24;
+    const nextVideoSources = setupDraft.videoSources.map((source) => ({
+      ...source,
+      capture: {
+        ...source.capture,
+        fps,
+      },
+    }));
+    const nextDraft = {
+      ...setupDraft,
+      videoSources: nextVideoSources,
+    };
+    dispatch(replaceVideoSources(nextVideoSources));
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleQualityChange = (value: number) => {
+    if (structuredEditingLocked) {
+      return;
+    }
+    const nextVideoSources = setupDraft.videoSources.map((source) => ({
+      ...source,
+      output: {
+        ...source.output,
+        quality: value,
+      },
+    }));
+    const nextDraft = {
+      ...setupDraft,
+      videoSources: nextVideoSources,
+    };
+    dispatch(replaceVideoSources(nextVideoSources));
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleAudioOutputChange = (value: string) => {
+    if (structuredEditingLocked) {
+      return;
+    }
+    const nextAudioOutput = {
+      ...setupDraft.audioOutput,
+      sampleRateHz: labelToSampleRate(value),
+    };
+    const nextDraft = {
+      ...setupDraft,
+      audioOutput: nextAudioOutput,
+    };
+    dispatch(setAudioOutput(nextAudioOutput));
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleMicInputChange = (deviceId: string) => {
+    if (structuredEditingLocked) {
+      return;
+    }
+    const descriptor = (discoveryData?.audio ?? []).find((input) => input.id === deviceId);
+    const nextSource = primaryAudioSource
+      ? {
+        ...primaryAudioSource,
+        deviceId,
+        name: descriptor?.name || primaryAudioSource.name,
+      }
+      : {
+        id: 'mic-1',
+        name: descriptor?.name || 'Microphone',
+        deviceId,
+        enabled: true,
+        gain: 1,
+        noiseGate: false,
+        denoise: false,
+      };
+    const nextAudioSources = primaryAudioSource
+      ? [nextSource, ...setupDraft.audioSources.slice(1)]
+      : [...setupDraft.audioSources, nextSource];
+    const nextDraft = {
+      ...setupDraft,
+      audioSources: nextAudioSources,
+    };
+    if (primaryAudioSource) {
+      dispatch(updateAudioSource(nextSource));
+    } else {
+      dispatch(addAudioSource(nextSource));
+    }
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleGainChange = (value: number) => {
+    if (structuredEditingLocked || !primaryAudioSource) {
+      return;
+    }
+    const nextSource = {
+      ...primaryAudioSource,
+      gain: Math.max(0, value) / 100,
+    };
+    const nextDraft = {
+      ...setupDraft,
+      audioSources: [nextSource, ...setupDraft.audioSources.slice(1)],
+    };
+    dispatch(updateAudioSource(nextSource));
+    syncStructuredDraft(nextDraft);
   };
 
   const displays = discoveryData?.displays ?? [];
@@ -936,6 +1169,13 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
 
             <div className="studio-content-row">
               <OutputPanel
+                recordingName={setupDraft.sessionId}
+                destinationRoot={destinationRoot ?? ''}
+                destinationRootEditable={destinationRootEditable}
+                destinationRootReason={destinationRootReason}
+                outputs={compiledOutputs}
+                outputPreviewBusy={isCompilingPreview}
+                outputPreviewErrors={compilePreviewErrors}
                 format={outputSettings.format}
                 fps={outputSettings.fps}
                 quality={outputSettings.quality}
@@ -947,11 +1187,13 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                 transportBusy={transportBusy}
                 elapsed={elapsed}
                 armedCount={armedSources.length}
-                onFormatChange={(value) => dispatch(setFormat(value))}
-                onFpsChange={(value) => dispatch(setFps(value))}
-                onQualityChange={(value) => dispatch(setQuality(value))}
-                onAudioChange={(value) => dispatch(setAudio(value))}
-                onMultiTrackChange={(value) => dispatch(setMultiTrack(value))}
+                onRecordingNameChange={handleRecordingNameChange}
+                onDestinationRootChange={handleDestinationRootChange}
+                onFormatChange={handleFormatChange}
+                onFpsChange={handleFpsChange}
+                onQualityChange={handleQualityChange}
+                onAudioChange={handleAudioOutputChange}
+                onMultiTrackChange={() => {}}
                 onToggleRecording={handleToggleRecording}
                 onTogglePause={() => {}}
               />
@@ -959,13 +1201,16 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
               <div className="studio-panel-stack">
                 <MicPanel
                   micInput={micSettings.micInput}
+                  micOptions={micOptions}
                   gain={micSettings.gain}
                   isRecording={isRecording}
-                  onMicInputChange={(value) => dispatch(setMicInput(value))}
-                  onGainChange={(value) => dispatch(setGain(value))}
+                  onMicInputChange={handleMicInputChange}
+                  onGainChange={handleGainChange}
                 />
 
                 <StatusPanel
+                  destinationRoot={destinationRoot ?? undefined}
+                  outputCount={compiledOutputs.length}
                   isRecording={isRecording}
                   isPaused={isPaused}
                   armedSources={armedSources}

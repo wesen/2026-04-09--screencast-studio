@@ -79,8 +79,8 @@ Acceptance criteria:
   - recording name
   - destination root directory
   - output path preview
-- [ ] Ensure the backend resolves output files using the same rules the runtime will actually use.
-- [ ] Decide how destination previews are produced:
+- [x] Ensure the backend resolves output files using the same rules the runtime will actually use.
+- [x] Decide how destination previews are produced:
   - normalize response
   - compile response
   - dedicated preview endpoint
@@ -106,23 +106,29 @@ Acceptance criteria:
 
 ## Phase 6: Frontend Recording Configuration UI
 
-- [ ] Add a recording name field to the mounted UI.
-- [ ] Replace the fake `Save to` selector with a real destination directory control.
-- [ ] Show resolved destination file paths and names in the UI before recording.
-- [ ] Ensure the current configuration view reflects backend-resolved paths rather than frontend guesses.
-- [ ] Keep the UI explicit about pending/invalid states while the backend recomputes previews.
+- [x] Add a recording name field to the mounted UI.
+- [x] Replace the fake `Save to` selector with a real destination directory control.
+- [x] Show resolved destination file paths and names in the UI before recording.
+- [x] Ensure the current configuration view reflects backend-resolved paths rather than frontend guesses.
+- [x] Keep the UI explicit about pending/invalid states while the backend recomputes previews.
 
 Acceptance criteria:
 
 - A user can see and edit the name and destination fields.
 - A user can see what files will be produced before recording begins.
 
+Current status:
+
+- The mounted UI now edits `setupDraft.sessionId`, builder-supported destination templates, audio output sample rate, primary audio-source device, and primary audio-source gain.
+- Output preview comes from `CompileResponse.outputs` on the existing compile endpoint, so the rendered file list is backend-resolved rather than guessed.
+- Destination-root editing is intentionally limited to the builder-supported template shape. Advanced/custom templates stay editable only through Raw DSL.
+
 ## Phase 7: Frontend Audio Telemetry And Device UX
 
-- [ ] Replace hardcoded microphone choices with discovered audio devices.
-- [ ] Wire gain changes to real backend-facing configuration.
+- [x] Replace hardcoded microphone choices with discovered audio devices.
+- [x] Wire gain changes to real backend-facing configuration.
 - [ ] Render live meter samples in `MicPanel`.
-- [ ] Ensure the panel gracefully shows “unavailable” only when telemetry is actually unavailable.
+- [x] Ensure the panel gracefully shows “unavailable” only when telemetry is actually unavailable.
 
 Acceptance criteria:
 
@@ -155,6 +161,13 @@ Acceptance criteria:
   - the meter moves while audio is active
   - the disk panel updates meaningfully
 
+Smoke-test progress:
+
+- Verified in the mounted UI that editing `Name` changed planned outputs from `recordings/...` to `captures/session-check/...`.
+- Verified in the mounted UI that editing `Save to` changed both the planned-output list and the `Status` destination line.
+- Verified in the mounted UI that the microphone selector now shows discovered PulseAudio device IDs instead of hardcoded placeholder labels.
+- Meter and disk telemetry checks remain pending because the backend telemetry slice is not implemented yet.
+
 Acceptance criteria:
 
 - The ticket includes a repeatable validation recipe.
@@ -165,6 +178,6 @@ Acceptance criteria:
 - [ ] Commit 1: protobuf contract expansion for config and telemetry
 - [ ] Commit 2: backend destination preview and validation
 - [ ] Commit 3: backend telemetry collection and websocket events
-- [ ] Commit 4: frontend recording configuration UI
+- [x] Commit 4: frontend recording configuration UI
 - [ ] Commit 5: frontend meter and disk telemetry rendering
 - [ ] Commit 6: tests, docs, and smoke validation

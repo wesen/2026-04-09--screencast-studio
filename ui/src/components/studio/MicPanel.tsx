@@ -1,11 +1,17 @@
 import React from 'react';
-import { Win, Sel, Slider } from '../primitives';
+import { Win, Slider } from '../primitives';
 import { MicMeter } from '../MicMeter';
 import { Waveform } from '../Waveform';
+
+interface MicOption {
+  value: string;
+  label: string;
+}
 
 interface MicPanelProps {
   micLevel?: number;
   micInput: string;
+  micOptions: MicOption[];
   gain: number;
   isRecording: boolean;
   onMicInputChange: (input: string) => void;
@@ -16,6 +22,7 @@ interface MicPanelProps {
 export const MicPanel: React.FC<MicPanelProps> = ({
   micLevel,
   micInput,
+  micOptions,
   gain,
   isRecording,
   onMicInputChange,
@@ -43,12 +50,18 @@ export const MicPanel: React.FC<MicPanelProps> = ({
         ) : null}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: '8px', color: 'var(--studio-mid)', width: 26 }}>Input</span>
-          <Sel
+          <select
             value={micInput}
-            opts={['Built-in Mic', 'External', 'Line In']}
-            onChange={onMicInputChange}
-            width={95}
-          />
+            onChange={(event) => onMicInputChange(event.target.value)}
+            className="studio-source-card__editor-input"
+            style={{ width: 120 }}
+          >
+            {micOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: '8px', color: 'var(--studio-mid)', width: 26 }}>Gain</span>

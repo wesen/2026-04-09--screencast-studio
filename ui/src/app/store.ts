@@ -4,7 +4,6 @@ import { editorReducer } from '@/features/editor/editorSlice';
 import { previewReducer } from '@/features/previews/previewSlice';
 import { setupReducer } from '@/features/setup/setupSlice';
 import { setupDraftReducer } from '@/features/setup-draft/setupDraftSlice';
-import { studioDraftReducer } from '@/features/studio-draft/studioDraftSlice';
 import { studioUiReducer } from '@/features/studio-ui/studioUiSlice';
 import { sessionReducer } from '@/features/session/sessionSlice';
 
@@ -15,7 +14,6 @@ export const store = configureStore({
     previews: previewReducer,
     setup: setupReducer,
     setupDraft: setupDraftReducer,
-    studioDraft: studioDraftReducer,
     studioUi: studioUiReducer,
     session: sessionReducer,
   },

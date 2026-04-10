@@ -3,6 +3,7 @@ import type { EffectiveConfig } from '@/api/types';
 import { effectiveConfigToSetupDraft } from './conversion';
 import type {
   SetupDraftAudioSource,
+  SetupDraftAudioOutput,
   SetupDraftDocument,
   SetupDraftVideoSource,
 } from './types';
@@ -31,6 +32,11 @@ const findSourceIndex = (
   sourceId: string
 ): number => sources.findIndex((source) => source.id === sourceId);
 
+const findAudioSourceIndex = (
+  sources: SetupDraftAudioSource[],
+  sourceId: string
+): number => sources.findIndex((source) => source.id === sourceId);
+
 const setupDraftSlice = createSlice({
   name: 'setupDraft',
   initialState,
@@ -45,6 +51,15 @@ const setupDraftSlice = createSlice({
       state.videoSources = next.videoSources;
       state.audioSources = next.audioSources;
       state.hydratedFromSessionId = action.payload.sessionId;
+    },
+    setSessionId(state, action: PayloadAction<string>) {
+      state.sessionId = action.payload;
+    },
+    replaceDestinationTemplates(state, action: PayloadAction<Record<string, string>>) {
+      state.destinationTemplates = action.payload;
+    },
+    setAudioOutput(state, action: PayloadAction<SetupDraftAudioOutput>) {
+      state.audioOutput = action.payload;
     },
     replaceVideoSources(state, action: PayloadAction<SetupDraftVideoSource[]>) {
       state.videoSources = action.payload;
@@ -110,12 +125,25 @@ const setupDraftSlice = createSlice({
     replaceAudioSources(state, action: PayloadAction<SetupDraftAudioSource[]>) {
       state.audioSources = action.payload;
     },
+    addAudioSource(state, action: PayloadAction<SetupDraftAudioSource>) {
+      state.audioSources.push(action.payload);
+    },
+    updateAudioSource(state, action: PayloadAction<SetupDraftAudioSource>) {
+      const index = findAudioSourceIndex(state.audioSources, action.payload.id);
+      if (index === -1) {
+        return;
+      }
+      state.audioSources[index] = action.payload;
+    },
     clearSetupDraft: () => initialState,
   },
 });
 
 export const {
   hydrateFromEffectiveConfig,
+  setSessionId,
+  replaceDestinationTemplates,
+  setAudioOutput,
   replaceVideoSources,
   addVideoSource,
   updateVideoSource,
@@ -124,6 +152,8 @@ export const {
   renameVideoSource,
   setVideoSourceEnabled,
   replaceAudioSources,
+  addAudioSource,
+  updateAudioSource,
   clearSetupDraft,
 } = setupDraftSlice.actions;
 

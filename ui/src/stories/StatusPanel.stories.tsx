@@ -23,6 +23,8 @@ const createSource = (id: string, label: string, armed: boolean): StudioSource =
 export const Ready: Story = {
   args: {
     diskPercent: 8,
+    destinationRoot: 'recordings',
+    outputCount: 2,
     isRecording: false,
     isPaused: false,
     armedSources: [createSource('display-1', 'Display 1', true)],
@@ -32,6 +34,8 @@ export const Ready: Story = {
 export const ReadyLowDisk: Story = {
   args: {
     diskPercent: 85,
+    destinationRoot: '/srv/captures',
+    outputCount: 3,
     isRecording: false,
     isPaused: false,
     armedSources: [createSource('display-1', 'Display 1', true)],
@@ -41,6 +45,8 @@ export const ReadyLowDisk: Story = {
 export const Recording: Story = {
   args: {
     diskPercent: 15,
+    destinationRoot: 'recordings',
+    outputCount: 2,
     isRecording: true,
     isPaused: false,
     armedSources: [createSource('display-1', 'Display 1', true)],
@@ -50,6 +56,8 @@ export const Recording: Story = {
 export const RecordingMultipleSources: Story = {
   args: {
     diskPercent: 25,
+    destinationRoot: '/tmp/recordings',
+    outputCount: 4,
     isRecording: true,
     isPaused: false,
     armedSources: [
@@ -63,6 +71,8 @@ export const RecordingMultipleSources: Story = {
 export const Paused: Story = {
   args: {
     diskPercent: 40,
+    destinationRoot: 'recordings',
+    outputCount: 1,
     isRecording: true,
     isPaused: true,
     armedSources: [createSource('display-1', 'Display 1', true)],
@@ -72,6 +82,8 @@ export const Paused: Story = {
 export const NoArmedSources: Story = {
   args: {
     diskPercent: 50,
+    destinationRoot: 'recordings',
+    outputCount: 0,
     isRecording: false,
     isPaused: false,
     armedSources: [],
@@ -81,6 +93,8 @@ export const NoArmedSources: Story = {
 export const DiskAlmostFull: Story = {
   args: {
     diskPercent: 92,
+    destinationRoot: '/mnt/archive',
+    outputCount: 2,
     isRecording: false,
     isPaused: false,
     armedSources: [createSource('display-1', 'Display 1', true)],
