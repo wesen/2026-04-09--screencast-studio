@@ -5,9 +5,9 @@ import "time"
 type RunEventType string
 
 const (
-	RunEventStateChanged  RunEventType = "state_changed"
+	RunEventStateChanged   RunEventType = "state_changed"
 	RunEventProcessStarted RunEventType = "process_started"
-	RunEventProcessLog    RunEventType = "process_log"
+	RunEventProcessLog     RunEventType = "process_log"
 )
 
 type RunEvent struct {

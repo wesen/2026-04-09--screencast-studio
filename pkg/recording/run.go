@@ -78,7 +78,9 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 		args, err := buildVideoRecordArgs(job, options.MaxDuration)
 		if err != nil {
 			_ = transitionSession(session, StateFailed, fmt.Sprintf("build video args for %s: %v", job.Source.Name, err), emit)
-			stopProcesses(session.processes, gracePeriod)
+			if stopErr := stopProcesses(session.processes, gracePeriod); stopErr != nil {
+				return nil, errors.Errorf("%v; cleanup failed: %v", err, stopErr)
+			}
 			return nil, err
 		}
 		session.markProcessStarted(newManagedProcess(job.Source.Name, args, job.OutputPath))
@@ -87,7 +89,9 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 		args, err := buildAudioMixArgs(job, options.MaxDuration)
 		if err != nil {
 			_ = transitionSession(session, StateFailed, fmt.Sprintf("build audio args for %s: %v", job.Name, err), emit)
-			stopProcesses(session.processes, gracePeriod)
+			if stopErr := stopProcesses(session.processes, gracePeriod); stopErr != nil {
+				return nil, errors.Errorf("%v; cleanup failed: %v", err, stopErr)
+			}
 			return nil, err
 		}
 		session.markProcessStarted(newManagedProcess(job.Name, args, job.OutputPath))
@@ -99,7 +103,9 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 
 	if err := transitionSession(session, StateRunning, "all workers started", emit); err != nil {
 		_ = transitionSession(session, StateFailed, err.Error(), emit)
-		stopProcesses(session.processes, gracePeriod)
+		if stopErr := stopProcesses(session.processes, gracePeriod); stopErr != nil {
+			return nil, errors.Errorf("%v; cleanup failed: %v", err, stopErr)
+		}
 		return nil, err
 	}
 
@@ -223,6 +229,10 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 					return nil, err
 				}
 				startStop()
+			case eventStopCompleted:
+				cancelProducers()
+				_ = group.Wait()
+				return nil, fmt.Errorf("received stop completion while session is still %s", session.state)
 			}
 		case StateStopping:
 			switch event.Type {
@@ -268,10 +278,10 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 			case eventCancelRequested, eventHardTimeout:
 				// Ignore duplicate stop requests once stopping has started.
 			}
-		default:
+		case StateStarting, StateFinished, StateFailed:
 			cancelProducers()
 			_ = group.Wait()
-			return nil, fmt.Errorf("unexpected terminal session state %s", session.state)
+			return nil, fmt.Errorf("unexpected session state %s while handling %s", session.state, event.Type)
 		}
 	}
 }

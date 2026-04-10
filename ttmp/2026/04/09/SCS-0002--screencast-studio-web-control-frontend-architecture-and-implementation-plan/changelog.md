@@ -95,3 +95,13 @@ Phase 8: Built main operator screen with source cards, preview panes, and record
 ## 2026-04-09
 
 Phase 10: Added WebSocket client with reconnection and PreviewStream component (commit 0e101c4)
+
+
+## 2026-04-09
+
+Reviewed the current `ui/` frontend against the implemented Go web backend, documented the major frontend/backend contract drift, identified the reusable strengths in the component and styling layers, and wrote a detailed intern-facing cleanup and next-steps guide.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/design-doc/02-frontend-assessment-and-improvement-guide.md — New frontend assessment, review, and improvement guide
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/reference/01-diary.md — Diary updated with the evidence and validation steps behind the frontend review

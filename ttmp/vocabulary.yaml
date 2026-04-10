@@ -19,6 +19,10 @@ topics:
       description: Architecture design and system structure topics
     - slug: ui
       description: User interface implementation and cleanup topics
+    - slug: product
+      description: Productization and end-user workflow topics
+    - slug: recording
+      description: Recording session lifecycle and output topics
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes

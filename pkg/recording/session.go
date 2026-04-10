@@ -70,6 +70,8 @@ func (s *Session) transition(next SessionState, reason string) error {
 		if s.startedAt.IsZero() {
 			s.startedAt = time.Now()
 		}
+	case StateRunning, StateStopping:
+		// No timestamp changes for non-terminal active states.
 	case StateFinished, StateFailed:
 		s.finishedAt = time.Now()
 	}

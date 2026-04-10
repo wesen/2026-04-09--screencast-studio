@@ -219,6 +219,120 @@ The new task plan deliberately starts with backend transport and session ownersh
 
 Files edited in this step:
 
+## Step 3: Assess The Current Frontend And Write An Improvement Guide
+
+This step reviewed the intern's current `ui/` work against the backend that now exists in `internal/web/`. The goal was not to produce a superficial style review. The real goal was to determine whether the frontend is currently a correct client of the backend, identify exactly where it drifted, preserve the parts that are genuinely good, and write a document that tells the intern how to fix the system without losing the useful work already done.
+
+The key conclusion from this step is that the frontend is visually promising but architecturally half-integrated. The component library, tokens, and Storybook setup are worth keeping. The transport, state ownership, and mock layers are not yet aligned with the current Go API and need targeted cleanup.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Ok, in the meantime our intern set up all the web side of things in ui/ but I don't know if they did a good job. Make a thorough assessment of the current frontend situation and write a detailed report and review and improvement guide and next steps design document for said intern (in the same detailed style) and store in the ticket and upload to remarkable."
+
+**Assistant interpretation:** Audit the frontend implementation in `ui/`, compare it to the actual backend web contract, write a long-form assessment and improvement guide in `SCS-0002`, update ticket bookkeeping, and upload the updated ticket bundle to reMarkable.
+
+### What I did
+
+- Inspected the frontend workspace structure under `ui/`.
+- Read the main frontend architecture files:
+  - `ui/package.json`
+  - `ui/src/api/*.ts`
+  - `ui/src/components/studio/StudioApp.tsx`
+  - `ui/src/pages/StudioPage.tsx`
+  - `ui/src/features/session/wsClient.ts`
+  - `ui/src/features/studio-draft/studioDraftSlice.ts`
+  - `ui/src/mocks/handlers.ts`
+- Read the backend transport files as the source of truth:
+  - `internal/web/api_types.go`
+  - `internal/web/handlers_api.go`
+  - `internal/web/handlers_preview.go`
+  - `internal/web/handlers_ws.go`
+- Ran validation commands:
+  - `pnpm --dir ui build`
+  - `pnpm --dir ui lint`
+  - `pnpm --dir ui build-storybook`
+- Wrote the new assessment document:
+  - `design-doc/02-frontend-assessment-and-improvement-guide.md`
+
+### Why
+
+- The web ticket is far enough along that we now need a quality review, not just implementation notes.
+- The intern needs concrete guidance on what to keep versus what to replace.
+- The frontend can look “pretty done” at a glance while still being structurally wrong, so the review had to focus on backend alignment and state ownership instead of only layout quality.
+
+### What worked
+
+- The frontend has a clear visual direction, good base components, and a useful Storybook setup.
+- The backend is now explicit enough that the transport mismatch could be evaluated precisely rather than guessed at.
+- The review surfaced a clean recovery plan instead of suggesting a full rewrite.
+
+### What didn't work
+
+- The API layer in `ui/src/api/` is substantially out of sync with the actual backend.
+- The mock layer reinforces stale assumptions instead of validating the real transport contract.
+- There are two overlapping app shells, which makes it unclear where orchestration should live.
+- Linting is declared but not actually configured, so one of the basic validation commands currently fails.
+
+### What I learned
+
+- The strongest part of the intern's work is the UI shell and component language, not the data integration.
+- The frontend is currently closer to a sophisticated product mock than a true backend client.
+- The recovery plan is not "rewrite everything." The recovery plan is "freeze the contract, collapse duplicate shells, replace simulated state with real state, and then repair the mocks."
+
+### What warrants a second pair of eyes
+
+- Whether `StudioPage.tsx` should definitely become the single long-term app shell, or whether the tabbed layout should be merged differently.
+- Whether the frontend should keep raw DSL as the primary editing surface in version 1 or move toward a stronger structured editor model.
+- Whether transport types should stay hand-maintained or move to some shared schema approach later.
+
+### What should be done in the future
+
+- Update the ticket changelog with the new assessment deliverable.
+- Relate the assessment doc to the inspected frontend and backend files.
+- Upload the updated ticket bundle to reMarkable.
+- Use this assessment as the baseline for future frontend review and cleanup work.
+
+### Code review instructions
+
+- Read the new review first:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/design-doc/02-frontend-assessment-and-improvement-guide.md`
+- Then verify the main transport findings against:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/types.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/discoveryApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/setupsApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/recordingApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/previewsApi.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/api_types.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+- Then verify the shell/state findings against:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StudioApp.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/mocks/handlers.ts`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+find ui -maxdepth 3 -type f | sort
+find ui/src -maxdepth 5 -type f | sort
+sed -n '1,220p' ui/package.json
+sed -n '1,260p' ui/src/components/studio/StudioApp.tsx
+sed -n '1,260p' ui/src/pages/StudioPage.tsx
+sed -n '1,260p' ui/src/features/session/wsClient.ts
+sed -n '1,260p' ui/src/mocks/handlers.ts
+sed -n '1,260p' internal/web/api_types.go
+sed -n '1,260p' internal/web/handlers_api.go
+sed -n '1,260p' internal/web/handlers_preview.go
+sed -n '1,260p' internal/web/handlers_ws.go
+pnpm --dir ui build
+pnpm --dir ui lint
+pnpm --dir ui build-storybook
+```
+
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/tasks.md`
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/changelog.md`
 - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0002--screencast-studio-web-control-frontend-architecture-and-implementation-plan/reference/01-diary.md`

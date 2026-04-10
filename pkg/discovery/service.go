@@ -13,9 +13,9 @@ import (
 
 var (
 	monitorGeometryRe = regexp.MustCompile(`^(\d+)/\d+x(\d+)/\d+\+(-?\d+)\+(-?\d+)$`)
-	windowIDRe    = regexp.MustCompile(`0x[0-9a-fA-F]+`)
-	quotedValueRe = regexp.MustCompile(`"([^"]*)"`)
-	geometryIntRe = regexp.MustCompile(`(-?\d+)`)
+	windowIDRe        = regexp.MustCompile(`0x[0-9a-fA-F]+`)
+	quotedValueRe     = regexp.MustCompile(`"([^"]*)"`)
+	geometryIntRe     = regexp.MustCompile(`(-?\d+)`)
 )
 
 func SnapshotAll(ctx context.Context) (*Snapshot, error) {

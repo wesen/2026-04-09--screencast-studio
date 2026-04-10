@@ -175,9 +175,9 @@ func (a *Application) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, op
 		},
 	})
 	summary := &RecordSummary{
-		SessionID:  plan.SessionID,
-		Outputs:    append([]dsl.PlannedOutput(nil), plan.Outputs...),
-		Warnings:   append([]string(nil), plan.Warnings...),
+		SessionID: plan.SessionID,
+		Outputs:   append([]dsl.PlannedOutput(nil), plan.Outputs...),
+		Warnings:  append([]string(nil), plan.Warnings...),
 	}
 	if result != nil {
 		summary.State = string(result.State)
