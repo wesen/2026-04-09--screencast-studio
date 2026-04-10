@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Win } from '../primitives/Win';
 import { Btn } from '../primitives/Btn';
 
 interface DSLEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onCompile: () => void;
-  isCompiling?: boolean;
+  onApply: () => void;
+  onReset: () => void;
+  isApplying?: boolean;
+  hasChanges?: boolean;
   warnings?: string[];
   errors?: string[];
   className?: string;
@@ -15,33 +17,20 @@ interface DSLEditorProps {
 export const DSLEditor: React.FC<DSLEditorProps> = ({
   value,
   onChange,
-  onCompile,
-  isCompiling = false,
+  onApply,
+  onReset,
+  isApplying = false,
+  hasChanges = false,
   warnings = [],
   errors = [],
   className,
 }) => {
-  const [localValue, setLocalValue] = useState(value);
-
-  const handleBlur = () => {
-    if (localValue !== value) {
-      onChange(localValue);
-    }
-  };
-
-  const handleReset = () => {
-    setLocalValue(value);
-  };
-
-  const hasChanges = localValue !== value;
-
   return (
-    <Win title="Raw DSL (Debug)" className={className}>
+    <Win title="Raw DSL (Advanced)" className={className}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <textarea
-          value={localValue}
-          onChange={(e) => setLocalValue(e.target.value)}
-          onBlur={handleBlur}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
           style={{
             width: '100%',
@@ -101,11 +90,11 @@ export const DSLEditor: React.FC<DSLEditorProps> = ({
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8 }}>
-          <Btn onClick={onCompile} disabled={isCompiling}>
-            {isCompiling ? 'Compiling...' : 'Compile'}
+          <Btn onClick={onApply} disabled={isApplying || !hasChanges}>
+            {isApplying ? 'Applying...' : 'Apply DSL'}
           </Btn>
           {hasChanges && (
-            <Btn onClick={handleReset}>Reset</Btn>
+            <Btn onClick={onReset}>Reset</Btn>
           )}
           {hasChanges && (
             <span

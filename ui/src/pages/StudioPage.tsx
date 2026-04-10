@@ -10,7 +10,7 @@ import {
   useStartRecordingMutation,
   useStopRecordingMutation,
 } from '@/api/recordingApi';
-import { useCompileSetupMutation, useNormalizeSetupMutation } from '@/api/setupApi';
+import { useNormalizeSetupMutation } from '@/api/setupApi';
 import type {
   ApiErrorResponse,
   CameraDescriptor,
@@ -28,7 +28,13 @@ import {
   selectCompileWarnings,
   selectDslText,
   selectIsCompiling,
+  selectRawDslDirty,
+  selectRawDslText,
+  selectStructuredEditingLocked,
+  selectStructuredEditingLockReason,
+  resetRawDslToApplied,
   setDslText,
+  setRawDslText,
 } from '@/features/editor/editorSlice';
 import {
   setAudio,
@@ -59,12 +65,15 @@ import {
 import {
   createCameraSourceDraft,
   createDisplaySourceDraft,
+  effectiveConfigToSetupDraft,
   createRegionSourceDraft,
   createWindowSourceDraft,
+  effectiveVideoSourceToDraft,
   presetRectForDisplay,
   renderSetupDraftAsDsl,
   type RegionPreset,
 } from '@/features/setup-draft/conversion';
+import { isBuilderCompatibleEffectiveConfig } from '@/features/setup-draft/compatibility';
 import {
   addVideoSource,
   hydrateFromEffectiveConfig,
@@ -193,10 +202,14 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const wsConnected = useAppSelector(selectWsConnected);
   const activeTab = useAppSelector(selectActiveTab);
   const dslText = useAppSelector(selectDslText);
+  const rawDslText = useAppSelector(selectRawDslText);
+  const rawDslDirty = useAppSelector(selectRawDslDirty);
   const setupDraft = useAppSelector(selectSetupDraftDocument);
   const compileWarnings = useAppSelector(selectCompileWarnings);
   const compileErrors = useAppSelector(selectCompileErrors);
   const isCompiling = useAppSelector(selectIsCompiling);
+  const structuredEditingLocked = useAppSelector(selectStructuredEditingLocked);
+  const structuredEditingLockReason = useAppSelector(selectStructuredEditingLockReason);
   const normalizedConfig = useAppSelector(selectNormalizedConfig);
   const normalizeWarnings = useAppSelector(selectNormalizeWarnings);
   const normalizeErrors = useAppSelector(selectNormalizeErrors);
@@ -211,11 +224,19 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const { data: currentSessionData } = useGetCurrentSessionQuery();
   const [startRecording, startRecordingState] = useStartRecordingMutation();
   const [stopRecording, stopRecordingState] = useStopRecordingMutation();
-  const [compileSetup] = useCompileSetupMutation();
   const [normalizeSetup] = useNormalizeSetupMutation();
   const [ensurePreview] = useEnsurePreviewMutation();
   const [releasePreview] = useReleasePreviewMutation();
   const [sourcePickerKind, setSourcePickerKind] = useState<StudioSource['kind'] | null>(null);
+
+  const visibleVideoSources = useMemo(
+    () => (
+      structuredEditingLocked && normalizedConfig
+        ? normalizedConfig.videoSources.map(effectiveVideoSourceToDraft)
+        : setupDraft.videoSources
+    ),
+    [normalizedConfig, setupDraft.videoSources, structuredEditingLocked]
+  );
 
   const isRecording = session.active;
   const isPaused = false;
@@ -226,12 +247,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     session.state === 'starting' ||
     session.state === 'stopping';
   const sources = useMemo(
-    () => setupDraft.videoSources.map((source) => {
+    () => visibleVideoSources.map((source) => {
       const previewId = ownedPreviewIdBySourceId[source.id];
       const preview = previewId ? previewsById[previewId] : undefined;
       return toStudioSource(source, preview);
     }),
-    [ownedPreviewIdBySourceId, previewsById, setupDraft.videoSources]
+    [ownedPreviewIdBySourceId, previewsById, visibleVideoSources]
   );
   const armedSources = useMemo(
     () => sources.filter((source) => source.armed),
@@ -262,8 +283,20 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     if (!normalizedConfig) {
       return;
     }
+    if (structuredEditingLocked) {
+      return;
+    }
+    if (setupDraft.sessionId !== '') {
+      return;
+    }
     dispatch(hydrateFromEffectiveConfig(normalizedConfig));
-  }, [dispatch, normalizedConfig]);
+  }, [dispatch, normalizedConfig, setupDraft.sessionId, structuredEditingLocked]);
+
+  useEffect(() => {
+    if (structuredEditingLocked) {
+      setSourcePickerKind(null);
+    }
+  }, [structuredEditingLocked]);
 
   useEffect(() => {
     const wsClient = new WsClient(dispatch);
@@ -456,19 +489,61 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     })();
   };
 
-  const handleCompile = () => {
+  const handleApplyDsl = () => {
     void (async () => {
       dispatch(compileStarted());
+      dispatch(normalizeStarted());
       try {
-        const response = await compileSetup({ dsl: dslText }).unwrap();
-        dispatch(compileSucceeded(response.warnings));
+        const response = await normalizeSetup({ dsl: rawDslText }).unwrap();
+        if (!response.config) {
+          dispatch(normalizeFailed(['normalize response missing config']));
+          dispatch(compileFailed(['normalize response missing config']));
+          return;
+        }
+
+        const roundTrippedDsl = renderSetupDraftAsDsl(
+          effectiveConfigToSetupDraft(response.config)
+        );
+        const roundTripResponse = await normalizeSetup({ dsl: roundTrippedDsl }).unwrap();
+        if (!roundTripResponse.config) {
+          dispatch(compileFailed(['builder compatibility check missing config']));
+          return;
+        }
+
+        const compatible = isBuilderCompatibleEffectiveConfig(
+          response.config,
+          roundTripResponse.config,
+        );
+        const lockReason = compatible
+          ? ''
+          : 'Advanced DSL is active. Structured editing is unavailable because this setup uses shapes the builder does not support yet.';
+
+        dispatch(normalizeSucceeded({
+          config: response.config,
+          warnings: response.warnings,
+        }));
+
+        if (compatible) {
+          dispatch(hydrateFromEffectiveConfig(response.config));
+        }
+
+        dispatch(compileSucceeded({
+          dslText: rawDslText,
+          warnings: response.warnings,
+          structuredEditingLocked: !compatible,
+          structuredEditingLockReason: lockReason,
+        }));
       } catch (error) {
+        dispatch(normalizeFailed([errorMessageFromUnknown(error)]));
         dispatch(compileFailed([errorMessageFromUnknown(error)]));
       }
     })();
   };
 
   const applyAddedSource = (source: ReturnType<typeof createDisplaySourceDraft>) => {
+    if (structuredEditingLocked) {
+      return;
+    }
     const nextDraft = {
       ...setupDraft,
       videoSources: [...setupDraft.videoSources, source],
@@ -479,6 +554,9 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   };
 
   const applyUpdatedSource = (updatedSource: SetupDraftVideoSource) => {
+    if (structuredEditingLocked) {
+      return;
+    }
     const nextDraft = {
       ...setupDraft,
       videoSources: setupDraft.videoSources.map((source) => (
@@ -748,17 +826,31 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       <div className="studio-main">
         {activeTab === 'studio' && (
           <>
+            {structuredEditingLocked && (
+              <div
+                style={{
+                  margin: '10px',
+                  padding: '8px 10px',
+                  border: '1px solid var(--studio-amber)',
+                  background: 'rgba(184, 152, 64, 0.12)',
+                  color: 'var(--studio-amber)',
+                  fontSize: 10,
+                }}
+              >
+                {structuredEditingLockReason}
+              </div>
+            )}
             <SourceGrid
               sources={sources}
               isRecording={isRecording}
-              editable
-              renderEditor={renderTargetEditor}
-              onRemove={handleRemoveSource}
-              onToggleArmed={handleToggleSourceEnabled}
-              onChangeScene={handleRenameSource}
-              onMoveUp={(sourceId) => handleMoveSource(sourceId, 'up')}
-              onMoveDown={(sourceId) => handleMoveSource(sourceId, 'down')}
-              onAdd={(kind) => setSourcePickerKind(kind)}
+              editable={!structuredEditingLocked}
+              renderEditor={structuredEditingLocked ? undefined : renderTargetEditor}
+              onRemove={structuredEditingLocked ? undefined : handleRemoveSource}
+              onToggleArmed={structuredEditingLocked ? undefined : handleToggleSourceEnabled}
+              onChangeScene={structuredEditingLocked ? undefined : handleRenameSource}
+              onMoveUp={structuredEditingLocked ? undefined : (sourceId) => handleMoveSource(sourceId, 'up')}
+              onMoveDown={structuredEditingLocked ? undefined : (sourceId) => handleMoveSource(sourceId, 'down')}
+              onAdd={structuredEditingLocked ? undefined : (kind) => setSourcePickerKind(kind)}
             />
 
             {sourcePickerKind && (
@@ -830,10 +922,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
 
         {activeTab === 'raw' && (
           <DSLEditor
-            value={dslText}
-            onChange={(value) => dispatch(setDslText(value))}
-            onCompile={handleCompile}
-            isCompiling={isCompiling}
+            value={rawDslText}
+            onChange={(value) => dispatch(setRawDslText(value))}
+            onApply={handleApplyDsl}
+            onReset={() => dispatch(resetRawDslToApplied())}
+            isApplying={isCompiling}
+            hasChanges={rawDslDirty}
             warnings={editorWarnings}
             errors={editorErrors}
           />

@@ -29,7 +29,7 @@ Acceptance criteria:
   - discovery -> draft source
   - draft source -> DSL
   - normalized backend config -> hydrated editor state when reopening
-- [ ] Decide where raw DSL remains visible in the product.
+- [x] Decide where raw DSL remains visible in the product.
 
 Acceptance criteria:
 
@@ -71,15 +71,34 @@ Acceptance criteria:
 
 ## Phase 5: Structured Draft To DSL Synchronization
 
-- [ ] Implement robust conversion from the structured setup draft into canonical DSL text.
-- [ ] Keep the Raw DSL tab synchronized with the structured editor.
-- [ ] Handle conflicts or parse failures when the user edits raw DSL directly.
-- [ ] Decide whether structured mode becomes read-only when raw DSL enters unsupported shapes.
+- [x] Implement robust conversion from the structured setup draft into canonical DSL text.
+- [x] Keep the Raw DSL tab synchronized with the structured editor.
+- [x] Handle conflicts or parse failures when the user edits raw DSL directly.
+- [x] Decide whether structured mode becomes read-only when raw DSL enters unsupported shapes.
 
 Acceptance criteria:
 
 - Structured editing and raw DSL remain coherent.
 - The user does not lose work when switching between modes.
+
+### Approved Policy
+
+- Raw DSL remains visible as an advanced mode.
+- Structured edits always regenerate Raw DSL text.
+- Raw DSL edits do not affect the running setup until the user clicks `Apply DSL`.
+- `Apply DSL` behavior:
+  - if normalize fails, stay in Raw DSL and show errors
+  - if normalize succeeds and the result is representable by the builder, hydrate structured state from that config
+  - if normalize succeeds but uses unsupported shapes, keep the applied config active but lock structured editing behind a clear banner
+
+### Concrete Implementation Tasks
+
+- [x] Add separate `applied` vs `raw draft` DSL state in the frontend editor slice.
+- [x] Change the Raw DSL tab from blur-driven implicit sync to explicit `Apply DSL` / `Reset` controls.
+- [x] Make the Studio tab use the applied config, not un-applied Raw DSL edits.
+- [x] Add a builder-compatibility check for applied Raw DSL.
+- [x] Lock structured editing when advanced DSL is active but not builder-compatible.
+- [x] Show a clear Studio-tab banner explaining why structured editing is unavailable.
 
 ## Phase 6: Preview Integration With Source Editing
 
@@ -91,6 +110,25 @@ Acceptance criteria:
 
 - Source editing does not break preview lifecycle ownership.
 - Preview behavior remains understandable during edits.
+
+### Approved Policy
+
+- Use the simplest reliable approach: hard cutover on meaningful reconfiguration.
+- Flicker is acceptable.
+- Cosmetic edits like rename should not restart previews.
+- Target/capture edits should release the old preview and let the ensure loop create a new one.
+
+### Concrete Implementation Tasks
+
+- [ ] Preview only enabled sources in the mounted Studio page.
+- [ ] Introduce an explicit `restart preview for source` path in `StudioPage`.
+- [ ] Restart previews on:
+  - window target changes
+  - camera device changes
+  - region rectangle changes
+  - other preview-relevant source changes as needed
+- [ ] Do not restart previews on rename-only edits.
+- [ ] Verify that the hard-cutover path does not leave orphaned preview leases.
 
 ## Phase 7: Validation And UX Guardrails
 
@@ -126,7 +164,7 @@ Acceptance criteria:
 - [x] Commit 1: structured setup draft model and conversion rules
 - [x] Commit 2: source-picker and source creation flow
 - [x] Commit 3: source editing, reorder, and removal
-- [ ] Commit 4: structured/raw DSL synchronization and validation
+- [x] Commit 4: structured/raw DSL synchronization and validation
 - [ ] Commit 5: preview integration adjustments
 - [ ] Commit 6: tests, stories, and smoke validation
 
@@ -136,3 +174,5 @@ Acceptance criteria:
 - 2026-04-09: Added a mounted source-picker that uses discovery data for display, window, camera, and preset region creation, then renders the updated setup draft back into DSL text.
 - 2026-04-09: Replaced the fake scene selector on mounted source cards with real rename, enable/disable, remove, and reorder actions backed by the setup draft and DSL sync. Target re-selection is still pending.
 - 2026-04-09: Added real target editors for window sources, camera sources, and region rectangles/presets. Removed the dead `solo` concept from the mounted source model. Full per-monitor display selection remains blocked on a backend target-model change.
+- 2026-04-09: Agreed product policy for the remaining work: Raw DSL becomes an explicit advanced apply flow, and preview reconfiguration uses simple hard-cutover release/re-ensure behavior.
+- 2026-04-09: Implemented Raw DSL as an explicit advanced apply flow with separate applied vs draft text, builder-compatibility lockout, and a read-only Studio fallback for unsupported advanced shapes.

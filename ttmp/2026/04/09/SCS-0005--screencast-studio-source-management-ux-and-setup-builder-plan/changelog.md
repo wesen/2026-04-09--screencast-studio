@@ -85,3 +85,20 @@ Implemented the target-editor cleanup slice:
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourceGrid.tsx — Source grid now forwards editor render content
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/conversion.ts — Region preset geometry helper export
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/styles/studio.css — Styling for the companion target editor
+
+## 2026-04-09
+
+Implemented the Raw DSL advanced-mode ownership slice:
+
+- split editor state into applied DSL vs raw draft DSL
+- changed the raw editor to explicit `Apply DSL` / `Reset` controls
+- routed Raw DSL apply through backend normalize plus a builder compatibility round-trip
+- locked the structured builder when advanced DSL uses unsupported shapes
+- rendered the Studio source grid read-only from the applied normalized config while locked
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts — Applied vs raw DSL state and structured-editor lock metadata
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/compatibility.ts — Builder compatibility comparison helper
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/dsl-editor/DSLEditor.tsx — Explicit advanced-mode apply/reset controls
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Apply flow, builder lock banner, and read-only Studio fallback

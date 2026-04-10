@@ -21,7 +21,7 @@ RelatedFiles:
       Note: Current app-level owner for structured source management work
 ExternalSources: []
 Summary: Chronological record of creating the source-management and setup-builder follow-on ticket and implementing it slice by slice.
-LastUpdated: 2026-04-09T21:47:00-04:00
+LastUpdated: 2026-04-09T22:20:00-04:00
 WhatFor: Preserve why the source-management work was split into its own ticket and what it should cover.
 WhenToUse: Read when starting implementation or reviewing the intended scope of the structured source builder.
 ---
@@ -379,3 +379,108 @@ docmgr doctor --ticket SCS-0005 --stale-after 30
 - add structured/raw conflict handling and unsupported-shape behavior
 - make previews react more clearly to source reconfiguration
 - add validation states and stronger smoke coverage
+
+## Step 6: Lock The Remaining Direction Before Implementing It
+
+Before continuing, the remaining ambiguous product behavior was narrowed down with two explicit decisions.
+
+### Raw DSL decision
+
+The Raw DSL tab will remain, but it is no longer treated as a live peer editor. The intended behavior is now:
+
+- structured editing is the primary path
+- structured edits regenerate Raw DSL
+- Raw DSL edits are local draft changes until the user clicks `Apply DSL`
+- if applied Raw DSL is builder-compatible, structured editing rehydrates from it
+- if applied Raw DSL is not builder-compatible, the config stays active but the structured editor locks behind a clear banner
+
+This keeps the product simple and avoids trying to live-sync both directions on every keystroke.
+
+### Preview reconfiguration decision
+
+For preview behavior during source reconfiguration, the chosen policy is the simplest reliable one:
+
+- hard cutover
+- release old preview
+- allow the normal ensure loop to create a new preview
+- flicker is acceptable
+- preview continuity is less important than correctness and flexibility
+
+That means the remaining preview work can stay in the frontend orchestration rather than needing a more elaborate reconciliation layer.
+
+### Why these decisions matter
+
+These decisions remove the two biggest remaining sources of complexity in `SCS-0005`:
+
+- bidirectional builder/raw synchronization rules
+- trying to be clever about preview reuse during edits
+
+With those choices fixed, the next two slices are now clear:
+
+1. Raw DSL advanced apply and builder lockout
+2. Simple preview hard-cutover on meaningful source reconfiguration
+
+## Step 7: Turn Raw DSL Into An Explicit Advanced Apply Flow
+
+The next slice made Raw DSL stop behaving like a hidden second primary editor. Before this change, the raw tab still used a blur-driven local buffer that wrote straight back into the canonical DSL state. That was convenient early on, but it blurred ownership and made it too easy for advanced-only setups to desynchronize the builder.
+
+### Product behavior after this slice
+
+The product now behaves like this:
+
+- structured edits still regenerate the canonical applied DSL immediately
+- Raw DSL edits are draft-only until the user clicks `Apply DSL`
+- the Studio tab, previews, and record path continue to use the applied DSL
+- `Apply DSL` normalizes through the backend
+- normalized advanced DSL is then checked for builder compatibility by round-tripping it through the structured setup draft renderer
+- compatible advanced DSL rehydrates the structured builder
+- incompatible advanced DSL remains active but the Studio builder locks and shows a clear banner
+
+### What I implemented
+
+- Extended `ui/src/features/editor/editorSlice.ts` with:
+  - `dslText` as the applied canonical DSL
+  - `rawDslText` as the advanced-mode draft
+  - lock state plus lock reason for structured editing
+- Added `ui/src/features/setup-draft/compatibility.ts` to compare the applied normalized config against the builder round-trip result.
+- Reworked `ui/src/components/dsl-editor/DSLEditor.tsx` into a controlled editor with:
+  - `Apply DSL`
+  - `Reset`
+  - no blur-driven implicit sync
+- Reworked `ui/src/pages/StudioPage.tsx` so:
+  - startup hydration from normalized config happens only once for the builder
+  - Raw DSL apply explicitly drives normalize + compatibility check
+  - builder-compatible advanced DSL rehydrates `setup-draft`
+  - incompatible advanced DSL keeps the applied config live but renders the Studio source grid read-only from `normalizedConfig`
+
+### Why this approach is better
+
+This keeps the ownership model simple:
+
+- the builder is the normal path
+- Raw DSL is an advanced override
+- unsupported advanced setups do not force the code into a confusing partial-sync state
+
+That is much easier to reason about than trying to keep two live editors mutually authoritative at all times.
+
+### Validation
+
+Commands run:
+
+```bash
+pnpm --dir ui build
+pnpm --dir ui lint
+```
+
+### Review focus
+
+Review these files together:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/compatibility.ts`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/dsl-editor/DSLEditor.tsx`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+
+### Next step
+
+The next slice should make preview ownership react explicitly to meaningful source reconfiguration by releasing and recreating previews on target changes instead of leaving same-ID sources on stale preview leases.
