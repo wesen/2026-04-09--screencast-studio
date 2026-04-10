@@ -160,11 +160,11 @@ Acceptance criteria:
 - [x] Commit 1: transport types and endpoint cleanup
 - [x] Commit 2: mounted shell consolidation
 - [x] Commit 3: state model cleanup
-- [ ] Commit 4: protobuf schema and generation plumbing
-- [ ] Commit 5: Go REST and websocket protobuf migration
-- [ ] Commit 6: frontend protobuf transport and websocket decode migration
+- [x] Commit 4: protobuf schema and generation plumbing
+- [x] Commit 5: Go REST and websocket protobuf migration
+- [x] Commit 6: frontend protobuf transport and websocket decode migration
 - [x] Commit 7: preview integration cleanup on top of protobuf
-- [ ] Commit 8: final dead-code deletion and hygiene cleanup
+- [x] Commit 8: final dead-code deletion and hygiene cleanup
 
 ## Validation Checklist
 

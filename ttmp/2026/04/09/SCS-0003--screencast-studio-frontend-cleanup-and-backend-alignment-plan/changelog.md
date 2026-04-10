@@ -137,3 +137,8 @@ Finished the cleanup and hygiene pass by deleting the remaining demo-only source
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StatusPanel.tsx — Status panel now renders “unavailable” instead of invented disk telemetry
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/DSLEditor.stories.tsx — Storybook DSL story now uses the same valid default DSL as the mounted app
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/reference/01-diary.md — Diary now records the final validation checklist and live smoke results
+
+## 2026-04-09
+
+Frontend cleanup, protobuf transport migration, preview lifecycle wiring, and smoke validation complete
+
