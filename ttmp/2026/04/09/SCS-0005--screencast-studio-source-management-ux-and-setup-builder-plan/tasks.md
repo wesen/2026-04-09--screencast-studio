@@ -6,15 +6,15 @@ Build a structured source-management experience that lets a user create, edit, r
 
 ## Phase 1: Freeze The Existing Source Model
 
-- [ ] Audit the current source display path in `StudioPage`, `SourceGrid`, and `SourceCard`.
-- [ ] Audit the current discovery response shape and the current DSL source model.
-- [ ] Record the exact source kinds that must be supported in v1:
+- [x] Audit the current source display path in `StudioPage`, `SourceGrid`, and `SourceCard`.
+- [x] Audit the current discovery response shape and the current DSL source model.
+- [x] Record the exact source kinds that must be supported in v1:
   - display
   - window
   - region
   - camera
   - audio source where relevant in the builder flow
-- [ ] Document the minimum editable fields per source kind.
+- [x] Document the minimum editable fields per source kind.
 
 Acceptance criteria:
 
@@ -23,9 +23,9 @@ Acceptance criteria:
 
 ## Phase 2: Define The Structured Setup Draft Model
 
-- [ ] Define a frontend draft model for structured source editing.
-- [ ] Decide whether the draft model should mirror DSL closely or use a slightly more UI-friendly intermediate model.
-- [ ] Define conversion rules:
+- [x] Define a frontend draft model for structured source editing.
+- [x] Decide whether the draft model should mirror DSL closely or use a slightly more UI-friendly intermediate model.
+- [x] Define conversion rules:
   - discovery -> draft source
   - draft source -> DSL
   - normalized backend config -> hydrated editor state when reopening
@@ -123,9 +123,13 @@ Acceptance criteria:
 
 ## Suggested Commit Boundaries
 
-- [ ] Commit 1: structured setup draft model and conversion rules
+- [x] Commit 1: structured setup draft model and conversion rules
 - [ ] Commit 2: source-picker and source creation flow
 - [ ] Commit 3: source editing, reorder, and removal
 - [ ] Commit 4: structured/raw DSL synchronization and validation
 - [ ] Commit 5: preview integration adjustments
 - [ ] Commit 6: tests, stories, and smoke validation
+
+## Progress Notes
+
+- 2026-04-09: Completed the initial audit and introduced the new `setup-draft` feature with explicit structured source types, reducer actions, and hydration from normalized backend config.

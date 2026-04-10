@@ -54,6 +54,7 @@ import {
   selectNormalizeErrors,
   selectNormalizeWarnings,
 } from '@/features/setup/setupSlice';
+import { hydrateFromEffectiveConfig } from '@/features/setup-draft/setupDraftSlice';
 import {
   clearOwnedPreview,
   selectOwnedPreviewIdBySourceId,
@@ -219,6 +220,13 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       dispatch(setSession(currentSessionData.session));
     }
   }, [currentSessionData, dispatch]);
+
+  useEffect(() => {
+    if (!normalizedConfig) {
+      return;
+    }
+    dispatch(hydrateFromEffectiveConfig(normalizedConfig));
+  }, [dispatch, normalizedConfig]);
 
   useEffect(() => {
     const wsClient = new WsClient(dispatch);
