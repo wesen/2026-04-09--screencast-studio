@@ -1,7 +1,10 @@
 package dsl
 
 import (
+	sterrors "errors"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,7 +38,34 @@ func renderDestination(tmpl string, vars renderVars) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("destination template rendered to empty path")
 	}
+	if strings.Contains(path, "{index}") {
+		return renderIndexedDestination(path)
+	}
 	return filepath.Clean(path), nil
+}
+
+func renderIndexedDestination(pathTemplate string) (string, error) {
+	for index := 1; ; index++ {
+		candidate := filepath.Clean(strings.ReplaceAll(pathTemplate, "{index}", strconv.Itoa(index)))
+		exists, err := pathExists(candidate)
+		if err != nil {
+			return "", errors.Wrapf(err, "stat destination path %q", candidate)
+		}
+		if !exists {
+			return candidate, nil
+		}
+	}
+}
+
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if sterrors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
 }
 
 func videoExtension(container string) string {

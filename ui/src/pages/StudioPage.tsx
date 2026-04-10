@@ -64,9 +64,11 @@ import {
 } from '@/features/setup/setupSlice';
 import {
   applyDestinationRootToTemplates,
+  applyFilenameSuffixToTemplates,
   createCameraSourceDraft,
   createDisplaySourceDraft,
   destinationRootFromTemplates,
+  filenameSuffixFromTemplates,
   effectiveConfigToSetupDraft,
   createRegionSourceDraft,
   createWindowSourceDraft,
@@ -600,12 +602,19 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     () => destinationRootFromTemplates(setupDraft.destinationTemplates),
     [setupDraft.destinationTemplates]
   );
-  const destinationRootEditable = !structuredEditingLocked && destinationRoot !== null;
-  const destinationRootReason = structuredEditingLocked
+  const filenameSuffix = useMemo(
+    () => filenameSuffixFromTemplates(setupDraft.destinationTemplates),
+    [setupDraft.destinationTemplates]
+  );
+  const builderTemplateReason = structuredEditingLocked
     ? structuredEditingLockReason
-    : destinationRoot === null
+    : destinationRoot === null || filenameSuffix === null
       ? 'Advanced destination templates are active. Edit Raw DSL to change output paths.'
       : undefined;
+  const destinationRootEditable = !structuredEditingLocked && destinationRoot !== null;
+  const destinationRootReason = destinationRootEditable ? undefined : builderTemplateReason;
+  const filenameSuffixEditable = !structuredEditingLocked && filenameSuffix !== null;
+  const filenameSuffixReason = filenameSuffixEditable ? undefined : builderTemplateReason;
   const micOptions = useMemo(
     () => {
       const options = (discoveryData?.audio ?? [])
@@ -823,6 +832,19 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       return;
     }
     const nextTemplates = applyDestinationRootToTemplates(value, setupDraft.destinationTemplates);
+    const nextDraft = {
+      ...setupDraft,
+      destinationTemplates: nextTemplates,
+    };
+    dispatch(replaceDestinationTemplates(nextTemplates));
+    syncStructuredDraft(nextDraft);
+  };
+
+  const handleFilenameSuffixChange = (value: string) => {
+    if (structuredEditingLocked || filenameSuffix === null) {
+      return;
+    }
+    const nextTemplates = applyFilenameSuffixToTemplates(value, setupDraft.destinationTemplates);
     const nextDraft = {
       ...setupDraft,
       destinationTemplates: nextTemplates,
@@ -1213,6 +1235,9 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                 destinationRoot={destinationRoot ?? ''}
                 destinationRootEditable={destinationRootEditable}
                 destinationRootReason={destinationRootReason}
+                filenameSuffix={filenameSuffix ?? ''}
+                filenameSuffixEditable={filenameSuffixEditable}
+                filenameSuffixReason={filenameSuffixReason}
                 outputs={compiledOutputs}
                 outputPreviewBusy={isCompilingPreview}
                 outputPreviewErrors={compilePreviewErrors}
@@ -1229,6 +1254,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                 armedCount={armedSources.length}
                 onRecordingNameChange={handleRecordingNameChange}
                 onDestinationRootChange={handleDestinationRootChange}
+                onFilenameSuffixChange={handleFilenameSuffixChange}
                 onFormatChange={handleFormatChange}
                 onFpsChange={handleFpsChange}
                 onQualityChange={handleQualityChange}

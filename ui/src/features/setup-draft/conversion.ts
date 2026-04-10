@@ -20,8 +20,9 @@ import type {
 const DEFAULT_SCHEMA = 'recorder.config/v1';
 const DEFAULT_DISPLAY_TARGET = ':0.0';
 const DEFAULT_DESTINATION_ROOT = 'recordings';
-const PER_SOURCE_SUFFIX = '/{session_id}/{source_name}.{ext}';
-const AUDIO_MIX_SUFFIX = '/{session_id}/audio-mix.{ext}';
+const DEFAULT_FILENAME_SUFFIX = '';
+const BUILDER_PER_SOURCE_TEMPLATE_RE = /^(.*)\/\{session_id\}\/\{source_name\}(.*)\.\{ext\}$/;
+const BUILDER_AUDIO_MIX_TEMPLATE_RE = /^(.*)\/\{session_id\}\/audio-mix(.*)\.\{ext\}$/;
 
 const normalizeVideoSourceKind = (value: string): SetupDraftVideoSourceKind => {
   const normalized = value.trim().toLowerCase();
@@ -479,33 +480,92 @@ export const renderSetupDraftAsDsl = (draft: SetupDraftDocument): string => {
 
 const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/g, '');
 
-export const destinationRootFromTemplates = (
+interface BuilderManagedDestinationPattern {
+  destinationRoot: string;
+  filenameSuffix: string;
+}
+
+const builderManagedDestinationPatternFromTemplates = (
   templates: Record<string, string>
-): string | null => {
+): BuilderManagedDestinationPattern | null => {
   const perSource = templates.per_source;
   const audioMix = templates.audio_mix;
   if (!perSource || !audioMix) {
     return null;
   }
-  if (!perSource.endsWith(PER_SOURCE_SUFFIX) || !audioMix.endsWith(AUDIO_MIX_SUFFIX)) {
+
+  const perSourceMatch = perSource.match(BUILDER_PER_SOURCE_TEMPLATE_RE);
+  const audioMixMatch = audioMix.match(BUILDER_AUDIO_MIX_TEMPLATE_RE);
+  if (!perSourceMatch || !audioMixMatch) {
     return null;
   }
-  const perSourceRoot = trimTrailingSlashes(perSource.slice(0, -PER_SOURCE_SUFFIX.length));
-  const audioMixRoot = trimTrailingSlashes(audioMix.slice(0, -AUDIO_MIX_SUFFIX.length));
+
+  const perSourceRoot = trimTrailingSlashes(perSourceMatch[1]);
+  const audioMixRoot = trimTrailingSlashes(audioMixMatch[1]);
   if (perSourceRoot !== audioMixRoot) {
     return null;
   }
-  return perSourceRoot || DEFAULT_DESTINATION_ROOT;
+
+  const perSourceSuffix = perSourceMatch[2] ?? '';
+  const audioMixSuffix = audioMixMatch[2] ?? '';
+  if (perSourceSuffix !== audioMixSuffix) {
+    return null;
+  }
+
+  return {
+    destinationRoot: perSourceRoot || DEFAULT_DESTINATION_ROOT,
+    filenameSuffix: perSourceSuffix || DEFAULT_FILENAME_SUFFIX,
+  };
+};
+
+export const destinationRootFromTemplates = (
+  templates: Record<string, string>
+): string | null => {
+  return builderManagedDestinationPatternFromTemplates(templates)?.destinationRoot ?? null;
+};
+
+export const filenameSuffixFromTemplates = (
+  templates: Record<string, string>
+): string | null => {
+  return builderManagedDestinationPatternFromTemplates(templates)?.filenameSuffix ?? null;
+};
+
+const normalizeFilenameSuffix = (value: string): string => value.trim();
+
+const applyBuilderManagedDestinationPattern = (
+  destinationRoot: string,
+  filenameSuffix: string,
+  templates: Record<string, string>
+): Record<string, string> => {
+  const root = trimTrailingSlashes(destinationRoot.trim()) || DEFAULT_DESTINATION_ROOT;
+  const suffix = normalizeFilenameSuffix(filenameSuffix);
+  return {
+    ...templates,
+    per_source: `${root}/{session_id}/{source_name}${suffix}.{ext}`,
+    audio_mix: `${root}/{session_id}/audio-mix${suffix}.{ext}`,
+  };
 };
 
 export const applyDestinationRootToTemplates = (
   destinationRoot: string,
   templates: Record<string, string>
 ): Record<string, string> => {
-  const root = trimTrailingSlashes(destinationRoot.trim()) || DEFAULT_DESTINATION_ROOT;
-  return {
-    ...templates,
-    per_source: `${root}${PER_SOURCE_SUFFIX}`,
-    audio_mix: `${root}${AUDIO_MIX_SUFFIX}`,
-  };
+  const pattern = builderManagedDestinationPatternFromTemplates(templates);
+  return applyBuilderManagedDestinationPattern(
+    destinationRoot,
+    pattern?.filenameSuffix ?? DEFAULT_FILENAME_SUFFIX,
+    templates,
+  );
+};
+
+export const applyFilenameSuffixToTemplates = (
+  filenameSuffix: string,
+  templates: Record<string, string>
+): Record<string, string> => {
+  const pattern = builderManagedDestinationPatternFromTemplates(templates);
+  return applyBuilderManagedDestinationPattern(
+    pattern?.destinationRoot ?? DEFAULT_DESTINATION_ROOT,
+    filenameSuffix,
+    templates,
+  );
 };

@@ -13,6 +13,9 @@ interface OutputPanelProps {
   destinationRoot: string;
   destinationRootEditable: boolean;
   destinationRootReason?: string;
+  filenameSuffix: string;
+  filenameSuffixEditable: boolean;
+  filenameSuffixReason?: string;
   outputs: OutputPreview[];
   outputPreviewBusy?: boolean;
   outputPreviewErrors?: string[];
@@ -29,6 +32,7 @@ interface OutputPanelProps {
   armedCount: number;
   onRecordingNameChange: (value: string) => void;
   onDestinationRootChange: (value: string) => void;
+  onFilenameSuffixChange: (value: string) => void;
   onFormatChange: (format: 'MOV' | 'AVI' | 'MP4') => void;
   onFpsChange: (fps: string) => void;
   onQualityChange: (quality: number) => void;
@@ -53,6 +57,9 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
   destinationRoot,
   destinationRootEditable,
   destinationRootReason,
+  filenameSuffix,
+  filenameSuffixEditable,
+  filenameSuffixReason,
   outputs,
   outputPreviewBusy = false,
   outputPreviewErrors = [],
@@ -69,6 +76,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
   armedCount,
   onRecordingNameChange,
   onDestinationRootChange,
+  onFilenameSuffixChange,
   onFormatChange,
   onFpsChange,
   onQualityChange,
@@ -118,6 +126,16 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
           width={100}
         />
 
+        <span className="studio-output-label">Filename:</span>
+        <input
+          value={filenameSuffix}
+          onChange={(event) => onFilenameSuffixChange(event.target.value)}
+          disabled={!filenameSuffixEditable}
+          className="studio-source-card__editor-input"
+          style={{ width: 160 }}
+          placeholder="-{date}-{index}"
+        />
+
         <span className="studio-output-label">Quality:</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ flex: 1 }}>
@@ -150,6 +168,19 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
           {destinationRootReason}
         </div>
       ) : null}
+      {filenameSuffixReason && !destinationRootReason ? (
+        <div style={{ fontSize: '8px', color: 'var(--studio-amber)', marginBottom: 6 }}>
+          {filenameSuffixReason}
+        </div>
+      ) : null}
+      <div style={{ fontSize: '8px', color: 'var(--studio-mid)', marginBottom: 8, lineHeight: 1.4 }}>
+        Video files use <code>{'{source_name}'}</code>
+        {filenameSuffix || '<suffix>'}
+        <code>.{'{ext}'}</code> and mixed audio uses <code>audio-mix</code>
+        {filenameSuffix || '<suffix>'}
+        <code>.{'{ext}'}</code>.
+        {' '}Tokens: <code>{'{date}'}</code>, <code>{'{time}'}</code>, <code>{'{timestamp}'}</code>, <code>{'{index}'}</code>.
+      </div>
 
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: '9px', color: 'var(--studio-mid)', marginBottom: 4 }}>
