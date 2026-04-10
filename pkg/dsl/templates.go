@@ -34,6 +34,11 @@ func renderDestination(tmpl string, vars renderVars) (string, error) {
 		"{time}", vars.Now.Format("15-04-05"),
 		"{timestamp}", vars.Now.Format("20060102-150405"),
 	).Replace(tmpl)
+	path = strings.NewReplacer(
+		"{date}", vars.Now.Format("2006-01-02"),
+		"{time}", vars.Now.Format("15-04-05"),
+		"{timestamp}", vars.Now.Format("20060102-150405"),
+	).Replace(path)
 	path = expandHome(path)
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("destination template rendered to empty path")

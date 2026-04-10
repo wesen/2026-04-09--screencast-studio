@@ -174,7 +174,8 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({
         </div>
       ) : null}
       <div style={{ fontSize: '8px', color: 'var(--studio-mid)', marginBottom: 8, lineHeight: 1.4 }}>
-        Video files use <code>{'{source_name}'}</code>
+        Tokens can be used in <code>Name</code>, <code>Save to</code>, and <code>Filename</code>.
+        {' '}Video files use <code>{'{source_name}'}</code>
         {filenameSuffix || '<suffix>'}
         <code>.{'{ext}'}</code> and mixed audio uses <code>audio-mix</code>
         {filenameSuffix || '<suffix>'}

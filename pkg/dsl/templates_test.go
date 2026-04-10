@@ -35,3 +35,14 @@ func TestRenderDestinationDateAndIncrementalIndex(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(root, "captures", "2026-04-09", "demo", "Main Display-2026-04-09-2.mov"), path)
 }
+
+func TestRenderDestinationExpandsDateTokensInsideSessionID(t *testing.T) {
+	path, err := renderDestination("./recordings/{session_id}/{source_name}.{ext}", renderVars{
+		SessionID:  "demo-{date}-{timestamp}",
+		SourceName: "Main Display",
+		Ext:        "mov",
+		Now:        time.Date(2026, 4, 9, 15, 4, 5, 0, time.UTC),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "recordings/demo-2026-04-09-20260409-150405/Main Display.mov", path)
+}
