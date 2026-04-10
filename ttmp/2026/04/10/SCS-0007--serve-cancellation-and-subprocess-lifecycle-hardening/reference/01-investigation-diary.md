@@ -676,3 +676,92 @@ go test ./...
 git add internal/web/server.go
 git commit -m "serve: orchestrate manager shutdown in server"
 ```
+
+## Step 8: Manually run `serve`, observe a real shutdown, and document the final shutdown order
+
+After the server orchestration refactor, I wanted at least one real serve-mode observation before doing more subprocess hardening. I ran a built binary under `timeout -s INT` so the process would receive a real interrupt. This turned out to be more useful than a truly idle run, because browser auto-open triggered the frontend, which in turn hit the backend endpoints, compiled a setup, started a preview, opened an MJPEG stream, and therefore exercised a realistic in-flight shutdown path without any special test harness.
+
+The most important observation from this run is that the current staged shutdown does work end-to-end in that scenario. When the signal arrived, the runtime canceled telemetry, the preview ffmpeg exited on context cancellation, the MJPEG request eventually completed, HTTP shutdown finished, the manager shutdown hooks ran, and the final summary reported no active recording and no remaining previews. The whole thing still ran under the `timeout` wrapper, so the shell command returned `124`, but the application logs themselves show a clean application shutdown path.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 4)
+
+**Assistant interpretation:** Keep making disciplined progress, but use real evidence where possible to validate the cancellation design.
+
+**Inferred user intent:** Confirm that the new shutdown orchestration behaves plausibly in a live run before investing more effort in lower-level hardening.
+
+**Commit (code):** pending at the time of this diary entry for the code-comment/doc follow-up step.
+
+### What I did
+- Built a fresh binary:
+
+```bash
+go build -o /tmp/screencast-studio-test ./cmd/screencast-studio
+```
+
+- Ran it under an interrupting timeout:
+
+```bash
+timeout -s INT 4s /tmp/screencast-studio-test serve
+```
+
+- Inspected the resulting logs rather than relying on the wrapper exit code alone.
+- Added a code comment to `internal/web/server.go` documenting the chosen shutdown order explicitly.
+
+### Why
+- Manual evidence is useful here because the browser-opening behavior causes the app to exercise more of the real runtime than a synthetic no-op start/stop would.
+- The explicit shutdown-order comment closes the remaining Phase 4 documentation task in code.
+
+### What worked
+- The live run produced a rich shutdown trace.
+- The frontend/browser interaction automatically created a realistic preview path.
+- The logs showed the expected staged order at a high level:
+  - runtime shutdown began,
+  - telemetry exited,
+  - preview ffmpeg exited on context cancellation,
+  - HTTP shutdown completed,
+  - recording and preview manager shutdown hooks ran,
+  - the final summary reported no live work.
+
+### What didn't work
+- The shell wrapper returned:
+
+```text
+Command exited with code 124
+```
+
+- That is expected for GNU `timeout` once the timeout threshold has been reached, even when the child process then shuts down cleanly after receiving `SIGINT`.
+- So the wrapper exit code is not itself evidence of application failure in this run.
+
+### What I learned
+- Browser auto-open materially changes the runtime shape because the frontend eagerly drives backend API calls and preview setup.
+- The current shutdown order lets in-flight preview work unwind before the manager shutdown hooks observe an already-drained preview map.
+- HTTP shutdown can take a noticeable amount of time when an MJPEG request is in flight; in this run that delay was visible and expected rather than pathological.
+
+### What was tricky to build
+- The tricky part here was interpreting the wrapper result correctly. If I had only looked at `timeout`’s exit code, I might have incorrectly concluded the shutdown failed. The log stream told the real story.
+- Another subtle point is that this was not actually an “idle” serve run once the browser opened. That ended up being a feature, not a bug, because it gave better evidence about real shutdown behavior.
+
+### What warrants a second pair of eyes
+- Whether we want the browser auto-open side effect to remain enabled during future serve integration tests, or whether test/dev modes should be able to suppress it.
+- Whether the observed delay waiting for the MJPEG request to unwind should eventually be surfaced more explicitly in shutdown logs.
+
+### What should be done in the future
+- Record a small manual-validation recipe in the ticket once more scenarios are exercised.
+- Try additional real runs for:
+  - active recording + `Ctrl-C`
+  - mixed preview + recording + `Ctrl-C`
+- Decide later whether browser auto-open should be configurable for testing and debugging.
+
+### Code review instructions
+- Review the new shutdown-order comment in `internal/web/server.go`.
+- Read the diary observations here alongside the live log output from the manual run.
+- Note that the meaningful signal is in the structured application logs, not just the `timeout` wrapper exit code.
+
+### Technical details
+- Representative observations from the live run:
+  - browser auto-open caused the frontend to request `/api/setup/compile` and `/api/previews/ensure`
+  - preview ffmpeg started and later exited on context cancellation
+  - telemetry `parec` started and later exited on context cancellation
+  - final runtime summary reported `recording_active=false` and `remaining_previews=0`

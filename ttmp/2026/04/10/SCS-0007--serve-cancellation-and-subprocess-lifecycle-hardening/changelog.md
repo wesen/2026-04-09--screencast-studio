@@ -91,3 +91,14 @@ Refactored `ListenAndServe` into a staged runtime shutdown in commit `070e6eb`, 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/reference/01-investigation-diary.md — Recorded the server orchestration phase and validation details
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/tasks.md — Marked the completed Phase 4 shutdown orchestration items
 
+
+## 2026-04-10
+
+Documented the final shutdown order in `internal/web/server.go` in commit `6226d20` and captured a real manual `serve` + `SIGINT` validation run. That live run was especially useful because browser auto-open triggered the frontend, which automatically exercised preview startup, MJPEG streaming, telemetry startup, and staged runtime shutdown under real conditions.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go — Added the explicit shutdown-order comment used by future reviewers and interns
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/reference/01-investigation-diary.md — Recorded the manual validation run and its observations
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0007--serve-cancellation-and-subprocess-lifecycle-hardening/tasks.md — Marked the shutdown-order documentation task complete
+

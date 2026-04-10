@@ -106,7 +106,7 @@ Acceptance criteria:
 - [x] Trigger manager shutdown explicitly during serve shutdown.
 - [x] Wait for telemetry exit as part of the same shutdown sequence.
 - [x] Aggregate shutdown errors from HTTP server, recording manager, preview manager, and telemetry manager.
-- [ ] Decide on the final shutdown order and encode it clearly in code comments.
+- [x] Decide on the final shutdown order and encode it clearly in code comments.
 - [x] Add a final success/failure summary log before `ListenAndServe` returns.
 
 Acceptance criteria:
