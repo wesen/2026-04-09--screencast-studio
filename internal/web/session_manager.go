@@ -72,6 +72,10 @@ func (m *RecordingManager) Current() recordingSessionState {
 func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.Duration) (recordingSessionState, error) {
 	plan, err := m.app.CompileDSL(context.Background(), dslBody)
 	if err != nil {
+		log.Error().
+			Str("event", "recording.session.compile.error").
+			Err(err).
+			Msg("failed to compile recording plan")
 		return recordingSessionState{}, err
 	}
 
@@ -79,6 +83,11 @@ func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.D
 	if m.current != nil && m.current.state.Active {
 		current := cloneRecordingState(m.current.state)
 		m.mu.Unlock()
+		log.Warn().
+			Str("event", "recording.session.start.rejected").
+			Str("session_id", current.SessionID).
+			Str("state", current.State).
+			Msg("recording start rejected because another session is active")
 		return current, ErrRecordingAlreadyActive
 	}
 
@@ -100,11 +109,24 @@ func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.D
 	snapshot := cloneRecordingState(current.state)
 	m.mu.Unlock()
 
+	log.Info().
+		Str("event", "recording.session.start").
+		Str("session_id", plan.SessionID).
+		Int("output_count", len(plan.Outputs)).
+		Int("warning_count", len(plan.Warnings)).
+		Dur("grace_period", gracePeriod).
+		Dur("max_duration", maxDuration).
+		Msg("recording session starting")
+
 	m.publishState(snapshot)
 
 	group, groupCtx := errgroup.WithContext(runCtx)
 	group.Go(func() error {
 		defer close(current.done)
+		log.Info().
+			Str("event", "recording.session.run.begin").
+			Str("session_id", plan.SessionID).
+			Msg("recording session worker running")
 		summary, recordErr := m.app.RecordPlan(groupCtx, plan, app.RecordOptions{
 			GracePeriod: gracePeriod,
 			MaxDuration: maxDuration,
@@ -125,10 +147,20 @@ func (m *RecordingManager) Stop() recordingSessionState {
 	m.mu.RUnlock()
 
 	if current == nil || !current.state.Active {
-		return m.Current()
+		snapshot := m.Current()
+		log.Info().
+			Str("event", "recording.session.stop.noop").
+			Str("session_id", snapshot.SessionID).
+			Str("state", snapshot.State).
+			Msg("recording stop requested but no active session exists")
+		return snapshot
 	}
 
-	log.Info().Str("session_id", current.state.SessionID).Msg("recording stop requested")
+	log.Info().
+		Str("event", "recording.session.stop.requested").
+		Str("session_id", current.state.SessionID).
+		Str("state", current.state.State).
+		Msg("recording stop requested")
 	current.cancel()
 	return m.Current()
 }
@@ -160,10 +192,24 @@ func (m *RecordingManager) applyRunEvent(sessionID string, event recording.RunEv
 			m.current.state.Logs = append([]processLogEntry(nil), m.current.state.Logs[len(m.current.state.Logs)-200:]...)
 		}
 	case recording.RunEventProcessStarted:
-		// Process-start events are currently only logged through the event hub.
+		log.Info().
+			Str("event", "recording.process.started").
+			Str("session_id", sessionID).
+			Str("process_label", event.ProcessLabel).
+			Str("output_path", event.OutputPath).
+			Msg("recording subprocess started event received")
 	}
 
 	snapshot := cloneRecordingState(m.current.state)
+	if event.Type == recording.RunEventStateChanged {
+		log.Info().
+			Str("event", "recording.session.state").
+			Str("session_id", sessionID).
+			Str("state", m.current.state.State).
+			Str("reason", m.current.state.Reason).
+			Bool("active", m.current.state.Active).
+			Msg("recording session state updated")
+	}
 	if event.Type == recording.RunEventProcessLog {
 		m.publish(ServerEvent{
 			Type:      "session.log",
@@ -204,6 +250,24 @@ func (m *RecordingManager) finish(sessionID string, summary *app.RecordSummary, 
 	m.current.state.Active = false
 
 	snapshot := cloneRecordingState(m.current.state)
+	if recordErr != nil {
+		log.Error().
+			Str("event", "recording.session.finish").
+			Str("session_id", sessionID).
+			Str("state", snapshot.State).
+			Str("reason", snapshot.Reason).
+			Err(recordErr).
+			Msg("recording session finished with error")
+	} else {
+		log.Info().
+			Str("event", "recording.session.finish").
+			Str("session_id", sessionID).
+			Str("state", snapshot.State).
+			Str("reason", snapshot.Reason).
+			Time("started_at", snapshot.StartedAt).
+			Time("finished_at", snapshot.FinishedAt).
+			Msg("recording session finished")
+	}
 	m.publishState(snapshot)
 }
 

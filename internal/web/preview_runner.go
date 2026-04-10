@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
@@ -27,8 +28,22 @@ type FFmpegPreviewRunner struct{}
 func (FFmpegPreviewRunner) Run(ctx context.Context, source dsl.EffectiveVideoSource, onFrame func([]byte), onLog func(string, string)) error {
 	args, err := recording.BuildPreviewArgs(source)
 	if err != nil {
+		log.Error().
+			Str("event", "preview.process.args.error").
+			Str("source_id", source.ID).
+			Str("source_name", source.Name).
+			Err(err).
+			Msg("failed to build preview ffmpeg args")
 		return err
 	}
+
+	log.Info().
+		Str("event", "preview.process.start.requested").
+		Str("source_id", source.ID).
+		Str("source_name", source.Name).
+		Str("source_type", source.Type).
+		Strs("argv", append([]string{"ffmpeg"}, args...)).
+		Msg("starting preview ffmpeg process")
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	stdout, err := cmd.StdoutPipe()
@@ -40,8 +55,18 @@ func (FFmpegPreviewRunner) Run(ctx context.Context, source dsl.EffectiveVideoSou
 		return errors.Wrap(err, "open preview stderr")
 	}
 	if err := cmd.Start(); err != nil {
+		log.Error().
+			Str("event", "preview.process.start.error").
+			Str("source_id", source.ID).
+			Err(err).
+			Msg("failed to start preview ffmpeg")
 		return errors.Wrap(err, "start preview ffmpeg")
 	}
+	log.Info().
+		Str("event", "preview.process.start.done").
+		Str("source_id", source.ID).
+		Int("pid", cmd.Process.Pid).
+		Msg("preview ffmpeg started")
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error {
@@ -66,14 +91,53 @@ func (FFmpegPreviewRunner) Run(ctx context.Context, source dsl.EffectiveVideoSou
 		}
 	})
 	group.Go(func() error {
+		log.Info().
+			Str("event", "preview.process.wait.begin").
+			Str("source_id", source.ID).
+			Int("pid", cmd.Process.Pid).
+			Msg("waiting for preview ffmpeg to exit")
 		err := cmd.Wait()
 		if err != nil && ctx.Err() != nil {
+			log.Info().
+				Str("event", "preview.process.wait.done").
+				Str("source_id", source.ID).
+				Int("pid", cmd.Process.Pid).
+				Str("reason", ctx.Err().Error()).
+				Msg("preview ffmpeg exited after context cancellation")
 			return nil
 		}
-		return err
+		if err != nil {
+			log.Error().
+				Str("event", "preview.process.wait.done").
+				Str("source_id", source.ID).
+				Int("pid", cmd.Process.Pid).
+				Err(err).
+				Msg("preview ffmpeg exited with error")
+			return err
+		}
+		log.Info().
+			Str("event", "preview.process.wait.done").
+			Str("source_id", source.ID).
+			Int("pid", cmd.Process.Pid).
+			Msg("preview ffmpeg exited cleanly")
+		return nil
 	})
 
-	return group.Wait()
+	err = group.Wait()
+	if err != nil {
+		log.Error().
+			Str("event", "preview.process.summary").
+			Str("source_id", source.ID).
+			Err(err).
+			Msg("preview runner finished with error")
+		return err
+	}
+	log.Info().
+		Str("event", "preview.process.summary").
+		Str("source_id", source.ID).
+		Str("reason", previewContextReason(ctx)).
+		Msg("preview runner finished")
+	return nil
 }
 
 func computePreviewSignature(source dsl.EffectiveVideoSource) string {
@@ -122,4 +186,11 @@ func readJPEGFrame(reader *bufio.Reader) ([]byte, error) {
 		}
 		previous = b
 	}
+}
+
+func previewContextReason(ctx context.Context) string {
+	if ctx == nil || ctx.Err() == nil {
+		return "running"
+	}
+	return ctx.Err().Error()
 }

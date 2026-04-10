@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
@@ -72,10 +73,25 @@ func NewTelemetryManager(publish func(ServerEvent)) *TelemetryManager {
 }
 
 func (m *TelemetryManager) Run(ctx context.Context) error {
+	log.Info().
+		Str("event", "telemetry.run.start").
+		Msg("telemetry manager run loop starting")
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error { return m.runDiskLoop(groupCtx) })
 	group.Go(func() error { return m.runAudioLoop(groupCtx) })
-	return group.Wait()
+	err := group.Wait()
+	if err != nil {
+		log.Error().
+			Str("event", "telemetry.run.exit").
+			Err(err).
+			Msg("telemetry manager run loop exited with error")
+		return err
+	}
+	log.Info().
+		Str("event", "telemetry.run.exit").
+		Str("reason", telemetryContextReason(ctx)).
+		Msg("telemetry manager run loop exited")
+	return nil
 }
 
 func (m *TelemetryManager) UpdateFromPlan(plan *dsl.CompiledPlan) {
@@ -136,6 +152,10 @@ func (m *TelemetryManager) setDiskStatus(snapshot diskTelemetrySnapshot) {
 }
 
 func (m *TelemetryManager) runDiskLoop(ctx context.Context) error {
+	log.Info().
+		Str("event", "telemetry.disk.start").
+		Dur("interval", 2*time.Second).
+		Msg("disk telemetry loop starting")
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
@@ -160,6 +180,10 @@ func (m *TelemetryManager) runDiskLoop(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Info().
+				Str("event", "telemetry.disk.exit").
+				Str("reason", telemetryContextReason(ctx)).
+				Msg("disk telemetry loop exiting")
 			return nil
 		case <-ticker.C:
 			publish()
@@ -168,6 +192,10 @@ func (m *TelemetryManager) runDiskLoop(ctx context.Context) error {
 }
 
 func (m *TelemetryManager) runAudioLoop(ctx context.Context) error {
+	log.Info().
+		Str("event", "telemetry.audio.start").
+		Dur("interval", 500*time.Millisecond).
+		Msg("audio telemetry loop starting")
 	var (
 		currentDevice string
 		runnerCancel  context.CancelFunc
@@ -175,11 +203,19 @@ func (m *TelemetryManager) runAudioLoop(ctx context.Context) error {
 	)
 	defer func() {
 		if runnerCancel != nil {
+			log.Info().
+				Str("event", "telemetry.audio.runner.cancel").
+				Str("device_id", currentDevice).
+				Msg("cancelling audio telemetry runner during loop teardown")
 			runnerCancel()
 		}
 		if runnerDone != nil {
 			<-runnerDone
 		}
+		log.Info().
+			Str("event", "telemetry.audio.exit").
+			Str("reason", telemetryContextReason(ctx)).
+			Msg("audio telemetry loop exiting")
 	}()
 
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -191,6 +227,10 @@ func (m *TelemetryManager) runAudioLoop(ctx context.Context) error {
 			return
 		}
 		if runnerCancel != nil {
+			log.Info().
+				Str("event", "telemetry.audio.runner.replace").
+				Str("device_id", currentDevice).
+				Msg("replacing existing audio telemetry runner")
 			runnerCancel()
 			<-runnerDone
 			runnerCancel = nil
@@ -198,6 +238,9 @@ func (m *TelemetryManager) runAudioLoop(ctx context.Context) error {
 		}
 		currentDevice = device
 		if device == "" {
+			log.Info().
+				Str("event", "telemetry.audio.runner.idle").
+				Msg("no audio device selected for telemetry")
 			m.setAudioMeter(audioMeterSnapshot{
 				DeviceID:  "",
 				Available: false,
@@ -205,6 +248,10 @@ func (m *TelemetryManager) runAudioLoop(ctx context.Context) error {
 			})
 			return
 		}
+		log.Info().
+			Str("event", "telemetry.audio.runner.start").
+			Str("device_id", device).
+			Msg("starting audio telemetry runner")
 		runnerCtx, cancel := context.WithCancel(ctx)
 		done := make(chan struct{})
 		runnerCancel = cancel
@@ -212,12 +259,23 @@ func (m *TelemetryManager) runAudioLoop(ctx context.Context) error {
 		go func(deviceID string) {
 			defer close(done)
 			if err := m.streamAudioMeter(runnerCtx, deviceID); err != nil && runnerCtx.Err() == nil {
+				log.Error().
+					Str("event", "telemetry.audio.runner.error").
+					Str("device_id", deviceID).
+					Err(err).
+					Msg("audio telemetry runner failed")
 				m.setAudioMeter(audioMeterSnapshot{
 					DeviceID:  deviceID,
 					Available: false,
 					Reason:    err.Error(),
 				})
+				return
 			}
+			log.Info().
+				Str("event", "telemetry.audio.runner.exit").
+				Str("device_id", deviceID).
+				Str("reason", telemetryContextReason(runnerCtx)).
+				Msg("audio telemetry runner exited")
 		}(device)
 	}
 
@@ -233,6 +291,11 @@ func (m *TelemetryManager) runAudioLoop(ctx context.Context) error {
 }
 
 func (m *TelemetryManager) streamAudioMeter(ctx context.Context, deviceID string) error {
+	log.Info().
+		Str("event", "telemetry.process.start.requested").
+		Str("device_id", deviceID).
+		Strs("argv", []string{"parec", "--device=" + deviceID, "--format=s16le", "--rate=16000", "--channels=2", "--raw"}).
+		Msg("starting parec audio telemetry process")
 	cmd := exec.CommandContext(ctx, "parec",
 		"--device="+deviceID,
 		"--format=s16le",
@@ -247,10 +310,39 @@ func (m *TelemetryManager) streamAudioMeter(ctx context.Context, deviceID string
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
 	if err := cmd.Start(); err != nil {
+		log.Error().
+			Str("event", "telemetry.process.start.error").
+			Str("device_id", deviceID).
+			Err(err).
+			Msg("failed to start parec audio telemetry process")
 		return errors.Wrap(err, "start parec")
 	}
+	log.Info().
+		Str("event", "telemetry.process.start.done").
+		Str("device_id", deviceID).
+		Int("pid", cmd.Process.Pid).
+		Msg("parec audio telemetry process started")
 	defer func() {
-		_ = cmd.Wait()
+		log.Info().
+			Str("event", "telemetry.process.wait.begin").
+			Str("device_id", deviceID).
+			Int("pid", cmd.Process.Pid).
+			Msg("waiting for parec audio telemetry process to exit")
+		if waitErr := cmd.Wait(); waitErr != nil && ctx.Err() == nil {
+			log.Error().
+				Str("event", "telemetry.process.wait.done").
+				Str("device_id", deviceID).
+				Int("pid", cmd.Process.Pid).
+				Err(waitErr).
+				Msg("parec audio telemetry process exited with error")
+			return
+		}
+		log.Info().
+			Str("event", "telemetry.process.wait.done").
+			Str("device_id", deviceID).
+			Int("pid", cmd.Process.Pid).
+			Str("reason", telemetryContextReason(ctx)).
+			Msg("parec audio telemetry process exited")
 	}()
 
 	buffer := make([]byte, 4096)
@@ -278,6 +370,11 @@ func (m *TelemetryManager) streamAudioMeter(ctx context.Context, deviceID string
 		}
 		if readErr != nil {
 			if ctx.Err() != nil {
+				log.Info().
+					Str("event", "telemetry.process.read.exit").
+					Str("device_id", deviceID).
+					Str("reason", telemetryContextReason(ctx)).
+					Msg("parec read loop exiting after context cancellation")
 				return nil
 			}
 			if readErr == io.EOF {
@@ -286,6 +383,13 @@ func (m *TelemetryManager) streamAudioMeter(ctx context.Context, deviceID string
 			return errors.Wrap(readErr, "read parec stream")
 		}
 	}
+}
+
+func telemetryContextReason(ctx context.Context) string {
+	if ctx == nil || ctx.Err() == nil {
+		return "running"
+	}
+	return ctx.Err().Error()
 }
 
 func peakLevels(buffer []byte) (float64, float64) {

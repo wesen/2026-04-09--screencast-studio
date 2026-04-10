@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
@@ -53,6 +54,13 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 	if len(plan.VideoJobs) == 0 && len(plan.AudioJobs) == 0 {
 		return nil, errors.New("compiled plan has no executable jobs")
 	}
+	log.Info().
+		Str("event", "recording.run.start").
+		Str("session_id", plan.SessionID).
+		Int("video_jobs", len(plan.VideoJobs)).
+		Int("audio_jobs", len(plan.AudioJobs)).
+		Int("output_count", len(plan.Outputs)).
+		Msg("recording run starting")
 
 	gracePeriod := options.GracePeriod
 	if gracePeriod <= 0 {
@@ -162,6 +170,14 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 	startStop := func() {
 		stopOnce.Do(func() {
 			session.stopStarted = true
+			log.Info().
+				Str("event", "recording.run.stop.begin").
+				Str("session_id", plan.SessionID).
+				Str("state", string(session.state)).
+				Str("reason", session.reason).
+				Dur("grace_period", gracePeriod).
+				Int("process_count", len(session.processes)).
+				Msg("recording run stop sequence starting")
 			group.Go(func() error {
 				stopErr = stopProcesses(session.processes, gracePeriod)
 				publishEvent(producerCtx, events, sessionEvent{
@@ -216,6 +232,11 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 				}
 				startStop()
 			case eventCancelRequested:
+				log.Info().
+					Str("event", "recording.run.cancel.requested").
+					Str("session_id", plan.SessionID).
+					Str("reason", event.Reason).
+					Msg("recording run received cancellation request")
 				if err := beginStopping(session, "cancellation requested: "+event.Reason, StateFinished, emit); err != nil {
 					cancelProducers()
 					_ = group.Wait()
@@ -223,6 +244,11 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 				}
 				startStop()
 			case eventHardTimeout:
+				log.Warn().
+					Str("event", "recording.run.timeout").
+					Str("session_id", plan.SessionID).
+					Str("reason", event.Reason).
+					Msg("recording run exceeded hard timeout")
 				if err := beginStopping(session, event.Reason, StateFailed, emit); err != nil {
 					cancelProducers()
 					_ = group.Wait()
@@ -244,18 +270,35 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 				}
 			case eventStopCompleted:
 				if event.Err != nil {
+					log.Error().
+						Str("event", "recording.run.stop.done").
+						Str("session_id", plan.SessionID).
+						Err(event.Err).
+						Msg("recording run stop sequence finished with error")
 					if err := transitionSession(session, StateFailed, fmt.Sprintf("graceful stop failed: %v", event.Err), emit); err != nil {
 						cancelProducers()
 						_ = group.Wait()
 						return nil, err
 					}
 				} else if session.finalTarget == StateFailed {
+					log.Warn().
+						Str("event", "recording.run.stop.done").
+						Str("session_id", plan.SessionID).
+						Str("state", string(session.finalTarget)).
+						Str("reason", session.reason).
+						Msg("recording run stop sequence completed with failed final target")
 					if err := transitionSession(session, StateFailed, session.reason, emit); err != nil {
 						cancelProducers()
 						_ = group.Wait()
 						return nil, err
 					}
 				} else {
+					log.Info().
+						Str("event", "recording.run.stop.done").
+						Str("session_id", plan.SessionID).
+						Str("state", string(session.finalTarget)).
+						Str("reason", session.reason).
+						Msg("recording run stop sequence completed")
 					if err := transitionSession(session, StateFinished, session.reason, emit); err != nil {
 						cancelProducers()
 						_ = group.Wait()
@@ -288,8 +331,17 @@ func Run(ctx context.Context, plan *dsl.CompiledPlan, options RunOptions) (*RunR
 
 func stopProcesses(processes []*ManagedProcess, timeout time.Duration) error {
 	if len(processes) == 0 {
+		log.Info().
+			Str("event", "recording.process.stop.batch").
+			Int("process_count", 0).
+			Msg("no recording processes to stop")
 		return nil
 	}
+	log.Info().
+		Str("event", "recording.process.stop.batch").
+		Int("process_count", len(processes)).
+		Dur("timeout", timeout).
+		Msg("stopping recording processes")
 	errs := []string{}
 	for _, proc := range processes {
 		if err := proc.Stop(timeout); err != nil {
@@ -297,8 +349,17 @@ func stopProcesses(processes []*ManagedProcess, timeout time.Duration) error {
 		}
 	}
 	if len(errs) == 0 {
+		log.Info().
+			Str("event", "recording.process.stop.batch.done").
+			Int("process_count", len(processes)).
+			Msg("all recording processes stopped")
 		return nil
 	}
+	log.Error().
+		Str("event", "recording.process.stop.batch.done").
+		Int("process_count", len(processes)).
+		Strs("errors", errs).
+		Msg("recording process stop batch completed with errors")
 	return errors.New(strings.Join(errs, "; "))
 }
 
@@ -319,6 +380,12 @@ func (p *ManagedProcess) Run(ctx context.Context, logger func(string, ...any), e
 	}
 
 	logger("%s argv: ffmpeg %s", p.Label, strings.Join(p.Args, " "))
+	log.Info().
+		Str("event", "recording.process.start.requested").
+		Str("process_label", p.Label).
+		Str("output_path", p.OutputPath).
+		Strs("argv", append([]string{"ffmpeg"}, p.Args...)).
+		Msg("starting recording ffmpeg process")
 
 	cmd := exec.Command("ffmpeg", p.Args...)
 	stdin, err := cmd.StdinPipe()
@@ -334,8 +401,20 @@ func (p *ManagedProcess) Run(ctx context.Context, logger func(string, ...any), e
 		return errors.Wrap(err, "open ffmpeg stderr")
 	}
 	if err := cmd.Start(); err != nil {
+		log.Error().
+			Str("event", "recording.process.start.error").
+			Str("process_label", p.Label).
+			Str("output_path", p.OutputPath).
+			Err(err).
+			Msg("failed to start recording ffmpeg process")
 		return errors.Wrap(err, "start ffmpeg")
 	}
+	log.Info().
+		Str("event", "recording.process.start.done").
+		Str("process_label", p.Label).
+		Str("output_path", p.OutputPath).
+		Int("pid", cmd.Process.Pid).
+		Msg("recording ffmpeg process started")
 
 	p.mu.Lock()
 	if p.done != nil {
@@ -386,7 +465,30 @@ func (p *ManagedProcess) Run(ctx context.Context, logger func(string, ...any), e
 		})
 	})
 	group.Go(func() error {
-		return cmd.Wait()
+		log.Info().
+			Str("event", "recording.process.wait.begin").
+			Str("process_label", p.Label).
+			Str("output_path", p.OutputPath).
+			Int("pid", cmd.Process.Pid).
+			Msg("waiting for recording ffmpeg process to exit")
+		err := cmd.Wait()
+		if err != nil {
+			log.Error().
+				Str("event", "recording.process.wait.done").
+				Str("process_label", p.Label).
+				Str("output_path", p.OutputPath).
+				Int("pid", cmd.Process.Pid).
+				Err(err).
+				Msg("recording ffmpeg process exited with error")
+			return err
+		}
+		log.Info().
+			Str("event", "recording.process.wait.done").
+			Str("process_label", p.Label).
+			Str("output_path", p.OutputPath).
+			Int("pid", cmd.Process.Pid).
+			Msg("recording ffmpeg process exited cleanly")
+		return nil
 	})
 
 	runErr := group.Wait()
@@ -397,6 +499,22 @@ func (p *ManagedProcess) Run(ctx context.Context, logger func(string, ...any), e
 	p.Stdin = nil
 	close(p.done)
 	p.mu.Unlock()
+
+	if runErr != nil {
+		log.Error().
+			Str("event", "recording.process.summary").
+			Str("process_label", p.Label).
+			Str("output_path", p.OutputPath).
+			Err(runErr).
+			Msg("recording process finished with error")
+	} else {
+		log.Info().
+			Str("event", "recording.process.summary").
+			Str("process_label", p.Label).
+			Str("output_path", p.OutputPath).
+			Str("reason", runContextReason(ctx)).
+			Msg("recording process finished")
+	}
 
 	return runErr
 }
@@ -411,22 +529,93 @@ func (p *ManagedProcess) Stop(timeout time.Duration) error {
 	done := p.done
 	p.mu.RUnlock()
 
+	pid := 0
+	if cmd != nil && cmd.Process != nil {
+		pid = cmd.Process.Pid
+	}
+	log.Info().
+		Str("event", "recording.process.stop.requested").
+		Str("process_label", p.Label).
+		Str("output_path", p.OutputPath).
+		Int("pid", pid).
+		Dur("timeout", timeout).
+		Msg("recording process stop requested")
+
 	if stdin != nil {
 		_, _ = io.WriteString(stdin, "q\n")
 		_ = stdin.Close()
+		log.Info().
+			Str("event", "recording.process.stop.stdin_q_sent").
+			Str("process_label", p.Label).
+			Str("output_path", p.OutputPath).
+			Int("pid", pid).
+			Msg("sent q to recording process stdin")
 	}
 	if done == nil {
+		log.Info().
+			Str("event", "recording.process.stop.noop").
+			Str("process_label", p.Label).
+			Str("output_path", p.OutputPath).
+			Int("pid", pid).
+			Msg("recording process stop requested but process is not running")
 		return nil
 	}
 	select {
 	case <-done:
-		return p.waitResult()
+		result := p.waitResult()
+		if result != nil {
+			log.Error().
+				Str("event", "recording.process.stop.done").
+				Str("process_label", p.Label).
+				Str("output_path", p.OutputPath).
+				Int("pid", pid).
+				Err(result).
+				Msg("recording process stopped with error result")
+		} else {
+			log.Info().
+				Str("event", "recording.process.stop.done").
+				Str("process_label", p.Label).
+				Str("output_path", p.OutputPath).
+				Int("pid", pid).
+				Msg("recording process stopped before timeout")
+		}
+		return result
 	case <-time.After(timeout):
+		log.Warn().
+			Str("event", "recording.process.stop.timeout").
+			Str("process_label", p.Label).
+			Str("output_path", p.OutputPath).
+			Int("pid", pid).
+			Dur("timeout", timeout).
+			Msg("recording process did not stop before timeout; forcing kill")
 		if cmd != nil && cmd.Process != nil {
 			_ = cmd.Process.Kill()
+			log.Warn().
+				Str("event", "recording.process.stop.kill_sent").
+				Str("process_label", p.Label).
+				Str("output_path", p.OutputPath).
+				Int("pid", pid).
+				Msg("sent kill to recording process")
 		}
 		<-done
-		return p.waitResult()
+		result := p.waitResult()
+		if result != nil {
+			log.Error().
+				Str("event", "recording.process.stop.done").
+				Str("process_label", p.Label).
+				Str("output_path", p.OutputPath).
+				Int("pid", pid).
+				Err(result).
+				Msg("recording process stop completed after forced kill with error result")
+		} else {
+			log.Info().
+				Str("event", "recording.process.stop.done").
+				Str("process_label", p.Label).
+				Str("output_path", p.OutputPath).
+				Int("pid", pid).
+				Msg("recording process stop completed after forced kill")
+		}
+		return result
 	}
 }
 
@@ -507,4 +696,11 @@ func beginStopping(session *Session, reason string, finalTarget SessionState, em
 		})
 	}
 	return nil
+}
+
+func runContextReason(ctx context.Context) string {
+	if ctx == nil || ctx.Err() == nil {
+		return "running"
+	}
+	return ctx.Err().Error()
 }

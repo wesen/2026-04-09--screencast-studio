@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -68,36 +71,140 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error {
 		log.Info().
+			Str("event", "runtime.http.start").
 			Str("addr", s.config.Addr).
 			Str("static_dir", s.config.StaticDir).
 			Int("preview_limit", s.config.PreviewLimit).
+			Dur("shutdown_timeout", s.config.ShutdownTimeout).
 			Msg("web server starting")
+
+		go s.openBrowser()
 
 		err := httpServer.ListenAndServe()
 		if err == nil || errors.Is(err, http.ErrServerClosed) {
+			log.Info().
+				Str("event", "runtime.http.exit").
+				Str("addr", s.config.Addr).
+				Msg("http server exited cleanly")
 			return nil
 		}
+		log.Error().
+			Str("event", "runtime.http.exit").
+			Str("addr", s.config.Addr).
+			Err(err).
+			Msg("http server exited with error")
 		return errors.Wrap(err, "listen and serve")
 	})
 	group.Go(func() error {
-		return s.telemetry.Run(groupCtx)
+		log.Info().
+			Str("event", "runtime.telemetry.start").
+			Msg("telemetry manager starting")
+		err := s.telemetry.Run(groupCtx)
+		if err != nil {
+			log.Error().
+				Str("event", "runtime.telemetry.exit").
+				Err(err).
+				Msg("telemetry manager exited with error")
+			return err
+		}
+		log.Info().
+			Str("event", "runtime.telemetry.exit").
+			Str("reason", contextReason(groupCtx)).
+			Msg("telemetry manager exited")
+		return nil
 	})
 	group.Go(func() error {
 		<-groupCtx.Done()
+		log.Info().
+			Str("event", "runtime.shutdown.begin").
+			Str("reason", contextReason(groupCtx)).
+			Dur("shutdown_timeout", s.config.ShutdownTimeout).
+			Msg("runtime shutdown triggered")
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout)
 		defer cancel()
 
+		log.Info().
+			Str("event", "runtime.http.shutdown.begin").
+			Str("reason", contextReason(groupCtx)).
+			Msg("http server shutdown starting")
 		if err := httpServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error().
+				Str("event", "runtime.http.shutdown.error").
+				Err(err).
+				Msg("http server shutdown failed")
 			return errors.Wrap(err, "shutdown web server")
 		}
+		log.Info().
+			Str("event", "runtime.http.shutdown.done").
+			Str("reason", contextReason(groupCtx)).
+			Msg("http server shutdown finished")
 		return nil
 	})
 
 	if err := group.Wait(); err != nil {
+		log.Error().
+			Str("event", "runtime.shutdown.summary").
+			Err(err).
+			Msg("server runtime exited with error")
 		return err
 	}
+	log.Info().
+		Str("event", "runtime.shutdown.summary").
+		Msg("server runtime exited cleanly")
 	return nil
+}
+
+func (s *Server) openBrowser() {
+	log.Info().
+		Str("event", "runtime.browser.open.begin").
+		Dur("delay", 500*time.Millisecond).
+		Msg("browser open scheduled")
+
+	// Small delay to ensure server is ready
+	time.Sleep(500 * time.Millisecond)
+
+	addr := s.config.Addr
+	if !strings.HasPrefix(addr, "http") {
+		if strings.HasPrefix(addr, ":") {
+			addr = "http://localhost" + addr
+		} else {
+			addr = "http://" + addr
+		}
+	}
+
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", addr)
+	case "linux":
+		cmd = exec.Command("xdg-open", addr)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", addr)
+	default:
+		return
+	}
+
+	if err := cmd.Start(); err != nil {
+		log.Warn().
+			Str("event", "runtime.browser.open.error").
+			Str("url", addr).
+			Err(err).
+			Msg("failed to open browser")
+	} else {
+		log.Info().
+			Str("event", "runtime.browser.open.done").
+			Str("url", addr).
+			Int("pid", cmd.Process.Pid).
+			Msg("opened browser")
+	}
+}
+
+func contextReason(ctx context.Context) string {
+	if ctx == nil || ctx.Err() == nil {
+		return "running"
+	}
+	return ctx.Err().Error()
 }
 
 func withLogging(next http.Handler) http.Handler {

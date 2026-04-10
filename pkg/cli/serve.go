@@ -40,7 +40,7 @@ func newServeCommand(application *app.Application) (*serveCommand, error) {
 			"serve",
 			cmds.WithShort("Run the local web API and control server"),
 			cmds.WithFlags(
-				fields.New("addr", fields.TypeString, fields.WithDefault(":8080"), fields.WithHelp("Bind address for the HTTP server")),
+				fields.New("addr", fields.TypeString, fields.WithDefault(":7777"), fields.WithHelp("Bind address for the HTTP server")),
 				fields.New("static-dir", fields.TypeString, fields.WithDefault(""), fields.WithHelp("Optional directory to serve at / during development")),
 				fields.New("preview-limit", fields.TypeInteger, fields.WithDefault(4), fields.WithHelp("Maximum number of preview workers allowed at once")),
 				fields.New("shutdown-timeout", fields.TypeInteger, fields.WithDefault(5), fields.WithHelp("Graceful shutdown timeout in seconds")),
