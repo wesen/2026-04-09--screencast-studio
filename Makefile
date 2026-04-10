@@ -1,4 +1,4 @@
-.PHONY: gifs
+.PHONY: gifs build-web
 
 all: gifs
 
@@ -40,6 +40,9 @@ govulncheck:
 
 test:
 	GOWORK=off go test ./...
+
+build-web:
+	GOWORK=off go run ./cmd/build-web
 
 build:
 	GOWORK=off go generate ./...

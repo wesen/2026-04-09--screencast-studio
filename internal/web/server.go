@@ -124,9 +124,14 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	if s.config.StaticDir != "" {
 		info, err := os.Stat(s.config.StaticDir)
 		if err == nil && info.IsDir() {
-			http.FileServer(http.Dir(s.config.StaticDir)).ServeHTTP(w, r)
-			return
+			if serveSPAFromFS(w, r, os.DirFS(s.config.StaticDir)) {
+				return
+			}
 		}
+	}
+
+	if serveSPAFromFS(w, r, publicFS) {
+		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

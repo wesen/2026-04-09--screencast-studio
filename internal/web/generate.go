@@ -1,3 +1,4 @@
 package web
 
-//go:generate buf generate
+//go:generate go run ../../cmd/build-web
+//go:generate sh -c "cd ../.. && buf generate"

@@ -1,0 +1,11 @@
+/screencast-studio
+/internal/web/dist/
+/ui/dist/
+/ui/node_modules/
+/ui/storybook-static/
+/ui/tsconfig.tsbuildinfo
+/.bin/
+/.playwright-mcp/
+/recordings/
+/.idea/
+/.codex

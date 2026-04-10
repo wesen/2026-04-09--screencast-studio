@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -449,5 +451,64 @@ func TestWebsocketEndpoint(t *testing.T) {
 	decodeProtoResponse(t, previewMessage, previewEvent)
 	if previewEvent.GetPreviewList() == nil {
 		t.Fatalf("second websocket event = %+v, want previewList", previewEvent)
+	}
+}
+
+func TestServeSPAFromFS(t *testing.T) {
+	t.Parallel()
+
+	root := fstest.MapFS{
+		"index.html":    &fstest.MapFile{Data: []byte("<html>studio</html>")},
+		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('ok')")},
+	}
+
+	for _, testCase := range []struct {
+		name       string
+		requestURL string
+		wantBody   string
+	}{
+		{
+			name:       "root serves index",
+			requestURL: "/",
+			wantBody:   "<html>studio</html>",
+		},
+		{
+			name:       "asset serves exact file",
+			requestURL: "/assets/app.js",
+			wantBody:   "console.log('ok')",
+		},
+		{
+			name:       "deep route falls back to index",
+			requestURL: "/studio/sources",
+			wantBody:   "<html>studio</html>",
+		},
+	} {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(http.MethodGet, testCase.requestURL, nil)
+			rec := httptest.NewRecorder()
+
+			if ok := serveSPAFromFS(rec, req, root); !ok {
+				t.Fatalf("serveSPAFromFS returned false")
+			}
+
+			if body := rec.Body.String(); body != testCase.wantBody {
+				t.Fatalf("body = %q, want %q", body, testCase.wantBody)
+			}
+		})
+	}
+}
+
+func TestServeSPAFromFSReturnsFalseWhenAssetMissing(t *testing.T) {
+	t.Parallel()
+
+	var root fs.FS = fstest.MapFS{}
+	req := httptest.NewRequest(http.MethodGet, "/missing.js", nil)
+	rec := httptest.NewRecorder()
+
+	if ok := serveSPAFromFS(rec, req, root); ok {
+		t.Fatalf("serveSPAFromFS returned true, want false")
 	}
 }
