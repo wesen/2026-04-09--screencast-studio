@@ -72,12 +72,15 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
+	httpDone := make(chan struct{})
+	telemetryDone := make(chan struct{})
 
 	log.Info().
 		Str("event", "runtime.context.bind").
 		Msg("recording and preview managers already bound to serve runtime context")
 
 	group.Go(func() error {
+		defer close(httpDone)
 		log.Info().
 			Str("event", "runtime.http.start").
 			Str("addr", s.config.Addr).
@@ -104,6 +107,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		return errors.Wrap(err, "listen and serve")
 	})
 	group.Go(func() error {
+		defer close(telemetryDone)
 		log.Info().
 			Str("event", "runtime.telemetry.start").
 			Msg("telemetry manager starting")
@@ -132,6 +136,8 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout)
 		defer cancel()
 
+		shutdownErrs := []string{}
+
 		log.Info().
 			Str("event", "runtime.http.shutdown.begin").
 			Str("reason", contextReason(groupCtx)).
@@ -141,12 +147,70 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 				Str("event", "runtime.http.shutdown.error").
 				Err(err).
 				Msg("http server shutdown failed")
-			return errors.Wrap(err, "shutdown web server")
+			shutdownErrs = append(shutdownErrs, errors.Wrap(err, "shutdown web server").Error())
+		} else {
+			log.Info().
+				Str("event", "runtime.http.shutdown.done").
+				Str("reason", contextReason(groupCtx)).
+				Msg("http server shutdown finished")
+		}
+
+		log.Info().
+			Str("event", "runtime.recordings.shutdown.begin").
+			Msg("recording manager shutdown starting")
+		if err := s.recordings.Shutdown(shutdownCtx); err != nil {
+			log.Error().
+				Str("event", "runtime.recordings.shutdown.error").
+				Err(err).
+				Msg("recording manager shutdown failed")
+			shutdownErrs = append(shutdownErrs, errors.Wrap(err, "shutdown recordings").Error())
+		} else {
+			log.Info().
+				Str("event", "runtime.recordings.shutdown.done").
+				Msg("recording manager shutdown finished")
+		}
+
+		log.Info().
+			Str("event", "runtime.previews.shutdown.begin").
+			Msg("preview manager shutdown starting")
+		if err := s.previews.Shutdown(shutdownCtx); err != nil {
+			log.Error().
+				Str("event", "runtime.previews.shutdown.error").
+				Err(err).
+				Msg("preview manager shutdown failed")
+			shutdownErrs = append(shutdownErrs, errors.Wrap(err, "shutdown previews").Error())
+		} else {
+			log.Info().
+				Str("event", "runtime.previews.shutdown.done").
+				Msg("preview manager shutdown finished")
+		}
+
+		if err := waitForRuntimeParticipant(shutdownCtx, httpDone, "http server goroutine"); err != nil {
+			shutdownErrs = append(shutdownErrs, err.Error())
 		}
 		log.Info().
-			Str("event", "runtime.http.shutdown.done").
-			Str("reason", contextReason(groupCtx)).
-			Msg("http server shutdown finished")
+			Str("event", "runtime.telemetry.wait.begin").
+			Msg("waiting for telemetry goroutine to exit")
+		if err := waitForRuntimeParticipant(shutdownCtx, telemetryDone, "telemetry goroutine"); err != nil {
+			shutdownErrs = append(shutdownErrs, err.Error())
+		} else {
+			log.Info().
+				Str("event", "runtime.telemetry.wait.done").
+				Msg("telemetry goroutine exited")
+		}
+
+		finalSession := s.recordings.Current()
+		remainingPreviews := s.previews.List()
+		log.Info().
+			Str("event", "runtime.shutdown.components").
+			Bool("recording_active", finalSession.Active).
+			Str("recording_session_id", finalSession.SessionID).
+			Int("remaining_previews", len(remainingPreviews)).
+			Msg("runtime shutdown component summary")
+
+		if len(shutdownErrs) > 0 {
+			return errors.New(strings.Join(shutdownErrs, "; "))
+		}
 		return nil
 	})
 
@@ -213,6 +277,31 @@ func contextReason(ctx context.Context) string {
 		return "running"
 	}
 	return ctx.Err().Error()
+}
+
+func waitForRuntimeParticipant(ctx context.Context, done <-chan struct{}, name string) error {
+	if done == nil {
+		return nil
+	}
+	log.Info().
+		Str("event", "runtime.participant.wait.begin").
+		Str("participant", name).
+		Msg("waiting for runtime participant to exit")
+	select {
+	case <-done:
+		log.Info().
+			Str("event", "runtime.participant.wait.done").
+			Str("participant", name).
+			Msg("runtime participant exited")
+		return nil
+	case <-ctx.Done():
+		log.Error().
+			Str("event", "runtime.participant.wait.timeout").
+			Str("participant", name).
+			Err(ctx.Err()).
+			Msg("timed out waiting for runtime participant to exit")
+		return errors.Wrapf(ctx.Err(), "wait for %s", name)
+	}
 }
 
 func withLogging(next http.Handler) http.Handler {
