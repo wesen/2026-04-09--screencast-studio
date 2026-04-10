@@ -127,6 +127,16 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	})
 	group.Go(func() error {
 		<-groupCtx.Done()
+
+		// Shutdown order is intentional:
+		//  1. stop accepting new HTTP work via http.Server.Shutdown,
+		//  2. explicitly drain serve-owned recording sessions,
+		//  3. explicitly drain serve-owned previews,
+		//  4. wait for the HTTP and telemetry goroutines to report exit,
+		//  5. emit a final component summary before returning.
+		//
+		// This keeps new work from entering the system while still giving
+		// already-started workers a bounded window to exit cleanly.
 		log.Info().
 			Str("event", "runtime.shutdown.begin").
 			Str("reason", contextReason(groupCtx)).
