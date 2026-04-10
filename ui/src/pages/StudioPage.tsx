@@ -39,6 +39,8 @@ import {
 import { selectActiveTab, setActiveTab, type StudioTab } from '@/features/studio-ui/studioUiSlice';
 import {
   addLog,
+  selectAudioMeter,
+  selectDiskStatus,
   selectSession,
   selectLogs,
   setSession,
@@ -243,6 +245,8 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const dispatch = useAppDispatch();
   const session = useAppSelector(selectSession);
   const logs = useAppSelector(selectLogs);
+  const audioMeter = useAppSelector(selectAudioMeter);
+  const diskStatus = useAppSelector(selectDiskStatus);
   const wsConnected = useAppSelector(selectWsConnected);
   const activeTab = useAppSelector(selectActiveTab);
   const dslText = useAppSelector(selectDslText);
@@ -592,6 +596,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     })),
     [discoveryData?.audio]
   );
+  const diskPercent = diskStatus?.available ? diskStatus.usedPercent : undefined;
 
   const handleToggleRecording = () => {
     void (async () => {
@@ -1200,6 +1205,8 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
 
               <div className="studio-panel-stack">
                 <MicPanel
+                  leftLevel={audioMeter?.available ? audioMeter.leftLevel : undefined}
+                  rightLevel={audioMeter?.available ? audioMeter.rightLevel : undefined}
                   micInput={micSettings.micInput}
                   micOptions={micOptions}
                   gain={micSettings.gain}
@@ -1209,8 +1216,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                 />
 
                 <StatusPanel
+                  diskPercent={diskPercent}
                   destinationRoot={destinationRoot ?? undefined}
                   outputCount={compiledOutputs.length}
+                  diskFreeGiB={diskStatus?.available ? diskStatus.freeGib : undefined}
+                  diskTotalGiB={diskStatus?.available ? diskStatus.totalGib : undefined}
+                  diskReason={!diskStatus?.available ? diskStatus?.reason : undefined}
                   isRecording={isRecording}
                   isPaused={isPaused}
                   armedSources={armedSources}

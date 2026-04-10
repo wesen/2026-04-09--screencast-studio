@@ -316,6 +316,14 @@ func mapServerEvent(event ServerEvent) *studiov1.ServerEvent {
 		if payload, ok := event.Payload.(*studiov1.ProcessLog); ok {
 			response.Kind = &studiov1.ServerEvent_PreviewLog{PreviewLog: payload}
 		}
+	case "telemetry.audio_meter":
+		if payload, ok := event.Payload.(*studiov1.AudioMeterEvent); ok {
+			response.Kind = &studiov1.ServerEvent_AudioMeter{AudioMeter: payload}
+		}
+	case "telemetry.disk_status":
+		if payload, ok := event.Payload.(*studiov1.DiskTelemetryEvent); ok {
+			response.Kind = &studiov1.ServerEvent_DiskStatus{DiskStatus: payload}
+		}
 	}
 
 	return response

@@ -307,6 +307,116 @@ tmux new-session -d -s scs-0004 'cd /home/manuel/code/wesen/2026-04-09--screenca
 curl -sSf http://127.0.0.1:18082/api/healthz
 ```
 
+## Step 4: Add Protobuf Telemetry Events And Server-Owned Audio/Disk Publishers
+
+The second code slice handled the part that genuinely belongs outside DSL: live telemetry. I added protobuf websocket messages for audio meter and disk status, introduced a server-owned telemetry manager, and wired the frontend session layer so the mounted `MicPanel` and `StatusPanel` consume generated telemetry events instead of placeholder props.
+
+The most important architectural decision here was ownership. The server now owns telemetry lifecycles. The compile endpoint updates the current telemetry target from the latest compiled plan, and a background telemetry manager follows that target. That means the client does not need a second custom “telemetry subscription config” channel just to tell the backend which microphone and destination are relevant.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 2)
+
+**Assistant interpretation:** Continue `SCS-0004` after the recording-config UI slice and implement the telemetry half with the same disciplined, schema-first approach.
+
+**Inferred user intent:** Finish the productization work by making the microphone and status panels consume real backend state rather than placeholders.
+
+### What I did
+
+- Extended the protobuf schema:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/proto/screencast/studio/v1/web.proto`
+- Regenerated Go and TypeScript protobuf outputs with `buf generate`.
+- Added a server-owned telemetry manager:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/telemetry_manager.go`
+- Wired telemetry into the server lifecycle and event mapping:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pb_mapping.go`
+- Extended the frontend websocket/session layer:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/sessionSlice.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/types.ts`
+- Updated the mounted panels to consume telemetry:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/MicPanel.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StatusPanel.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+- Updated Storybook stories for the new meter prop shape:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/MicPanel.stories.tsx`
+
+### Why
+
+- Meter and disk status are runtime facts, not DSL fields.
+- Using protobuf events keeps the transport schema-first and consistent with the recent web-contract cleanup.
+- A server-owned telemetry manager avoids inventing a parallel client channel for “current mic” and “current destination” configuration.
+
+### What worked
+
+- The backend now publishes audio-meter and disk-status protobuf websocket events.
+- Disk telemetry is visible in the mounted UI with used-percent and free/total GiB context.
+- The live browser smoke showed `Disk 20%` and `Free: 361.4 GiB / 1829.7 GiB` in the status panel.
+- Switching the mic selector to the active input removed the `Live meter unavailable` fallback in the mounted UI, showing that the backend telemetry feed became available for that device on this host.
+- `go test ./...`, `go build ./...`, `pnpm --dir ui lint`, `pnpm --dir ui build`, `CI=1 pnpm --dir ui build-storybook`, and `docmgr doctor --ticket SCS-0004 --stale-after 30` all passed.
+
+### What didn't work
+
+- The first frontend build after changing `MicPanel` failed because the stories still passed a single `micLevel` prop after the component moved to explicit `leftLevel` and `rightLevel` props. The TypeScript fix was straightforward: update the stories to provide both channels.
+- After restarting the dev server during the browser smoke, the existing page briefly showed `Reconnecting to server...`. Reloading the page established a fresh websocket connection and the telemetry state appeared correctly.
+
+### What I learned
+
+- Updating the telemetry target from the compile endpoint is enough for this single-user local application model. It keeps the server aligned with the currently edited setup without inventing a second transport.
+- The simplest reliable audio-meter implementation on this host is to run `parec` against the selected source and compute peaks from raw PCM.
+
+### What was tricky to build
+
+- The sharp edge was concurrency ownership. Telemetry is easy to make “work” with loose background goroutines, but that would have violated the project’s runtime discipline. The final shape keeps ownership explicit:
+  - `Server.ListenAndServe()` owns the telemetry manager lifetime through the parent context.
+  - the telemetry manager owns one disk loop and one audio loop.
+  - the audio loop owns a cancellable `parec` worker for the current device and tears it down when the selected source changes.
+
+### What warrants a second pair of eyes
+
+- The telemetry-target model currently follows the latest compiled plan globally. That is a pragmatic fit for the current single-user local product, but it is the first place to revisit if the app ever needs multi-user or multi-session web access.
+- The audio meter currently samples the first active audio source chosen by the builder UI. If richer audio-source management lands later, the target-selection rule should be reviewed.
+
+### What should be done in the future
+
+- Add narrower backend tests around the telemetry manager itself, not just the surrounding server package.
+- Decide whether the mic panel should surface explicit “meter source unavailable” reasons in addition to the current fallback behavior.
+- Consider tightening websocket initial-state tests so the new telemetry events are asserted directly.
+
+### Code review instructions
+
+- Start with the contract:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/proto/screencast/studio/v1/web.proto`
+- Then review the backend ownership model:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/telemetry_manager.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+- Then review the frontend consumption path:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/sessionSlice.ts`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+
+### Technical details
+
+Validation commands used in this step:
+
+```bash
+buf generate
+gofmt -w internal/web/server.go internal/web/handlers_api.go internal/web/handlers_ws.go internal/web/pb_mapping.go internal/web/telemetry_manager.go
+go test ./...
+go build ./...
+pnpm --dir ui lint
+pnpm --dir ui build
+CI=1 pnpm --dir ui build-storybook
+docmgr doctor --ticket SCS-0004 --stale-after 30
+lsof-who -p 18082 -k || true
+tmux new-session -d -s scs-0004 'cd /home/manuel/code/wesen/2026-04-09--screencast-studio && go run ./cmd/screencast-studio serve --addr :18082 --static-dir ui/dist'
+curl -sSf http://127.0.0.1:18082/api/healthz
+```
+
 ## Step 2: Audit The Current Controls And Freeze The Product Model
 
 The first implementation step was not code. It was freezing the actual product gap and choosing a simple ownership model before changing the frontend. That matters here because the codebase already has three nearby concepts: raw DSL, a structured setup draft, and a fake `studioDraft` UI slice. Without deciding which one should win, the implementation would drift into another temporary state layer.

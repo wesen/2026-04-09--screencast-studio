@@ -8,6 +8,7 @@ export interface ApiErrorResponse {
 }
 
 export type {
+  AudioMeterEvent,
   AudioInputDescriptor,
   AudioMixJob,
   AudioOutputSettings,
@@ -16,6 +17,7 @@ export type {
   CompileResponse,
   DiscoveryResponse,
   DisplayDescriptor,
+  DiskTelemetryEvent,
   DslRequest,
   EffectiveAudioSource,
   EffectiveConfig,

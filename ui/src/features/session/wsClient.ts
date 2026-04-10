@@ -2,7 +2,13 @@ import { fromJson, type JsonValue } from '@bufbuild/protobuf';
 import type { AppDispatch } from '@/app/store';
 import { ServerEventSchema } from '@/gen/proto/screencast/studio/v1/web_pb';
 import { setPreviews, upsertPreview } from '@/features/previews/previewSlice';
-import { addLog, setWsConnected, updateSessionState } from './sessionSlice';
+import {
+  addLog,
+  setAudioMeter,
+  setDiskStatus,
+  setWsConnected,
+  updateSessionState,
+} from './sessionSlice';
 
 const websocketUrl = () =>
   `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
@@ -61,6 +67,12 @@ export class WsClient {
             break;
           case 'previewState':
             this.dispatch(upsertPreview(event.kind.value));
+            break;
+          case 'audioMeter':
+            this.dispatch(setAudioMeter(event.kind.value));
+            break;
+          case 'diskStatus':
+            this.dispatch(setDiskStatus(event.kind.value));
             break;
           case undefined:
             break;

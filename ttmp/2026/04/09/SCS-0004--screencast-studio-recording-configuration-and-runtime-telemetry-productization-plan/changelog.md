@@ -25,3 +25,15 @@ Replaced the last fake mounted recording-config state with real DSL-backed setup
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/setupDraftSlice.ts — Owns recording name, template edits, and primary audio-source updates
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx — Shows name, destination, and planned-output preview
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/MicPanel.tsx — Uses discovered device options instead of hardcoded placeholder inputs
+
+## 2026-04-10
+
+Added schema-first runtime telemetry for the mounted studio: protobuf audio-meter and disk-status events, a server-side telemetry manager that follows the latest compiled setup, websocket delivery of the generated messages, and frontend rendering of real disk state plus live mic availability.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/proto/screencast/studio/v1/web.proto — Added audio-meter and disk-status protobuf messages and websocket event variants
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/telemetry_manager.go — New server-owned telemetry manager with cancellable audio and disk loops
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go — Sends initial telemetry snapshots to websocket clients
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts — Consumes generated telemetry websocket events
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StatusPanel.tsx — Renders real disk percentage and capacity context

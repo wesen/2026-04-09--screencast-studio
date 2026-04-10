@@ -9,7 +9,8 @@ interface MicOption {
 }
 
 interface MicPanelProps {
-  micLevel?: number;
+  leftLevel?: number;
+  rightLevel?: number;
   micInput: string;
   micOptions: MicOption[];
   gain: number;
@@ -20,7 +21,8 @@ interface MicPanelProps {
 }
 
 export const MicPanel: React.FC<MicPanelProps> = ({
-  micLevel,
+  leftLevel,
+  rightLevel,
   micInput,
   micOptions,
   gain,
@@ -29,21 +31,22 @@ export const MicPanel: React.FC<MicPanelProps> = ({
   onGainChange,
   className,
 }) => {
-  const effectiveLevel = micLevel ?? 0;
+  const effectiveLeftLevel = leftLevel ?? 0;
+  const effectiveRightLevel = rightLevel ?? effectiveLeftLevel;
 
   return (
     <Win title="Microphone" className={className}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: '8px', color: 'var(--studio-mid)', width: 8 }}>L</span>
-          <MicMeter level={effectiveLevel} />
+          <MicMeter level={effectiveLeftLevel} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: '8px', color: 'var(--studio-mid)', width: 8 }}>R</span>
-          <MicMeter level={effectiveLevel * 0.85} />
+          <MicMeter level={effectiveRightLevel} />
         </div>
         <Waveform active={isRecording} />
-        {micLevel === undefined ? (
+        {leftLevel === undefined && rightLevel === undefined ? (
           <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
             Live meter unavailable
           </div>

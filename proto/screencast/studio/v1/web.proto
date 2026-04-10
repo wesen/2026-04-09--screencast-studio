@@ -218,6 +218,25 @@ message PreviewListResponse {
   repeated PreviewDescriptor previews = 1;
 }
 
+message AudioMeterEvent {
+  string device_id = 1;
+  double left_level = 2;
+  double right_level = 3;
+  bool available = 4;
+  string reason = 5;
+}
+
+message DiskTelemetryEvent {
+  string path = 1;
+  string filesystem = 2;
+  double used_percent = 3;
+  double free_gib = 4;
+  double total_gib = 5;
+  bool low_space = 6;
+  bool available = 7;
+  string reason = 8;
+}
+
 message ServerEvent {
   google.protobuf.Timestamp timestamp = 1;
 
@@ -227,5 +246,7 @@ message ServerEvent {
     PreviewListResponse preview_list = 12;
     PreviewDescriptor preview_state = 13;
     ProcessLog preview_log = 14;
+    AudioMeterEvent audio_meter = 15;
+    DiskTelemetryEvent disk_status = 16;
   }
 }

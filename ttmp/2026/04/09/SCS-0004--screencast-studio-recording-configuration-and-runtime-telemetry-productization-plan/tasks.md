@@ -60,13 +60,13 @@ Acceptance criteria:
 
 ## Phase 3: Extend The Shared Contract
 
-- [ ] Add protobuf messages or fields for telemetry and any later recording-configuration inputs that cannot cleanly flow through DSL.
-- [ ] Add protobuf messages or events for runtime telemetry:
+- [x] Add protobuf messages or fields for telemetry and any later recording-configuration inputs that cannot cleanly flow through DSL.
+- [x] Add protobuf messages or events for runtime telemetry:
   - audio meter samples
   - disk telemetry
   - output path preview if delivered from the backend
-- [ ] Regenerate Go and TypeScript protobuf outputs.
-- [ ] Update any mapping helpers in `internal/web/`.
+- [x] Regenerate Go and TypeScript protobuf outputs.
+- [x] Update any mapping helpers in `internal/web/`.
 
 Acceptance criteria:
 
@@ -93,11 +93,11 @@ Acceptance criteria:
 
 ## Phase 5: Backend Telemetry Surface
 
-- [ ] Implement live audio meter collection for the active input path.
-- [ ] Implement disk telemetry collection for the chosen output destination or current filesystem.
-- [ ] Publish telemetry on the websocket event stream at a controlled cadence.
-- [ ] Ensure every goroutine involved in telemetry uses context cancellation and has clear ownership.
-- [ ] Bound memory and event volume so telemetry does not flood the UI.
+- [x] Implement live audio meter collection for the active input path.
+- [x] Implement disk telemetry collection for the chosen output destination or current filesystem.
+- [x] Publish telemetry on the websocket event stream at a controlled cadence.
+- [x] Ensure every goroutine involved in telemetry uses context cancellation and has clear ownership.
+- [x] Bound memory and event volume so telemetry does not flood the UI.
 
 Acceptance criteria:
 
@@ -127,7 +127,7 @@ Current status:
 
 - [x] Replace hardcoded microphone choices with discovered audio devices.
 - [x] Wire gain changes to real backend-facing configuration.
-- [ ] Render live meter samples in `MicPanel`.
+- [x] Render live meter samples in `MicPanel`.
 - [x] Ensure the panel gracefully shows “unavailable” only when telemetry is actually unavailable.
 
 Acceptance criteria:
@@ -137,9 +137,9 @@ Acceptance criteria:
 
 ## Phase 8: Frontend Status Telemetry
 
-- [ ] Replace placeholder disk telemetry in `StatusPanel` with real backend-fed status.
-- [ ] Show destination and capacity context clearly enough that a user can reason about risk before recording.
-- [ ] Ensure the UI degrades cleanly when telemetry cannot be collected.
+- [x] Replace placeholder disk telemetry in `StatusPanel` with real backend-fed status.
+- [x] Show destination and capacity context clearly enough that a user can reason about risk before recording.
+- [x] Ensure the UI degrades cleanly when telemetry cannot be collected.
 
 Acceptance criteria:
 
@@ -166,7 +166,8 @@ Smoke-test progress:
 - Verified in the mounted UI that editing `Name` changed planned outputs from `recordings/...` to `captures/session-check/...`.
 - Verified in the mounted UI that editing `Save to` changed both the planned-output list and the `Status` destination line.
 - Verified in the mounted UI that the microphone selector now shows discovered PulseAudio device IDs instead of hardcoded placeholder labels.
-- Meter and disk telemetry checks remain pending because the backend telemetry slice is not implemented yet.
+- Verified in the mounted UI that disk telemetry now shows a real used-percent value and `Free: ... GiB / ... GiB`.
+- Verified in the mounted UI that switching to the active microphone input removed the `Live meter unavailable` fallback, indicating the telemetry feed became available on this host.
 
 Acceptance criteria:
 
@@ -175,9 +176,9 @@ Acceptance criteria:
 
 ## Suggested Commit Boundaries
 
-- [ ] Commit 1: protobuf contract expansion for config and telemetry
-- [ ] Commit 2: backend destination preview and validation
-- [ ] Commit 3: backend telemetry collection and websocket events
+- [x] Commit 1: protobuf contract expansion for config and telemetry
+- [x] Commit 2: backend destination preview and validation
+- [x] Commit 3: backend telemetry collection and websocket events
 - [x] Commit 4: frontend recording configuration UI
 - [ ] Commit 5: frontend meter and disk telemetry rendering
 - [ ] Commit 6: tests, docs, and smoke validation

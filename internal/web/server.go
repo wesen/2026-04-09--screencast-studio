@@ -26,6 +26,7 @@ type Server struct {
 	events     *EventHub
 	recordings *RecordingManager
 	previews   *PreviewManager
+	telemetry  *TelemetryManager
 }
 
 func NewServer(application ApplicationService, cfg Config) *Server {
@@ -47,6 +48,7 @@ func NewServer(application ApplicationService, cfg Config) *Server {
 		events:     events,
 		recordings: NewRecordingManager(application, events.Publish),
 		previews:   NewPreviewManager(application, events.Publish, cfg.PreviewLimit, nil),
+		telemetry:  NewTelemetryManager(events.Publish),
 	}
 	server.registerRoutes()
 	return server
@@ -76,6 +78,9 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			return nil
 		}
 		return errors.Wrap(err, "listen and serve")
+	})
+	group.Go(func() error {
+		return s.telemetry.Run(groupCtx)
 	})
 	group.Go(func() error {
 		<-groupCtx.Done()

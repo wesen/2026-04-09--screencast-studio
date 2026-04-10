@@ -12,7 +12,8 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    micLevel: 0.12,
+    leftLevel: 0.12,
+    rightLevel: 0.09,
     micInput: 'default',
     micOptions: [
       { value: 'default', label: 'Built-in Mic' },
@@ -27,7 +28,8 @@ export const Default: Story = {
 
 export const Recording: Story = {
   args: {
-    micLevel: 0.45,
+    leftLevel: 0.45,
+    rightLevel: 0.41,
     micInput: 'default',
     micOptions: [
       { value: 'default', label: 'Built-in Mic' },
@@ -42,7 +44,8 @@ export const Recording: Story = {
 
 export const RecordingHighLevel: Story = {
   args: {
-    micLevel: 0.78,
+    leftLevel: 0.78,
+    rightLevel: 0.74,
     micInput: 'default',
     micOptions: [
       { value: 'default', label: 'Built-in Mic' },
@@ -57,7 +60,8 @@ export const RecordingHighLevel: Story = {
 
 export const ExternalMic: Story = {
   args: {
-    micLevel: 0.35,
+    leftLevel: 0.35,
+    rightLevel: 0.31,
     micInput: 'usb',
     micOptions: [
       { value: 'default', label: 'Built-in Mic' },
@@ -72,7 +76,8 @@ export const ExternalMic: Story = {
 
 export const LineIn: Story = {
   args: {
-    micLevel: 0.5,
+    leftLevel: 0.5,
+    rightLevel: 0.48,
     micInput: 'line-in',
     micOptions: [
       { value: 'default', label: 'Built-in Mic' },
@@ -87,7 +92,8 @@ export const LineIn: Story = {
 
 export const LowGain: Story = {
   args: {
-    micLevel: 0.15,
+    leftLevel: 0.15,
+    rightLevel: 0.12,
     micInput: 'default',
     micOptions: [
       { value: 'default', label: 'Built-in Mic' },
@@ -102,7 +108,8 @@ export const LowGain: Story = {
 
 export const HighGain: Story = {
   args: {
-    micLevel: 0.92,
+    leftLevel: 0.92,
+    rightLevel: 0.88,
     micInput: 'default',
     micOptions: [
       { value: 'default', label: 'Built-in Mic' },

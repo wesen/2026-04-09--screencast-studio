@@ -1,6 +1,6 @@
 import { create } from '@bufbuild/protobuf';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { ProcessLog, RecordingSession } from '@/api/types';
+import type { AudioMeterEvent, DiskTelemetryEvent, ProcessLog, RecordingSession } from '@/api/types';
 import { RecordingSessionSchema } from '@/gen/proto/screencast/studio/v1/web_pb';
 
 // ── Types ──
@@ -8,6 +8,8 @@ import { RecordingSessionSchema } from '@/gen/proto/screencast/studio/v1/web_pb'
 export interface SessionState {
   session: RecordingSession;
   logs: ProcessLog[];
+  audioMeter: AudioMeterEvent | null;
+  diskStatus: DiskTelemetryEvent | null;
   wsConnected: boolean;
 }
 
@@ -21,6 +23,8 @@ const initialState: SessionState = {
     logs: [],
   }),
   logs: [],
+  audioMeter: null,
+  diskStatus: null,
   wsConnected: false,
 };
 
@@ -58,6 +62,12 @@ const sessionSlice = createSlice({
         state.session.logs = state.logs;
       }
     },
+    setAudioMeter: (state, action: PayloadAction<AudioMeterEvent>) => {
+      state.audioMeter = action.payload;
+    },
+    setDiskStatus: (state, action: PayloadAction<DiskTelemetryEvent>) => {
+      state.diskStatus = action.payload;
+    },
     clearLogs: (state) => {
       state.logs = [];
     },
@@ -72,6 +82,8 @@ export const {
   updateSessionState,
   setWsConnected,
   addLog,
+  setAudioMeter,
+  setDiskStatus,
   clearLogs,
   resetSession,
 } = sessionSlice.actions;
@@ -94,3 +106,7 @@ export const selectWsConnected = (state: { session: SessionState }) =>
 
 export const selectLogs = (state: { session: SessionState }) =>
   state.session.logs;
+export const selectAudioMeter = (state: { session: SessionState }) =>
+  state.session.audioMeter;
+export const selectDiskStatus = (state: { session: SessionState }) =>
+  state.session.diskStatus;

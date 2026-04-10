@@ -2078,6 +2078,182 @@ func (x *PreviewListResponse) GetPreviews() []*PreviewDescriptor {
 	return nil
 }
 
+type AudioMeterEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	LeftLevel     float64                `protobuf:"fixed64,2,opt,name=left_level,json=leftLevel,proto3" json:"left_level,omitempty"`
+	RightLevel    float64                `protobuf:"fixed64,3,opt,name=right_level,json=rightLevel,proto3" json:"right_level,omitempty"`
+	Available     bool                   `protobuf:"varint,4,opt,name=available,proto3" json:"available,omitempty"`
+	Reason        string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AudioMeterEvent) Reset() {
+	*x = AudioMeterEvent{}
+	mi := &file_proto_screencast_studio_v1_web_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AudioMeterEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AudioMeterEvent) ProtoMessage() {}
+
+func (x *AudioMeterEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_screencast_studio_v1_web_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AudioMeterEvent.ProtoReflect.Descriptor instead.
+func (*AudioMeterEvent) Descriptor() ([]byte, []int) {
+	return file_proto_screencast_studio_v1_web_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *AudioMeterEvent) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *AudioMeterEvent) GetLeftLevel() float64 {
+	if x != nil {
+		return x.LeftLevel
+	}
+	return 0
+}
+
+func (x *AudioMeterEvent) GetRightLevel() float64 {
+	if x != nil {
+		return x.RightLevel
+	}
+	return 0
+}
+
+func (x *AudioMeterEvent) GetAvailable() bool {
+	if x != nil {
+		return x.Available
+	}
+	return false
+}
+
+func (x *AudioMeterEvent) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type DiskTelemetryEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Filesystem    string                 `protobuf:"bytes,2,opt,name=filesystem,proto3" json:"filesystem,omitempty"`
+	UsedPercent   float64                `protobuf:"fixed64,3,opt,name=used_percent,json=usedPercent,proto3" json:"used_percent,omitempty"`
+	FreeGib       float64                `protobuf:"fixed64,4,opt,name=free_gib,json=freeGib,proto3" json:"free_gib,omitempty"`
+	TotalGib      float64                `protobuf:"fixed64,5,opt,name=total_gib,json=totalGib,proto3" json:"total_gib,omitempty"`
+	LowSpace      bool                   `protobuf:"varint,6,opt,name=low_space,json=lowSpace,proto3" json:"low_space,omitempty"`
+	Available     bool                   `protobuf:"varint,7,opt,name=available,proto3" json:"available,omitempty"`
+	Reason        string                 `protobuf:"bytes,8,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiskTelemetryEvent) Reset() {
+	*x = DiskTelemetryEvent{}
+	mi := &file_proto_screencast_studio_v1_web_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiskTelemetryEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiskTelemetryEvent) ProtoMessage() {}
+
+func (x *DiskTelemetryEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_screencast_studio_v1_web_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiskTelemetryEvent.ProtoReflect.Descriptor instead.
+func (*DiskTelemetryEvent) Descriptor() ([]byte, []int) {
+	return file_proto_screencast_studio_v1_web_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *DiskTelemetryEvent) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *DiskTelemetryEvent) GetFilesystem() string {
+	if x != nil {
+		return x.Filesystem
+	}
+	return ""
+}
+
+func (x *DiskTelemetryEvent) GetUsedPercent() float64 {
+	if x != nil {
+		return x.UsedPercent
+	}
+	return 0
+}
+
+func (x *DiskTelemetryEvent) GetFreeGib() float64 {
+	if x != nil {
+		return x.FreeGib
+	}
+	return 0
+}
+
+func (x *DiskTelemetryEvent) GetTotalGib() float64 {
+	if x != nil {
+		return x.TotalGib
+	}
+	return 0
+}
+
+func (x *DiskTelemetryEvent) GetLowSpace() bool {
+	if x != nil {
+		return x.LowSpace
+	}
+	return false
+}
+
+func (x *DiskTelemetryEvent) GetAvailable() bool {
+	if x != nil {
+		return x.Available
+	}
+	return false
+}
+
+func (x *DiskTelemetryEvent) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 type ServerEvent struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Timestamp *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -2088,6 +2264,8 @@ type ServerEvent struct {
 	//	*ServerEvent_PreviewList
 	//	*ServerEvent_PreviewState
 	//	*ServerEvent_PreviewLog
+	//	*ServerEvent_AudioMeter
+	//	*ServerEvent_DiskStatus
 	Kind          isServerEvent_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2095,7 +2273,7 @@ type ServerEvent struct {
 
 func (x *ServerEvent) Reset() {
 	*x = ServerEvent{}
-	mi := &file_proto_screencast_studio_v1_web_proto_msgTypes[30]
+	mi := &file_proto_screencast_studio_v1_web_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2107,7 +2285,7 @@ func (x *ServerEvent) String() string {
 func (*ServerEvent) ProtoMessage() {}
 
 func (x *ServerEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_screencast_studio_v1_web_proto_msgTypes[30]
+	mi := &file_proto_screencast_studio_v1_web_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2120,7 +2298,7 @@ func (x *ServerEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerEvent.ProtoReflect.Descriptor instead.
 func (*ServerEvent) Descriptor() ([]byte, []int) {
-	return file_proto_screencast_studio_v1_web_proto_rawDescGZIP(), []int{30}
+	return file_proto_screencast_studio_v1_web_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ServerEvent) GetTimestamp() *timestamppb.Timestamp {
@@ -2182,6 +2360,24 @@ func (x *ServerEvent) GetPreviewLog() *ProcessLog {
 	return nil
 }
 
+func (x *ServerEvent) GetAudioMeter() *AudioMeterEvent {
+	if x != nil {
+		if x, ok := x.Kind.(*ServerEvent_AudioMeter); ok {
+			return x.AudioMeter
+		}
+	}
+	return nil
+}
+
+func (x *ServerEvent) GetDiskStatus() *DiskTelemetryEvent {
+	if x != nil {
+		if x, ok := x.Kind.(*ServerEvent_DiskStatus); ok {
+			return x.DiskStatus
+		}
+	}
+	return nil
+}
+
 type isServerEvent_Kind interface {
 	isServerEvent_Kind()
 }
@@ -2206,6 +2402,14 @@ type ServerEvent_PreviewLog struct {
 	PreviewLog *ProcessLog `protobuf:"bytes,14,opt,name=preview_log,json=previewLog,proto3,oneof"`
 }
 
+type ServerEvent_AudioMeter struct {
+	AudioMeter *AudioMeterEvent `protobuf:"bytes,15,opt,name=audio_meter,json=audioMeter,proto3,oneof"`
+}
+
+type ServerEvent_DiskStatus struct {
+	DiskStatus *DiskTelemetryEvent `protobuf:"bytes,16,opt,name=disk_status,json=diskStatus,proto3,oneof"`
+}
+
 func (*ServerEvent_SessionState) isServerEvent_Kind() {}
 
 func (*ServerEvent_SessionLog) isServerEvent_Kind() {}
@@ -2215,6 +2419,10 @@ func (*ServerEvent_PreviewList) isServerEvent_Kind() {}
 func (*ServerEvent_PreviewState) isServerEvent_Kind() {}
 
 func (*ServerEvent_PreviewLog) isServerEvent_Kind() {}
+
+func (*ServerEvent_AudioMeter) isServerEvent_Kind() {}
+
+func (*ServerEvent_DiskStatus) isServerEvent_Kind() {}
 
 var File_proto_screencast_studio_v1_web_proto protoreflect.FileDescriptor
 
@@ -2399,7 +2607,26 @@ const file_proto_screencast_studio_v1_web_proto_rawDesc = "" +
 	"\x0fPreviewEnvelope\x12A\n" +
 	"\apreview\x18\x01 \x01(\v2'.screencast.studio.v1.PreviewDescriptorR\apreview\"Z\n" +
 	"\x13PreviewListResponse\x12C\n" +
-	"\bpreviews\x18\x01 \x03(\v2'.screencast.studio.v1.PreviewDescriptorR\bpreviews\"\xc8\x03\n" +
+	"\bpreviews\x18\x01 \x03(\v2'.screencast.studio.v1.PreviewDescriptorR\bpreviews\"\xa4\x01\n" +
+	"\x0fAudioMeterEvent\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x1d\n" +
+	"\n" +
+	"left_level\x18\x02 \x01(\x01R\tleftLevel\x12\x1f\n" +
+	"\vright_level\x18\x03 \x01(\x01R\n" +
+	"rightLevel\x12\x1c\n" +
+	"\tavailable\x18\x04 \x01(\bR\tavailable\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"\xf6\x01\n" +
+	"\x12DiskTelemetryEvent\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1e\n" +
+	"\n" +
+	"filesystem\x18\x02 \x01(\tR\n" +
+	"filesystem\x12!\n" +
+	"\fused_percent\x18\x03 \x01(\x01R\vusedPercent\x12\x19\n" +
+	"\bfree_gib\x18\x04 \x01(\x01R\afreeGib\x12\x1b\n" +
+	"\ttotal_gib\x18\x05 \x01(\x01R\btotalGib\x12\x1b\n" +
+	"\tlow_space\x18\x06 \x01(\bR\blowSpace\x12\x1c\n" +
+	"\tavailable\x18\a \x01(\bR\tavailable\x12\x16\n" +
+	"\x06reason\x18\b \x01(\tR\x06reason\"\xdf\x04\n" +
 	"\vServerEvent\x128\n" +
 	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12M\n" +
 	"\rsession_state\x18\n" +
@@ -2409,7 +2636,11 @@ const file_proto_screencast_studio_v1_web_proto_rawDesc = "" +
 	"\fpreview_list\x18\f \x01(\v2).screencast.studio.v1.PreviewListResponseH\x00R\vpreviewList\x12N\n" +
 	"\rpreview_state\x18\r \x01(\v2'.screencast.studio.v1.PreviewDescriptorH\x00R\fpreviewState\x12C\n" +
 	"\vpreview_log\x18\x0e \x01(\v2 .screencast.studio.v1.ProcessLogH\x00R\n" +
-	"previewLogB\x06\n" +
+	"previewLog\x12H\n" +
+	"\vaudio_meter\x18\x0f \x01(\v2%.screencast.studio.v1.AudioMeterEventH\x00R\n" +
+	"audioMeter\x12K\n" +
+	"\vdisk_status\x18\x10 \x01(\v2(.screencast.studio.v1.DiskTelemetryEventH\x00R\n" +
+	"diskStatusB\x06\n" +
 	"\x04kindB[ZYgithub.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1;studiov1b\x06proto3"
 
 var (
@@ -2424,7 +2655,7 @@ func file_proto_screencast_studio_v1_web_proto_rawDescGZIP() []byte {
 	return file_proto_screencast_studio_v1_web_proto_rawDescData
 }
 
-var file_proto_screencast_studio_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_proto_screencast_studio_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_proto_screencast_studio_v1_web_proto_goTypes = []any{
 	(*HealthResponse)(nil),        // 0: screencast.studio.v1.HealthResponse
 	(*DisplayDescriptor)(nil),     // 1: screencast.studio.v1.DisplayDescriptor
@@ -2456,9 +2687,11 @@ var file_proto_screencast_studio_v1_web_proto_goTypes = []any{
 	(*PreviewDescriptor)(nil),     // 27: screencast.studio.v1.PreviewDescriptor
 	(*PreviewEnvelope)(nil),       // 28: screencast.studio.v1.PreviewEnvelope
 	(*PreviewListResponse)(nil),   // 29: screencast.studio.v1.PreviewListResponse
-	(*ServerEvent)(nil),           // 30: screencast.studio.v1.ServerEvent
-	nil,                           // 31: screencast.studio.v1.EffectiveConfig.DestinationTemplatesEntry
-	(*timestamppb.Timestamp)(nil), // 32: google.protobuf.Timestamp
+	(*AudioMeterEvent)(nil),       // 30: screencast.studio.v1.AudioMeterEvent
+	(*DiskTelemetryEvent)(nil),    // 31: screencast.studio.v1.DiskTelemetryEvent
+	(*ServerEvent)(nil),           // 32: screencast.studio.v1.ServerEvent
+	nil,                           // 33: screencast.studio.v1.EffectiveConfig.DestinationTemplatesEntry
+	(*timestamppb.Timestamp)(nil), // 34: google.protobuf.Timestamp
 }
 var file_proto_screencast_studio_v1_web_proto_depIdxs = []int32{
 	1,  // 0: screencast.studio.v1.DiscoveryResponse.displays:type_name -> screencast.studio.v1.DisplayDescriptor
@@ -2470,7 +2703,7 @@ var file_proto_screencast_studio_v1_web_proto_depIdxs = []int32{
 	9,  // 6: screencast.studio.v1.EffectiveVideoSource.capture:type_name -> screencast.studio.v1.VideoCaptureSettings
 	10, // 7: screencast.studio.v1.EffectiveVideoSource.output:type_name -> screencast.studio.v1.VideoOutputSettings
 	12, // 8: screencast.studio.v1.EffectiveAudioSource.settings:type_name -> screencast.studio.v1.AudioSourceSettings
-	31, // 9: screencast.studio.v1.EffectiveConfig.destination_templates:type_name -> screencast.studio.v1.EffectiveConfig.DestinationTemplatesEntry
+	33, // 9: screencast.studio.v1.EffectiveConfig.destination_templates:type_name -> screencast.studio.v1.EffectiveConfig.DestinationTemplatesEntry
 	11, // 10: screencast.studio.v1.EffectiveConfig.audio_output:type_name -> screencast.studio.v1.AudioOutputSettings
 	13, // 11: screencast.studio.v1.EffectiveConfig.video_sources:type_name -> screencast.studio.v1.EffectiveVideoSource
 	14, // 12: screencast.studio.v1.EffectiveConfig.audio_sources:type_name -> screencast.studio.v1.EffectiveAudioSource
@@ -2486,17 +2719,19 @@ var file_proto_screencast_studio_v1_web_proto_depIdxs = []int32{
 	23, // 22: screencast.studio.v1.SessionEnvelope.session:type_name -> screencast.studio.v1.RecordingSession
 	27, // 23: screencast.studio.v1.PreviewEnvelope.preview:type_name -> screencast.studio.v1.PreviewDescriptor
 	27, // 24: screencast.studio.v1.PreviewListResponse.previews:type_name -> screencast.studio.v1.PreviewDescriptor
-	32, // 25: screencast.studio.v1.ServerEvent.timestamp:type_name -> google.protobuf.Timestamp
+	34, // 25: screencast.studio.v1.ServerEvent.timestamp:type_name -> google.protobuf.Timestamp
 	23, // 26: screencast.studio.v1.ServerEvent.session_state:type_name -> screencast.studio.v1.RecordingSession
 	22, // 27: screencast.studio.v1.ServerEvent.session_log:type_name -> screencast.studio.v1.ProcessLog
 	29, // 28: screencast.studio.v1.ServerEvent.preview_list:type_name -> screencast.studio.v1.PreviewListResponse
 	27, // 29: screencast.studio.v1.ServerEvent.preview_state:type_name -> screencast.studio.v1.PreviewDescriptor
 	22, // 30: screencast.studio.v1.ServerEvent.preview_log:type_name -> screencast.studio.v1.ProcessLog
-	31, // [31:31] is the sub-list for method output_type
-	31, // [31:31] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	30, // 31: screencast.studio.v1.ServerEvent.audio_meter:type_name -> screencast.studio.v1.AudioMeterEvent
+	31, // 32: screencast.studio.v1.ServerEvent.disk_status:type_name -> screencast.studio.v1.DiskTelemetryEvent
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_proto_screencast_studio_v1_web_proto_init() }
@@ -2507,12 +2742,14 @@ func file_proto_screencast_studio_v1_web_proto_init() {
 	file_proto_screencast_studio_v1_web_proto_msgTypes[8].OneofWrappers = []any{}
 	file_proto_screencast_studio_v1_web_proto_msgTypes[9].OneofWrappers = []any{}
 	file_proto_screencast_studio_v1_web_proto_msgTypes[21].OneofWrappers = []any{}
-	file_proto_screencast_studio_v1_web_proto_msgTypes[30].OneofWrappers = []any{
+	file_proto_screencast_studio_v1_web_proto_msgTypes[32].OneofWrappers = []any{
 		(*ServerEvent_SessionState)(nil),
 		(*ServerEvent_SessionLog)(nil),
 		(*ServerEvent_PreviewList)(nil),
 		(*ServerEvent_PreviewState)(nil),
 		(*ServerEvent_PreviewLog)(nil),
+		(*ServerEvent_AudioMeter)(nil),
+		(*ServerEvent_DiskStatus)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2520,7 +2757,7 @@ func file_proto_screencast_studio_v1_web_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_screencast_studio_v1_web_proto_rawDesc), len(file_proto_screencast_studio_v1_web_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   32,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

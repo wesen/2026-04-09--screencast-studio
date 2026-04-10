@@ -66,6 +66,7 @@ func (s *Server) handleCompileSetup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "compile_failed", err.Error())
 		return
 	}
+	s.telemetry.UpdateFromPlan(plan)
 
 	writeProtoJSON(w, http.StatusOK, mapCompileResponse(plan))
 }

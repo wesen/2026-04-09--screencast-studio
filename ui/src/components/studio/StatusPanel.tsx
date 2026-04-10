@@ -6,6 +6,9 @@ interface StatusPanelProps {
   diskPercent?: number;
   destinationRoot?: string;
   outputCount?: number;
+  diskFreeGiB?: number;
+  diskTotalGiB?: number;
+  diskReason?: string;
   isRecording: boolean;
   isPaused: boolean;
   armedSources: StudioSource[];
@@ -28,6 +31,9 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
   diskPercent,
   destinationRoot,
   outputCount = 0,
+  diskFreeGiB,
+  diskTotalGiB,
+  diskReason,
   isRecording,
   isPaused,
   armedSources,
@@ -53,7 +59,7 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
         </div>
         {!hasDiskData ? (
           <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
-            Disk telemetry unavailable
+            {diskReason || 'Disk telemetry unavailable'}
           </div>
         ) : null}
         <div style={{ fontSize: '9px', color: 'var(--studio-mid)' }}>
@@ -73,6 +79,11 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
         <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
           Planned outputs: {outputCount}
         </div>
+        {hasDiskData && typeof diskFreeGiB === 'number' && typeof diskTotalGiB === 'number' ? (
+          <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
+            Free: {diskFreeGiB.toFixed(1)} GiB / {diskTotalGiB.toFixed(1)} GiB
+          </div>
+        ) : null}
       </div>
     </Win>
   );

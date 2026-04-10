@@ -40,6 +40,18 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	})); err != nil {
 		return
 	}
+	if err := writeProtoWebsocketJSON(conn, mapServerEvent(ServerEvent{
+		Type:    "telemetry.audio_meter",
+		Payload: mapAudioMeterSnapshot(s.telemetry.AudioMeter()),
+	})); err != nil {
+		return
+	}
+	if err := writeProtoWebsocketJSON(conn, mapServerEvent(ServerEvent{
+		Type:    "telemetry.disk_status",
+		Payload: mapDiskTelemetrySnapshot(s.telemetry.DiskStatus()),
+	})); err != nil {
+		return
+	}
 
 	group, ctx := errgroup.WithContext(r.Context())
 	group.Go(func() error {
