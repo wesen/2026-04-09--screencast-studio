@@ -36,27 +36,27 @@ const previewsSlice = createSlice({
   name: 'previews',
   initialState,
   reducers: {
-    setPreviews(state, action: PayloadAction<PreviewDescriptor[]>) {
+    setPreviews: (state, action: PayloadAction<PreviewDescriptor[]>) => {
       state.previewsById = toPreviewMap(action.payload);
       state.ownedPreviewIdBySourceId = pruneOwnedPreviewMap(
         state.previewsById,
         state.ownedPreviewIdBySourceId
       );
     },
-    upsertPreview(state, action: PayloadAction<PreviewDescriptor>) {
+    upsertPreview: (state, action: PayloadAction<PreviewDescriptor>) => {
       state.previewsById[action.payload.id] = action.payload;
     },
-    clearPreviews(state) {
+    clearPreviews: (state) => {
       state.previewsById = {};
       state.ownedPreviewIdBySourceId = {};
     },
-    trackOwnedPreview(
+    trackOwnedPreview: (
       state,
       action: PayloadAction<{ sourceId: string; previewId: string }>
-    ) {
+    ) => {
       state.ownedPreviewIdBySourceId[action.payload.sourceId] = action.payload.previewId;
     },
-    clearOwnedPreview(state, action: PayloadAction<{ sourceId: string }>) {
+    clearOwnedPreview: (state, action: PayloadAction<{ sourceId: string }>) => {
       delete state.ownedPreviewIdBySourceId[action.payload.sourceId];
     },
   },

@@ -124,3 +124,16 @@ Implemented the first real preview-integration slice on top of the protobuf tran
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/SourceCard.tsx — Source cards now render the real preview stream component
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/discoveryApi.ts — Added health query usage so preview leasing can respect the backend preview limit
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go — Preview validation messages no longer refer to stale snake_case field names
+
+## 2026-04-09
+
+Finished the cleanup and hygiene pass by deleting the remaining demo-only source state from `studioDraftSlice`, removing the mounted page’s fake mic and disk telemetry, fixing the default DSL so the real page boots into a valid backend shape, and documenting a successful live smoke test against the Go server including preview ensure and release behavior.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/studio-draft/studioDraftSlice.ts — Removed unused source-list and fake meter state, leaving only UI-owned output and microphone controls
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts — Default DSL now matches the backend’s normalized config shape
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/MicPanel.tsx — Microphone panel now renders “unavailable” instead of invented live meters
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StatusPanel.tsx — Status panel now renders “unavailable” instead of invented disk telemetry
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/DSLEditor.stories.tsx — Storybook DSL story now uses the same valid default DSL as the mounted app
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0003--screencast-studio-frontend-cleanup-and-backend-alignment-plan/reference/01-diary.md — Diary now records the final validation checklist and live smoke results

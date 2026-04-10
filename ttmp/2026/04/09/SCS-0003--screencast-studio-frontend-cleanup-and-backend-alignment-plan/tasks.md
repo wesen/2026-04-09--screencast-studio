@@ -136,8 +136,8 @@ Acceptance criteria:
 
 - [x] Add an ESLint configuration under `ui/`.
 - [x] Make `pnpm --dir ui lint` pass.
-- [ ] Decide whether `ui/dist/` and `ui/storybook-static/` should remain checked in.
-- [ ] Add a short frontend validation checklist to the ticket diary or follow-on docs.
+- [x] Decide whether `ui/dist/` and `ui/storybook-static/` should remain checked in.
+- [x] Add a short frontend validation checklist to the ticket diary or follow-on docs.
 
 Acceptance criteria:
 
@@ -146,9 +146,9 @@ Acceptance criteria:
 
 ## Phase 11: Delete The Dead Code
 
-- [ ] Remove deprecated API helpers, stale types, and duplicate shell code once replacements are in place.
-- [ ] Remove unused imports, selectors, reducers, stories, or helpers discovered during cleanup.
-- [ ] Do a final repo scan for files and symbols that only supported the deleted paths.
+- [x] Remove deprecated API helpers, stale types, and duplicate shell code once replacements are in place.
+- [x] Remove unused imports, selectors, reducers, stories, or helpers discovered during cleanup.
+- [x] Do a final repo scan for files and symbols that only supported the deleted paths.
 
 Acceptance criteria:
 
@@ -163,7 +163,7 @@ Acceptance criteria:
 - [ ] Commit 4: protobuf schema and generation plumbing
 - [ ] Commit 5: Go REST and websocket protobuf migration
 - [ ] Commit 6: frontend protobuf transport and websocket decode migration
-- [ ] Commit 7: preview integration cleanup on top of protobuf
+- [x] Commit 7: preview integration cleanup on top of protobuf
 - [ ] Commit 8: final dead-code deletion and hygiene cleanup
 
 ## Validation Checklist
@@ -173,5 +173,5 @@ Acceptance criteria:
 - [x] `pnpm --dir ui build-storybook`
 - [x] `go test ./...`
 - [x] `go build ./...`
-- [ ] manual smoke test against the real Go server
-- [ ] review for remaining duplicate shells or stale routes
+- [x] manual smoke test against the real Go server
+- [x] review for remaining duplicate shells or stale routes

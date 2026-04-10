@@ -4,7 +4,7 @@ import { MicMeter } from '../MicMeter';
 import { Waveform } from '../Waveform';
 
 interface MicPanelProps {
-  micLevel: number;
+  micLevel?: number;
   micInput: string;
   gain: number;
   isRecording: boolean;
@@ -22,18 +22,25 @@ export const MicPanel: React.FC<MicPanelProps> = ({
   onGainChange,
   className,
 }) => {
+  const effectiveLevel = micLevel ?? 0;
+
   return (
     <Win title="Microphone" className={className}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: '8px', color: 'var(--studio-mid)', width: 8 }}>L</span>
-          <MicMeter level={micLevel} />
+          <MicMeter level={effectiveLevel} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: '8px', color: 'var(--studio-mid)', width: 8 }}>R</span>
-          <MicMeter level={micLevel * 0.85} />
+          <MicMeter level={effectiveLevel * 0.85} />
         </div>
         <Waveform active={isRecording} />
+        {micLevel === undefined ? (
+          <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
+            Live meter unavailable
+          </div>
+        ) : null}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: '8px', color: 'var(--studio-mid)', width: 26 }}>Input</span>
           <Sel

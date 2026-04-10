@@ -181,7 +181,6 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
 
   const isRecording = session.active;
   const isPaused = false;
-  const diskPercent = 8;
   const previewLimit = healthData?.previewLimit || DEFAULT_PREVIEW_LIMIT;
   const transportBusy =
     startRecordingState.isLoading ||
@@ -382,7 +381,6 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const micSettings = useAppSelector((state) => ({
     micInput: state.studioDraft.micInput,
     gain: state.studioDraft.gain,
-    micLevel: state.studioDraft.micLevel,
   }));
 
   const handleToggleRecording = () => {
@@ -489,7 +487,6 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
 
               <div className="studio-panel-stack">
                 <MicPanel
-                  micLevel={micSettings.micLevel}
                   micInput={micSettings.micInput}
                   gain={micSettings.gain}
                   isRecording={isRecording}
@@ -498,7 +495,6 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                 />
 
                 <StatusPanel
-                  diskPercent={diskPercent}
                   isRecording={isRecording}
                   isPaused={isPaused}
                   armedSources={armedSources}

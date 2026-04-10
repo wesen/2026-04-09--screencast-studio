@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { DSLEditor } from '../components/dsl-editor/DSLEditor';
+import { DEFAULT_DSL_TEXT } from '../features/editor/editorSlice';
 
 const meta = {
   title: 'Studio/DSLEditor',
@@ -10,23 +11,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const sampleDSL = `schema: recorder.config/v1
-session_id: demo
-destination_templates:
-  video: recordings/{session_id}/{name}.mov
-video_sources:
-  - id: desktop-1
-    name: Full Desktop
-    type: display
-    target:
-      display: display-1
-    settings:
-      capture:
-        fps: 24
-      output:
-        container: mov
-        video_codec: h264
-        quality: 75`;
+const sampleDSL = DEFAULT_DSL_TEXT;
 
 export const Default: Story = {
   args: {

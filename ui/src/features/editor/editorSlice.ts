@@ -2,25 +2,54 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export const DEFAULT_DSL_TEXT = `schema: recorder.config/v1
 session_id: demo
+
 destination_templates:
-  video: recordings/{session_id}/{name}.mov
+  per_source: recordings/{session_id}/{source_name}.{ext}
+  audio_mix: recordings/{session_id}/audio-mix.{ext}
+
+screen_capture_defaults:
+  capture:
+    fps: 24
+    cursor: true
+    follow_resize: false
+  output:
+    container: mov
+    video_codec: h264
+    quality: 75
+
+camera_capture_defaults:
+  capture:
+    fps: 30
+    mirror: false
+    size: "1280x720"
+  output:
+    container: mov
+    video_codec: h264
+    quality: 80
+
+audio_defaults:
+  output:
+    codec: pcm_s16le
+    sample_rate_hz: 48000
+    channels: 2
+
+audio_mix:
+  destination_template: audio_mix
+
 video_sources:
   - id: desktop-1
     name: Full Desktop
     type: display
     target:
-      display: display-1
-    settings:
-      capture:
-        fps: 24
-      output:
-        container: mov
-        video_codec: h264
-        quality: 75
+      display: ":0.0"
+    destination_template: per_source
+
 audio_sources:
   - id: mic-1
     name: Built-in Mic
     device: default
+    settings:
+      gain: 1.0
 `;
 
 export interface EditorState {

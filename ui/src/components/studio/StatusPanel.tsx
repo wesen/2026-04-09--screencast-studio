@@ -3,7 +3,7 @@ import { Win } from '../primitives';
 import type { StudioSource } from '@/components/source-card';
 
 interface StatusPanelProps {
-  diskPercent: number;
+  diskPercent?: number;
   isRecording: boolean;
   isPaused: boolean;
   armedSources: StudioSource[];
@@ -30,8 +30,9 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
   className,
 }) => {
   const status = getStatusText(isRecording, isPaused);
-  const diskPct = Math.min(95, diskPercent);
-  const diskRemaining = Math.round(100 - diskPct);
+  const hasDiskData = typeof diskPercent === 'number';
+  const diskPct = hasDiskData ? Math.min(95, diskPercent) : 0;
+  const diskRemaining = hasDiskData ? `${Math.round(100 - diskPct)}%` : 'n/a';
 
   return (
     <Win title="Status" className={className}>
@@ -39,13 +40,18 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
         <div className="studio-status-item">
           <span className="studio-status-label">Disk</span>
           <div className="studio-status-bar">
-            <div
+          <div
               className={`studio-status-bar__fill ${diskPct > 85 ? 'studio-status-bar__fill--warning' : ''}`}
               style={{ width: `${diskPct}%` }}
             />
           </div>
-          <span className="studio-status-value">{diskRemaining}%</span>
+          <span className="studio-status-value">{diskRemaining}</span>
         </div>
+        {!hasDiskData ? (
+          <div style={{ fontSize: '8px', color: 'var(--studio-mid)' }}>
+            Disk telemetry unavailable
+          </div>
+        ) : null}
         <div style={{ fontSize: '9px', color: 'var(--studio-mid)' }}>
           Status:{' '}
           <span style={{ color: status.color, fontWeight: 'bold' }}>

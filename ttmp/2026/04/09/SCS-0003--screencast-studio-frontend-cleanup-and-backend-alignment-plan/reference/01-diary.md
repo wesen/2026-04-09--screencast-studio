@@ -478,6 +478,124 @@ pnpm --dir ui lint
 go test ./internal/web ./ui/...
 ```
 
+## Step 9: Remove The Last Demo Runtime State And Run A Real Smoke Test
+
+This step finished the cleanup ticket’s main technical goals. The important part was not just deleting one more unused reducer. The important part was verifying that the mounted app now comes up in a real backend-shaped state and that preview lifecycle behavior works end to end against the live Go server.
+
+Two concrete issues were still visible before this step:
+
+- `StudioPage` still carried fake runtime telemetry for microphone level and disk usage.
+- The default DSL in `editorSlice.ts` no longer matched the backend’s real normalization rules, so the page booted into a broken state and immediately got a `400` from `/api/setup/normalize`.
+
+Both needed to be fixed before this ticket could credibly be called a cleanup and alignment ticket.
+
+### What I did
+
+- Simplified `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/studio-draft/studioDraftSlice.ts` so it only contains UI-owned output and microphone control settings.
+- Removed the dead source-list reducers, selectors, and fake meter state from `studioDraftSlice`.
+- Updated `StudioPage` so it no longer invents disk percentage or microphone meter data locally.
+- Updated:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/MicPanel.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StatusPanel.tsx`
+  so they render “unavailable” states instead of fake runtime telemetry.
+- Replaced the invalid default DSL in:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/editor/editorSlice.ts`
+  with a backend-valid config shape.
+- Updated `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/DSLEditor.stories.tsx` to use the same valid default DSL.
+- Ran a live smoke test with the real Go server in tmux using the built frontend from `ui/dist`.
+
+### Why
+
+- A frontend that boots into an invalid DSL is still not aligned with the backend, even if the transport code is correct.
+- Fake disk and microphone telemetry directly contradict the earlier cleanup decision that the mounted UI must stop simulating runtime state it does not actually have.
+- The live smoke test was needed to verify the page in a user-like path instead of just proving that build, lint, and unit-style checks pass.
+
+### What worked
+
+- After replacing the default DSL, the page normalized successfully and rendered a real source card on first load.
+- Preview ensure worked automatically from the mounted Studio tab.
+- Switching away from the Studio tab triggered preview release and `/api/previews` returned to an empty list.
+- `ui/dist/` and `ui/storybook-static/` are not tracked in Git, which is the correct hygiene decision for this repo right now.
+
+### What didn't work
+
+- The first smoke pass failed because the previous default DSL shape was invalid for the current backend. That was an actual frontend bug, not a flaky test artifact.
+- `pnpm --dir ui build-storybook` also failed once after the preview-slice refactor because Storybook’s react-docgen plugin did not like object-method reducer syntax in `previewSlice.ts`.
+
+### Exact failures
+
+Browser console on the first smoke pass:
+
+```text
+Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://127.0.0.1:18080/api/setup/normalize
+```
+
+Storybook build failure after the preview-slice refactor:
+
+```text
+[storybook:react-docgen-plugin] Attempted to resolveName for an unsupported path. resolveName does not accept ObjectMethod
+file: ./src/features/previews/previewSlice.ts
+```
+
+The fix for the Storybook issue was small and contained: convert the preview-slice reducers from method shorthand to arrow-function properties, which made react-docgen stop tripping on that file.
+
+### Validation checklist
+
+The current validation recipe for this ticket is:
+
+```bash
+go test ./...
+go build ./...
+pnpm --dir ui build
+pnpm --dir ui lint
+CI=1 pnpm --dir ui build-storybook
+docmgr doctor --ticket SCS-0003 --stale-after 30
+```
+
+The current build artifacts `ui/dist/` and `ui/storybook-static/` are intentionally not checked in.
+
+### Live smoke test notes
+
+The live smoke test used:
+
+```bash
+tmux new-session -d -s scs3-smoke 'cd /home/manuel/code/wesen/2026-04-09--screencast-studio && go run ./cmd/screencast-studio serve --addr :18080 --static-dir ui/dist'
+```
+
+Then the browser was pointed at `http://127.0.0.1:18080/`.
+
+Observed healthy behavior:
+
+- page loaded successfully
+- `/api/healthz` returned `200`
+- `/api/setup/normalize` returned `200`
+- `/api/previews/ensure` returned `200`
+- `/api/previews` showed one running preview with `hasFrame: true`
+- switching to the `Logs` tab triggered `POST /api/previews/release`
+- `/api/previews` then returned `{"previews":[]}`
+
+### What warrants a second pair of eyes
+
+- Whether the current “release previews when leaving the Studio tab” policy is the final UX we want, or just the right resource-conservative default for v1.
+- Whether we want a dedicated backend endpoint for disk telemetry or microphone levels later, now that the frontend explicitly renders those as unavailable instead of inventing them.
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+git ls-files ui/dist ui/storybook-static
+pnpm --dir ui build
+pnpm --dir ui lint
+go test ./internal/web
+go build ./...
+CI=1 pnpm --dir ui build-storybook
+tmux new-session -d -s scs3-smoke 'cd /home/manuel/code/wesen/2026-04-09--screencast-studio && go run ./cmd/screencast-studio serve --addr :18080 --static-dir ui/dist'
+curl -sSf http://127.0.0.1:18080/api/healthz
+curl -sSf http://127.0.0.1:18080/api/previews
+tmux capture-pane -pt scs3-smoke
+```
+
 ## Step 3: Collapse The App To One Mounted Shell
 
 This step removed the most obvious frontend duplication by making `StudioPage` the single mounted shell and deleting `StudioApp`. The purpose of this slice was not to finish the runtime integration. The purpose was to establish one place where future state and transport cleanup can happen.
