@@ -18,7 +18,7 @@ RelatedFiles:
       Note: Output naming controls and inline documentation
 ExternalSources: []
 Summary: Diary for filename-template tokens and mounted-UI guidance.
-LastUpdated: 2026-04-10T14:25:00-04:00
+LastUpdated: 2026-04-10T15:05:00-04:00
 WhatFor: Capture what changed, why, what worked, and how to review ticket SCS-0010.
 WhenToUse: Use when reviewing or resuming ticket SCS-0010.
 ---
@@ -179,4 +179,76 @@ audio_mix:  <root>/{session_id}/audio-mix<suffix>.{ext}
 {time}       -> 15-04-05
 {timestamp}  -> 20060102-150405
 {index}      -> 1, 2, 3, ... first free filename
+```
+
+## Step 3: Apply token support to Name and clarify Save to behavior
+
+The first version made tokenized filename suffixes easy to use, but the mounted copy still implied that the feature only applied to the new `Filename` field. You then asked to apply it to `name` and `save to` as well. After checking the code path, I found that `Save to` already worked because it rewrites the canonical destination template directly, so tokens placed there naturally render at compile time. The missing part was `Name`, because `session_id` was inserted as a literal path segment and date/time tokens inside that field were not expanded.
+
+I fixed that by adding a second date/time token pass after `{session_id}` has been injected into the destination template. That makes values like `demo-{date}-{timestamp}` work in the `Name` field without widening the token model further. I also updated the inline output help text so the UI states explicitly that tokens apply to `Name`, `Save to`, and `Filename`.
+
+### Prompt Context
+
+**User prompt (verbatim):** "apply to \"name\" + \"save to\" as well."
+
+**Assistant interpretation:** Extend the token behavior and the mounted UI guidance so the user can rely on the same token set from the recording name and destination root controls, not just from the filename suffix field.
+
+**Inferred user intent:** Make the naming controls feel coherent across the whole output section instead of having one token-aware field and two token-blind fields.
+
+**Commit (code):** `06be6c1` — `output: expand name tokens`
+
+### What I did
+- Confirmed that `Save to` already participates in token rendering because it is written back into `destination_templates`.
+- Updated `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/templates.go` so date/time tokens are expanded again after path variables like `{session_id}` are substituted.
+- Added a regression test in `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/templates_test.go` for a tokenized `session_id`.
+- Updated `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx` to say tokens can be used in `Name`, `Save to`, and `Filename`.
+- Re-ran:
+
+```bash
+gofmt -w pkg/dsl/templates.go pkg/dsl/templates_test.go
+go test ./pkg/dsl ./internal/web -count=1
+pnpm --dir ui build
+go generate ./internal/web
+```
+
+### Why
+- `Name` was the only output control whose tokens did not actually render.
+- `Save to` did not need new runtime behavior, but the UI needed to say that clearly.
+
+### What worked
+- The existing renderer could support tokenized `session_id` with a narrow post-substitution pass for time-related tokens.
+- `Save to` needed no structural change because it already rewrites the canonical templates.
+- The validation path stayed clean after the patch.
+
+### What didn't work
+- N/A
+
+### What I learned
+- The control surface looked less coherent than the actual runtime behavior. The real gap was partly code (`Name`) and partly documentation (`Save to`).
+
+### What was tricky to build
+- The tricky part was avoiding recursive or overly broad re-expansion. I only re-expanded the date/time tokens after variable injection, leaving placeholders like `{source_name}` and `{ext}` as one-pass template concerns. That keeps the renderer predictable while still solving the user-facing gap.
+
+### What warrants a second pair of eyes
+- Whether `{index}` should also be documented as usable in `Name` and `Save to` from a UX perspective, even though the renderer now supports it transitively in the final path.
+- Whether the post-substitution token pass should eventually be formalized as a named renderer phase instead of an inline second replacement.
+
+### What should be done in the future
+- If users start relying heavily on tokenized `Name`, consider showing a small concrete example in the output panel copy.
+
+### Code review instructions
+- Start with `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/templates.go` and the new test in `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/dsl/templates_test.go`.
+- Then review the wording change in `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/OutputPanel.tsx`.
+
+### Technical details
+- Example supported `Name` value:
+
+```text
+demo-{date}-{timestamp}
+```
+
+- Example resulting output path shape:
+
+```text
+recordings/demo-2026-04-09-20260409-150405/<source_name>...
 ```
