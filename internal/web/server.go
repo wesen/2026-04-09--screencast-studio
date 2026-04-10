@@ -108,6 +108,9 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	})
 	group.Go(func() error {
 		defer close(telemetryDone)
+		// Telemetry remains context-driven for now: Run(ctx) exits when the
+		// runtime context is canceled, and the server explicitly waits for this
+		// goroutine during shutdown rather than introducing a second shutdown API.
 		log.Info().
 			Str("event", "runtime.telemetry.start").
 			Msg("telemetry manager starting")
