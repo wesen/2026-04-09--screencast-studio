@@ -109,11 +109,11 @@ Acceptance criteria:
 
 ## Phase 8: Repair Preview Integration On Top Of The Shared Schema
 
-- [ ] Ensure preview creation uses the protobuf-generated `{ dsl, sourceId }` request shape.
-- [ ] Ensure preview release uses the protobuf-generated `previewId` request shape.
-- [ ] Add or refactor preview state so source-card or source-grid containers lease previews through one shared state model.
-- [ ] Keep `PreviewStream` presentational and focused on rendering the supplied preview state.
-- [ ] Remove any preview code that assumes stale route names, stale field names, or source-id-only lifecycle shortcuts.
+- [x] Ensure preview creation uses the protobuf-generated `{ dsl, sourceId }` request shape.
+- [x] Ensure preview release uses the protobuf-generated `previewId` request shape.
+- [x] Add or refactor preview state so source-card or source-grid containers lease previews through one shared state model.
+- [x] Keep `PreviewStream` presentational and focused on rendering the supplied preview state.
+- [x] Remove any preview code that assumes stale route names, stale field names, or source-id-only lifecycle shortcuts.
 
 Acceptance criteria:
 

@@ -8,6 +8,9 @@ export interface StudioSource {
   armed: boolean;
   solo: boolean;
   label: string;
+  previewId?: string;
+  previewState?: string;
+  previewReason?: string;
   previewUrl?: string;
 }
 

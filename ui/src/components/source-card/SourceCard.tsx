@@ -1,6 +1,6 @@
 import React from 'react';
 import { Btn, Sel } from '../primitives';
-import { FakeScreen } from '../FakeScreen';
+import { PreviewStream } from '../preview';
 import type { StudioSource, StudioSourceKind } from './types';
 
 interface SourceCardProps {
@@ -79,7 +79,12 @@ export const SourceCard: React.FC<SourceCardProps> = ({
         <div style={{ width: 10 }} />
       </div>
       <div className="studio-source-card__body">
-        <FakeScreen kind={source.kind} scene={source.scene} />
+        <PreviewStream
+          sourceId={source.sourceId}
+          state={source.previewState}
+          reason={source.previewReason}
+          streamUrl={source.previewUrl}
+        />
         <div className="studio-source-card__preview">
           {editable ? (
             <>

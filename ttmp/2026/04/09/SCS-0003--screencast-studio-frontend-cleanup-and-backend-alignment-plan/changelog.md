@@ -111,3 +111,16 @@ Implemented the shared protobuf transport contract for both REST and websocket t
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/proto.ts — Frontend protobuf JSON helper boundary
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts — Websocket decode now uses the generated `ServerEvent` schema
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/gen/proto/screencast/studio/v1/web_pb.ts — Generated TypeScript transport types and schemas
+
+## 2026-04-09
+
+Implemented the first real preview-integration slice on top of the protobuf transport by adding explicit owned preview leases in the frontend state model, ensuring and releasing previews from `StudioPage`, and rendering source cards through the presentational `PreviewStream` component instead of preview-adjacent demo placeholders.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Page now owns preview leasing and release against the real preview API
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/previews/previewSlice.ts — Preview slice now tracks server descriptors plus client-owned preview leases by source
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/preview/PreviewStream.tsx — Preview stream now renders supplied preview state and stream URLs without inventing lifecycle rules
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/SourceCard.tsx — Source cards now render the real preview stream component
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/discoveryApi.ts — Added health query usage so preview leasing can respect the backend preview limit
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go — Preview validation messages no longer refer to stale snake_case field names

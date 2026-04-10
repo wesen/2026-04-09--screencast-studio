@@ -22,7 +22,7 @@ func (s *Server) handlePreviewEnsure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if request.GetDsl() == "" || request.GetSourceId() == "" {
-		writeError(w, http.StatusBadRequest, "invalid_preview_request", "dsl and source_id are required")
+		writeError(w, http.StatusBadRequest, "invalid_preview_request", "dsl and sourceId are required")
 		return
 	}
 
@@ -53,7 +53,7 @@ func (s *Server) handlePreviewRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if request.GetPreviewId() == "" {
-		writeError(w, http.StatusBadRequest, "missing_preview_id", "preview_id is required")
+		writeError(w, http.StatusBadRequest, "missing_preview_id", "previewId is required")
 		return
 	}
 

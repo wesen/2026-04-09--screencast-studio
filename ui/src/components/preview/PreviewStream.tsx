@@ -2,18 +2,32 @@ import React, { useState } from 'react';
 
 interface PreviewStreamProps {
   sourceId: string;
+  state?: string;
+  reason?: string;
   streamUrl?: string;
   className?: string;
 }
 
 export const PreviewStream: React.FC<PreviewStreamProps> = ({
   sourceId,
+  state,
+  reason,
   streamUrl,
   className,
 }) => {
   const [error, setError] = useState(false);
 
   if (!streamUrl || error) {
+    const message = error
+      ? 'Preview stream failed'
+      : state === 'starting'
+        ? 'Preview starting'
+        : state === 'stopping'
+          ? 'Preview stopping'
+          : state === 'failed'
+            ? reason || 'Preview failed'
+            : 'Preview unavailable';
+
     return (
       <div
         className={className}
@@ -28,9 +42,11 @@ export const PreviewStream: React.FC<PreviewStreamProps> = ({
           justifyContent: 'center',
           color: 'var(--studio-mid)',
           fontSize: 9,
+          textAlign: 'center',
+          padding: '0 12px',
         }}
       >
-        Preview unavailable
+        {message}
       </div>
     );
   }

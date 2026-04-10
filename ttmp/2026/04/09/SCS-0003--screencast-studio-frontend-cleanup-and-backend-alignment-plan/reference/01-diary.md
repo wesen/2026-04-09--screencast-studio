@@ -373,6 +373,111 @@ pnpm --dir ui lint
 pnpm --dir ui build-storybook
 ```
 
+## Step 8: Put Real Preview Leasing On Top Of The Shared Schema
+
+This step finally connected the source grid to the real preview lifecycle instead of leaving preview support as an API layer plus isolated components with no clear owner. The goal here was not to build a perfect long-term preview manager in the frontend. The goal was to establish one explicit ownership path for preview ensure and release behavior that respects the backend contract and makes the current UI honest.
+
+The main architectural decision was to keep preview ownership in `StudioPage`, because the page is the current owner of normalized setup state, the active studio tab, and the mounted websocket connection. That means the page already knows when sources are visible and when the studio view is active. The preview component itself stays presentational.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, continue"
+
+**Assistant interpretation:** Continue executing `SCS-0003` task-by-task after the protobuf migration, starting with the next uncompleted phase rather than branching into unrelated frontend work.
+
+### What I did
+
+- Added a `getHealth` query to:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/api/discoveryApi.ts`
+- Refactored the preview slice so it tracks both:
+  - preview descriptors by preview ID
+  - client-owned preview leases by source ID
+- Added owned-preview reducers and selectors in:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/previews/previewSlice.ts`
+- Updated `StudioPage` so it:
+  - computes the desired visible preview sources
+  - respects the backend preview limit
+  - ensures previews using `{ dsl, sourceId }`
+  - releases previews using `previewId`
+  - logs ensure and release failures into the existing process-log panel
+  - releases owned previews on unmount
+- Updated the source-card model to carry preview state and preview URLs:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/types.ts`
+- Switched source cards from the fake preview placeholder to the presentational preview component:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/SourceCard.tsx`
+- Made `PreviewStream` display the supplied preview state more clearly instead of only showing a generic unavailable message:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/preview/PreviewStream.tsx`
+- Cleaned up stale backend error text that still referred to snake_case preview field names:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+
+### Why
+
+- The transport and websocket layers were already correct, but the mounted studio screen still was not using the real preview lifecycle.
+- Preview ownership was otherwise about to become ambiguous again, split between page code, source-card code, and free-form local state.
+- The user explicitly wants the frontend aligned to the backend, and preview lifecycle is one of the most concrete places where “aligned” has to mean “real ensure and release semantics.”
+
+### What worked
+
+- The protobuf transport made the page-level preview code much simpler than the old handwritten-transport version would have been.
+- A dedicated preview slice with explicit owned-lease tracking gave the page a stable place to store “which previews did this UI instance ensure?”
+- Keeping `PreviewStream` presentational avoided pushing network or lifecycle behavior down into the card component tree.
+
+### What didn't work
+
+- The first version of the unmount cleanup used a dependency-bound effect that would have attempted cleanup on dependency changes, not only on unmount.
+- That needed to be corrected by storing the latest owned-preview map in a ref and using a dedicated unmount cleanup effect.
+
+### What I learned
+
+- Preview descriptors from the server and preview leases owned by this frontend are related, but they are not the same state. Treating them separately makes the code easier to reason about.
+- The correct UI rule is “render the preview if the page currently owns a lease for that source,” not “render any descriptor in the store that happens to share a source ID.”
+- The server-side preview limit belongs in the frontend behavior too. Hard-coding a UI assumption there would just reintroduce drift.
+
+### Validation
+
+The following commands passed after this step:
+
+```bash
+pnpm --dir ui build
+pnpm --dir ui lint
+go test ./internal/web ./ui/...
+```
+
+Note: `go test ./ui/...` does not match any Go packages, so the meaningful validation here is `go test ./internal/web` plus the frontend build and lint commands.
+
+### What warrants a second pair of eyes
+
+- Whether the page should keep previews alive when the user switches away from the Studio tab, or whether releasing immediately on tab switch is the correct resource policy for v1.
+- Whether a future manual smoke test shows that limiting previews to the first visible sources is the right product behavior when more sources exist than the backend preview limit allows.
+
+### What should be done in the future
+
+- Run a real browser-backed smoke test against the Go server to confirm preview start, frame arrival, and release behavior through the actual MJPEG stream.
+- Continue with the remaining hygiene and dead-code cleanup now that preview lifecycle is no longer a major missing piece.
+
+### Code review instructions
+
+- Review the page-level preview ownership first:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+- Then review the preview state model:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/previews/previewSlice.ts`
+- Then review the rendering boundary:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/SourceCard.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/preview/PreviewStream.tsx`
+- Finally review the small backend cleanup:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+
+### Technical details
+
+Commands used in this step:
+
+```bash
+rg -n "previewId|preview_id|source_id|sourceId|getWsClient|handleWsEvent|setupsApi|StudioApp" ui internal/web
+pnpm --dir ui build
+pnpm --dir ui lint
+go test ./internal/web ./ui/...
+```
+
 ## Step 3: Collapse The App To One Mounted Shell
 
 This step removed the most obvious frontend duplication by making `StudioPage` the single mounted shell and deleting `StudioApp`. The purpose of this slice was not to finish the runtime integration. The purpose was to establish one place where future state and transport cleanup can happen.

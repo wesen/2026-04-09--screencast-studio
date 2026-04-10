@@ -1,12 +1,21 @@
 import { create } from '@bufbuild/protobuf';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useGetHealthQuery } from '@/api/discoveryApi';
+import {
+  useEnsurePreviewMutation,
+  useReleasePreviewMutation,
+} from '@/api/previewsApi';
 import {
   useGetCurrentSessionQuery,
   useStartRecordingMutation,
   useStopRecordingMutation,
 } from '@/api/recordingApi';
 import { useCompileSetupMutation, useNormalizeSetupMutation } from '@/api/setupApi';
-import type { ApiErrorResponse, EffectiveVideoSource } from '@/api/types';
+import type {
+  ApiErrorResponse,
+  EffectiveVideoSource,
+  PreviewDescriptor,
+} from '@/api/types';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import type { StudioSource } from '@/components/source-card';
 import {
@@ -45,6 +54,13 @@ import {
   selectNormalizeErrors,
   selectNormalizeWarnings,
 } from '@/features/setup/setupSlice';
+import {
+  clearOwnedPreview,
+  selectOwnedPreviewIdBySourceId,
+  selectPreviewsById,
+  trackOwnedPreview,
+  upsertPreview,
+} from '@/features/previews/previewSlice';
 import { MenuBar, SourceGrid, OutputPanel, MicPanel, StatusPanel } from '@/components/studio';
 import { LogPanel } from '@/components/log-panel';
 import { DSLEditor } from '@/components/dsl-editor';
@@ -54,6 +70,8 @@ import { ProcessLogSchema } from '@/gen/proto/screencast/studio/v1/web_pb';
 interface StudioPageProps {
   className?: string;
 }
+
+const DEFAULT_PREVIEW_LIMIT = 4;
 
 const parseTimestamp = (value?: string): number | null => {
   if (!value) {
@@ -84,7 +102,29 @@ const errorMessageFromUnknown = (error: unknown): string => {
   return 'unknown error';
 };
 
-const toStudioSource = (source: EffectiveVideoSource): StudioSource => {
+const apiErrorCodeFromUnknown = (error: unknown): string | undefined => {
+  if (typeof error === 'object' && error !== null && 'data' in error) {
+    const data = (error as { data?: unknown }).data;
+    if (
+      typeof data === 'object' &&
+      data !== null &&
+      'error' in data &&
+      typeof (data as ApiErrorResponse).error?.code === 'string'
+    ) {
+      return (data as ApiErrorResponse).error.code;
+    }
+  }
+  return undefined;
+};
+
+const previewStreamUrl = (previewId?: string): string | undefined => (
+  previewId ? `/api/previews/${previewId}/mjpeg` : undefined
+);
+
+const toStudioSource = (
+  source: EffectiveVideoSource,
+  preview?: PreviewDescriptor
+): StudioSource => {
   const normalizedType = source.type.trim().toLowerCase();
   const kind = normalizedType === 'window'
     ? 'Window'
@@ -102,6 +142,12 @@ const toStudioSource = (source: EffectiveVideoSource): StudioSource => {
     armed: source.enabled,
     solo: false,
     label: source.name,
+    previewId: preview?.id,
+    previewState: preview?.state,
+    previewReason: preview?.reason,
+    previewUrl: preview && preview.state !== 'failed' && preview.state !== 'finished'
+      ? previewStreamUrl(preview.id)
+      : undefined,
   };
 };
 
@@ -118,28 +164,47 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const normalizedConfig = useAppSelector(selectNormalizedConfig);
   const normalizeWarnings = useAppSelector(selectNormalizeWarnings);
   const normalizeErrors = useAppSelector(selectNormalizeErrors);
+  const previewsById = useAppSelector(selectPreviewsById);
+  const ownedPreviewIdBySourceId = useAppSelector(selectOwnedPreviewIdBySourceId);
   const [now, setNow] = useState(() => Date.now());
+  const ownedPreviewIdBySourceIdRef = useRef<Record<string, string>>({});
+  const pendingPreviewEnsuresRef = useRef<Set<string>>(new Set());
+  const pendingPreviewReleasesRef = useRef<Map<string, string>>(new Map());
+  const { data: healthData } = useGetHealthQuery();
   const { data: currentSessionData } = useGetCurrentSessionQuery();
   const [startRecording, startRecordingState] = useStartRecordingMutation();
   const [stopRecording, stopRecordingState] = useStopRecordingMutation();
   const [compileSetup] = useCompileSetupMutation();
   const [normalizeSetup] = useNormalizeSetupMutation();
+  const [ensurePreview] = useEnsurePreviewMutation();
+  const [releasePreview] = useReleasePreviewMutation();
 
   const isRecording = session.active;
   const isPaused = false;
   const diskPercent = 8;
+  const previewLimit = healthData?.previewLimit || DEFAULT_PREVIEW_LIMIT;
   const transportBusy =
     startRecordingState.isLoading ||
     stopRecordingState.isLoading ||
     session.state === 'starting' ||
     session.state === 'stopping';
   const sources = useMemo(
-    () => normalizedConfig?.videoSources.map(toStudioSource) ?? [],
-    [normalizedConfig]
+    () => normalizedConfig?.videoSources.map((source) => {
+      const previewId = ownedPreviewIdBySourceId[source.id];
+      const preview = previewId ? previewsById[previewId] : undefined;
+      return toStudioSource(source, preview);
+    }) ?? [],
+    [normalizedConfig, ownedPreviewIdBySourceId, previewsById]
   );
   const armedSources = useMemo(
     () => sources.filter((source) => source.armed),
     [sources]
+  );
+  const desiredPreviewSourceIds = useMemo(
+    () => activeTab === 'studio'
+      ? sources.slice(0, previewLimit).map((source) => source.sourceId)
+      : [],
+    [activeTab, previewLimit, sources]
   );
   const editorWarnings = useMemo(
     () => [...normalizeWarnings, ...compileWarnings],
@@ -202,6 +267,98 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       window.clearTimeout(timeoutId);
     };
   }, [dispatch, dslText, normalizeSetup]);
+
+  useEffect(() => {
+    ownedPreviewIdBySourceIdRef.current = ownedPreviewIdBySourceId;
+  }, [ownedPreviewIdBySourceId]);
+
+  useEffect(() => {
+    const desired = new Set(desiredPreviewSourceIds);
+
+    for (const sourceId of desired) {
+      if (
+        ownedPreviewIdBySourceId[sourceId] ||
+        pendingPreviewEnsuresRef.current.has(sourceId)
+      ) {
+        continue;
+      }
+
+      pendingPreviewEnsuresRef.current.add(sourceId);
+      void (async () => {
+        try {
+          const response = await ensurePreview({
+            dsl: dslText,
+            sourceId,
+          }).unwrap();
+          if (response.preview) {
+            dispatch(upsertPreview(response.preview));
+            dispatch(trackOwnedPreview({
+              sourceId,
+              previewId: response.preview.id,
+            }));
+          }
+        } catch (error) {
+          dispatch(addLog(create(ProcessLogSchema, {
+            timestamp: new Date().toISOString(),
+            processLabel: 'ui.preview',
+            stream: 'stderr',
+            message: `failed to ensure preview for ${sourceId}: ${errorMessageFromUnknown(error)}`,
+          })));
+        } finally {
+          pendingPreviewEnsuresRef.current.delete(sourceId);
+        }
+      })();
+    }
+
+    for (const [sourceId, previewId] of Object.entries(ownedPreviewIdBySourceId)) {
+      if (
+        desired.has(sourceId) ||
+        pendingPreviewReleasesRef.current.has(sourceId)
+      ) {
+        continue;
+      }
+
+      pendingPreviewReleasesRef.current.set(sourceId, previewId);
+      void (async () => {
+        try {
+          const response = await releasePreview({ previewId }).unwrap();
+          if (response.preview) {
+            dispatch(upsertPreview(response.preview));
+          }
+          dispatch(clearOwnedPreview({ sourceId }));
+        } catch (error) {
+          if (apiErrorCodeFromUnknown(error) === 'preview_not_found') {
+            dispatch(clearOwnedPreview({ sourceId }));
+            return;
+          }
+
+          dispatch(addLog(create(ProcessLogSchema, {
+            timestamp: new Date().toISOString(),
+            processLabel: 'ui.preview',
+            stream: 'stderr',
+            message: `failed to release preview ${previewId}: ${errorMessageFromUnknown(error)}`,
+          })));
+        } finally {
+          pendingPreviewReleasesRef.current.delete(sourceId);
+        }
+      })();
+    }
+  }, [
+    desiredPreviewSourceIds,
+    dispatch,
+    dslText,
+    ensurePreview,
+    ownedPreviewIdBySourceId,
+    releasePreview,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      for (const previewId of Object.values(ownedPreviewIdBySourceIdRef.current)) {
+        void releasePreview({ previewId });
+      }
+    };
+  }, [releasePreview]);
 
   const elapsed = useMemo(() => {
     const startedAt = parseTimestamp(session.startedAt);
