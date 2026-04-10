@@ -177,6 +177,66 @@ func (m *RecordingManager) Stop() recordingSessionState {
 	return m.Current()
 }
 
+func (m *RecordingManager) Shutdown(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	m.mu.RLock()
+	current := m.current
+	var snapshot recordingSessionState
+	if current != nil {
+		snapshot = cloneRecordingState(current.state)
+	}
+	m.mu.RUnlock()
+
+	if current == nil {
+		log.Info().
+			Str("event", "recording.shutdown.noop").
+			Msg("recording manager shutdown requested with no session")
+		return nil
+	}
+
+	log.Info().
+		Str("event", "recording.shutdown.begin").
+		Str("session_id", snapshot.SessionID).
+		Str("state", snapshot.State).
+		Bool("active", snapshot.Active).
+		Msg("recording manager shutdown starting")
+
+	if snapshot.Active {
+		current.cancel()
+		log.Info().
+			Str("event", "recording.shutdown.cancel").
+			Str("session_id", snapshot.SessionID).
+			Msg("recording manager requested session cancellation")
+	}
+
+	if current.done == nil {
+		log.Info().
+			Str("event", "recording.shutdown.done").
+			Str("session_id", snapshot.SessionID).
+			Msg("recording manager shutdown finished without wait")
+		return nil
+	}
+
+	select {
+	case <-current.done:
+		log.Info().
+			Str("event", "recording.shutdown.done").
+			Str("session_id", snapshot.SessionID).
+			Msg("recording manager shutdown finished")
+		return nil
+	case <-ctx.Done():
+		log.Error().
+			Str("event", "recording.shutdown.timeout").
+			Str("session_id", snapshot.SessionID).
+			Err(ctx.Err()).
+			Msg("recording manager shutdown timed out")
+		return ctx.Err()
+	}
+}
+
 func (m *RecordingManager) applyRunEvent(sessionID string, event recording.RunEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -232,6 +233,97 @@ func (m *PreviewManager) Release(previewID string) (previewSnapshot, error) {
 		Msg("preview release handled")
 	m.publishPreviewState(snapshot)
 	return snapshot, nil
+}
+
+func (m *PreviewManager) Shutdown(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	type shutdownTarget struct {
+		id       string
+		sourceID string
+		cancel   context.CancelFunc
+		done     chan struct{}
+	}
+
+	m.mu.Lock()
+	targets := make([]shutdownTarget, 0, len(m.byID))
+	snapshots := make([]previewSnapshot, 0, len(m.byID))
+	for _, preview := range m.byID {
+		if preview.state != "finished" && preview.state != "failed" {
+			preview.state = "stopping"
+			if preview.reason == "" {
+				preview.reason = "shutdown requested"
+			}
+		}
+		targets = append(targets, shutdownTarget{
+			id:       preview.id,
+			sourceID: preview.source.ID,
+			cancel:   preview.cancel,
+			done:     preview.done,
+		})
+		snapshots = append(snapshots, snapshotPreview(preview))
+	}
+	m.mu.Unlock()
+
+	if len(targets) == 0 {
+		log.Info().
+			Str("event", "preview.shutdown.noop").
+			Msg("preview manager shutdown requested with no active previews")
+		return nil
+	}
+
+	log.Info().
+		Str("event", "preview.shutdown.begin").
+		Int("preview_count", len(targets)).
+		Msg("preview manager shutdown starting")
+
+	for _, snapshot := range snapshots {
+		m.publishPreviewState(snapshot)
+	}
+	for _, target := range targets {
+		log.Info().
+			Str("event", "preview.shutdown.cancel").
+			Str("preview_id", target.id).
+			Str("source_id", target.sourceID).
+			Msg("preview manager requested preview cancellation")
+		if target.cancel != nil {
+			target.cancel()
+		}
+	}
+
+	for i, target := range targets {
+		if target.done == nil {
+			continue
+		}
+		select {
+		case <-target.done:
+			log.Info().
+				Str("event", "preview.shutdown.wait.done").
+				Str("preview_id", target.id).
+				Str("source_id", target.sourceID).
+				Int("remaining", len(targets)-i-1).
+				Msg("preview shutdown wait completed")
+		case <-ctx.Done():
+			pending := []string{target.id}
+			for _, remaining := range targets[i+1:] {
+				pending = append(pending, remaining.id)
+			}
+			log.Error().
+				Str("event", "preview.shutdown.timeout").
+				Strs("pending_previews", pending).
+				Err(ctx.Err()).
+				Msg("preview manager shutdown timed out")
+			return fmt.Errorf("preview shutdown timed out waiting for %v: %w", pending, ctx.Err())
+		}
+	}
+
+	log.Info().
+		Str("event", "preview.shutdown.done").
+		Int("preview_count", len(targets)).
+		Msg("preview manager shutdown finished")
+	return nil
 }
 
 func (m *PreviewManager) List() []previewSnapshot {
