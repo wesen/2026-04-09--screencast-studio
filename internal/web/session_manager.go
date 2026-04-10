@@ -43,15 +43,16 @@ type managedRecording struct {
 }
 
 type RecordingManager struct {
-	app       ApplicationService
-	publish   func(ServerEvent)
-	parentCtx context.Context
+	app         ApplicationService
+	afterFinish func(recordingSessionState)
+	publish     func(ServerEvent)
+	parentCtx   context.Context
 
 	mu      sync.RWMutex
 	current *managedRecording
 }
 
-func NewRecordingManager(parentCtx context.Context, application ApplicationService, publish func(ServerEvent)) *RecordingManager {
+func NewRecordingManager(parentCtx context.Context, application ApplicationService, publish func(ServerEvent), afterFinish func(recordingSessionState)) *RecordingManager {
 	if publish == nil {
 		publish = func(ServerEvent) {}
 	}
@@ -59,9 +60,10 @@ func NewRecordingManager(parentCtx context.Context, application ApplicationServi
 		parentCtx = context.Background()
 	}
 	return &RecordingManager{
-		app:       application,
-		publish:   publish,
-		parentCtx: parentCtx,
+		app:         application,
+		afterFinish: afterFinish,
+		publish:     publish,
+		parentCtx:   parentCtx,
 	}
 }
 
@@ -146,7 +148,10 @@ func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.D
 				m.applyRunEvent(plan.SessionID, event)
 			},
 		})
-		m.finish(plan.SessionID, summary, recordErr)
+		finishedState, ok := m.finish(plan.SessionID, summary, recordErr)
+		if ok && m.afterFinish != nil {
+			m.afterFinish(finishedState)
+		}
 		return nil
 	})
 
@@ -298,12 +303,12 @@ func (m *RecordingManager) applyRunEvent(sessionID string, event recording.RunEv
 	m.publishState(snapshot)
 }
 
-func (m *RecordingManager) finish(sessionID string, summary *app.RecordSummary, recordErr error) {
+func (m *RecordingManager) finish(sessionID string, summary *app.RecordSummary, recordErr error) (recordingSessionState, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.current == nil || m.current.state.SessionID != sessionID {
-		return
+		return recordingSessionState{}, false
 	}
 
 	if summary != nil {
@@ -341,6 +346,7 @@ func (m *RecordingManager) finish(sessionID string, summary *app.RecordSummary, 
 			Msg("recording session finished")
 	}
 	m.publishState(snapshot)
+	return snapshot, true
 }
 
 func (m *RecordingManager) publishState(state recordingSessionState) {

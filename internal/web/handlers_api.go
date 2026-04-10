@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 
+	"github.com/rs/zerolog/log"
 	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 )
 
@@ -86,18 +87,42 @@ func (s *Server) handleRecordingStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	current := s.recordings.Current()
+	if current.Active {
+		writeProtoJSON(w, http.StatusConflict, mapSessionEnvelope(current))
+		return
+	}
+
+	suspendedPreviews, err := s.previews.SuspendAll(r.Context(), "recording starting")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "preview_suspend_failed", err.Error())
+		return
+	}
+
 	state, err := s.recordings.Start(
 		[]byte(request.GetDsl()),
 		durationFromSeconds(int(request.GetGracePeriodSeconds())),
 		durationFromSeconds(int(request.GetMaxDurationSeconds())),
 	)
 	if err != nil {
+		if !suspendedPreviews.Empty() {
+			if restoreErr := s.previews.RestoreSuspended(s.runtimeContext(), []byte(request.GetDsl()), suspendedPreviews); restoreErr != nil {
+				log.Error().
+					Str("event", "recording.preview_handoff.restore.error").
+					Err(restoreErr).
+					Msg("failed to restore previews after recording start error")
+			}
+		}
 		if err == ErrRecordingAlreadyActive {
 			writeProtoJSON(w, http.StatusConflict, mapSessionEnvelope(state))
 			return
 		}
 		writeError(w, http.StatusBadRequest, "recording_start_failed", err.Error())
 		return
+	}
+
+	if !suspendedPreviews.Empty() {
+		s.storeRecordingPreviewHandoff(state.SessionID, []byte(request.GetDsl()), suspendedPreviews)
 	}
 
 	writeProtoJSON(w, http.StatusOK, mapSessionEnvelope(state))

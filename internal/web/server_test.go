@@ -26,8 +26,11 @@ import (
 type fakeApplication struct {
 	discoverySnapshot *discovery.Snapshot
 	normalizeConfig   *dsl.EffectiveConfig
+	normalizeErr      error
 	compilePlan       *dsl.CompiledPlan
+	compileErr        error
 	recordDelay       time.Duration
+	recordErr         error
 	recordStarted     chan struct{}
 }
 
@@ -48,10 +51,16 @@ func (f *fakeApplication) DiscoverySnapshot(ctx context.Context) (*discovery.Sna
 }
 
 func (f *fakeApplication) NormalizeDSL(ctx context.Context, body []byte) (*dsl.EffectiveConfig, error) {
+	if f.normalizeErr != nil {
+		return nil, f.normalizeErr
+	}
 	return f.normalizeConfig, nil
 }
 
 func (f *fakeApplication) CompileDSL(ctx context.Context, body []byte) (*dsl.CompiledPlan, error) {
+	if f.compileErr != nil {
+		return nil, f.compileErr
+	}
 	return f.compilePlan, nil
 }
 
@@ -80,6 +89,9 @@ func (f *fakeApplication) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan
 	select {
 	case <-ctx.Done():
 	case <-time.After(f.recordDelay):
+	}
+	if f.recordErr != nil {
+		return nil, f.recordErr
 	}
 	finishedAt := time.Now()
 	if options.EventSink != nil {
@@ -416,6 +428,146 @@ func TestPreviewMJPEGStream(t *testing.T) {
 	streamBody, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(streamBody), "--frame") {
 		t.Fatalf("expected mjpeg boundary in body, got %q", string(streamBody))
+	}
+}
+
+func TestRecordingStartSuspendsAndRestoresPreviews(t *testing.T) {
+	t.Parallel()
+
+	fakeApp := &fakeApplication{
+		normalizeConfig: &dsl.EffectiveConfig{
+			Schema:               dsl.SchemaVersion,
+			SessionID:            "session-preview-recording",
+			DestinationTemplates: map[string]string{"default": "/tmp/out.mkv"},
+			VideoSources: []dsl.EffectiveVideoSource{
+				{
+					ID:                  "display-1",
+					Name:                "Display 1",
+					Type:                "display",
+					Enabled:             true,
+					Target:              dsl.VideoTarget{Display: ":0.0"},
+					Capture:             dsl.VideoCaptureSettings{FPS: 5},
+					Output:              dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
+					DestinationTemplate: "default",
+				},
+			},
+		},
+		compilePlan: &dsl.CompiledPlan{
+			SessionID: "session-preview-recording",
+			Outputs:   []dsl.PlannedOutput{{Kind: "video", Name: "Display", Path: "/tmp/display.mkv"}},
+		},
+		recordDelay:   10 * time.Second,
+		recordStarted: make(chan struct{}, 1),
+	}
+	runner := &fakePreviewRunner{started: make(chan struct{}, 4)}
+	server := NewServer(context.Background(), fakeApp, Config{PreviewLimit: 2})
+	server.previews = NewPreviewManager(context.Background(), fakeApp, server.events.Publish, 2, runner)
+
+	ensureReq := httptest.NewRequest(http.MethodPost, "/api/previews/ensure", bytes.NewBufferString(`{"dsl":"test","sourceId":"display-1"}`))
+	ensureRec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(ensureRec, ensureReq)
+	if ensureRec.Code != http.StatusOK {
+		t.Fatalf("ensure status = %d, want %d", ensureRec.Code, http.StatusOK)
+	}
+
+	select {
+	case <-runner.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for initial preview to start")
+	}
+
+	startReq := httptest.NewRequest(http.MethodPost, "/api/recordings/start", bytes.NewBufferString(`{"dsl":"test"}`))
+	startRec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(startRec, startReq)
+	if startRec.Code != http.StatusOK {
+		t.Fatalf("start status = %d, want %d", startRec.Code, http.StatusOK)
+	}
+
+	select {
+	case <-fakeApp.recordStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for recording to start")
+	}
+
+	if previews := server.previews.List(); len(previews) != 0 {
+		t.Fatalf("expected previews to be suspended during recording, got %+v", previews)
+	}
+
+	stopReq := httptest.NewRequest(http.MethodPost, "/api/recordings/stop", nil)
+	stopRec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(stopRec, stopReq)
+	if stopRec.Code != http.StatusOK {
+		t.Fatalf("stop status = %d, want %d", stopRec.Code, http.StatusOK)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if runner.runs.Load() >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected preview to be restored, runs=%d", runner.runs.Load())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestRecordingStartFailureRestoresSuspendedPreviews(t *testing.T) {
+	t.Parallel()
+
+	fakeApp := &fakeApplication{
+		normalizeConfig: &dsl.EffectiveConfig{
+			Schema:               dsl.SchemaVersion,
+			SessionID:            "session-preview-recording-failure",
+			DestinationTemplates: map[string]string{"default": "/tmp/out.mkv"},
+			VideoSources: []dsl.EffectiveVideoSource{
+				{
+					ID:                  "display-1",
+					Name:                "Display 1",
+					Type:                "display",
+					Enabled:             true,
+					Target:              dsl.VideoTarget{Display: ":0.0"},
+					Capture:             dsl.VideoCaptureSettings{FPS: 5},
+					Output:              dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
+					DestinationTemplate: "default",
+				},
+			},
+		},
+		compileErr: context.Canceled,
+	}
+	runner := &fakePreviewRunner{started: make(chan struct{}, 4)}
+	server := NewServer(context.Background(), fakeApp, Config{PreviewLimit: 2})
+	server.previews = NewPreviewManager(context.Background(), fakeApp, server.events.Publish, 2, runner)
+
+	ensureReq := httptest.NewRequest(http.MethodPost, "/api/previews/ensure", bytes.NewBufferString(`{"dsl":"test","sourceId":"display-1"}`))
+	ensureRec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(ensureRec, ensureReq)
+	if ensureRec.Code != http.StatusOK {
+		t.Fatalf("ensure status = %d, want %d", ensureRec.Code, http.StatusOK)
+	}
+
+	select {
+	case <-runner.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for initial preview to start")
+	}
+
+	startReq := httptest.NewRequest(http.MethodPost, "/api/recordings/start", bytes.NewBufferString(`{"dsl":"test"}`))
+	startRec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(startRec, startReq)
+	if startRec.Code != http.StatusBadRequest {
+		t.Fatalf("start status = %d, want %d", startRec.Code, http.StatusBadRequest)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if runner.runs.Load() >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected preview to be restored after start failure, runs=%d", runner.runs.Load())
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

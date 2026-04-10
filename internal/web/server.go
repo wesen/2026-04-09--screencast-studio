@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -27,9 +28,19 @@ type Server struct {
 	config     Config
 	mux        *http.ServeMux
 	events     *EventHub
+	parentCtx  context.Context
 	recordings *RecordingManager
 	previews   *PreviewManager
 	telemetry  *TelemetryManager
+
+	previewHandoffMu sync.Mutex
+	previewHandoff   *recordingPreviewHandoff
+}
+
+type recordingPreviewHandoff struct {
+	sessionID string
+	dslBody   []byte
+	plan      previewResumePlan
 }
 
 func NewServer(parentCtx context.Context, application ApplicationService, cfg Config) *Server {
@@ -48,20 +59,110 @@ func NewServer(parentCtx context.Context, application ApplicationService, cfg Co
 
 	events := NewEventHub()
 	server := &Server{
-		app:        application,
-		config:     cfg,
-		mux:        http.NewServeMux(),
-		events:     events,
-		recordings: NewRecordingManager(parentCtx, application, events.Publish),
-		previews:   NewPreviewManager(parentCtx, application, events.Publish, cfg.PreviewLimit, nil),
-		telemetry:  NewTelemetryManager(events.Publish),
+		app:       application,
+		config:    cfg,
+		mux:       http.NewServeMux(),
+		events:    events,
+		parentCtx: parentCtx,
+		telemetry: NewTelemetryManager(events.Publish),
 	}
+	server.recordings = NewRecordingManager(parentCtx, application, events.Publish, server.handleRecordingFinished)
+	server.previews = NewPreviewManager(parentCtx, application, events.Publish, cfg.PreviewLimit, nil)
 	server.registerRoutes()
 	return server
 }
 
 func (s *Server) Handler() http.Handler {
 	return withLogging(s.mux)
+}
+
+func (s *Server) runtimeContext() context.Context {
+	if s.parentCtx == nil {
+		return context.Background()
+	}
+	return s.parentCtx
+}
+
+func (s *Server) storeRecordingPreviewHandoff(sessionID string, dslBody []byte, plan previewResumePlan) {
+	if sessionID == "" || plan.Empty() {
+		return
+	}
+
+	s.previewHandoffMu.Lock()
+	s.previewHandoff = &recordingPreviewHandoff{
+		sessionID: sessionID,
+		dslBody:   append([]byte(nil), dslBody...),
+		plan: previewResumePlan{
+			SourceIDs: append([]string(nil), plan.SourceIDs...),
+		},
+	}
+	s.previewHandoffMu.Unlock()
+
+	log.Info().
+		Str("event", "recording.preview_handoff.stored").
+		Str("session_id", sessionID).
+		Strs("source_ids", plan.SourceIDs).
+		Msg("stored preview handoff for recording session")
+}
+
+func (s *Server) takeRecordingPreviewHandoff(sessionID string) *recordingPreviewHandoff {
+	s.previewHandoffMu.Lock()
+	defer s.previewHandoffMu.Unlock()
+
+	if s.previewHandoff == nil {
+		return nil
+	}
+	if sessionID != "" && s.previewHandoff.sessionID != sessionID {
+		return nil
+	}
+
+	handoff := s.previewHandoff
+	s.previewHandoff = nil
+	return handoff
+}
+
+func (s *Server) restoreRecordingPreviewHandoff(handoff *recordingPreviewHandoff) error {
+	if handoff == nil || handoff.plan.Empty() {
+		return nil
+	}
+	if s.runtimeContext().Err() != nil {
+		log.Info().
+			Str("event", "recording.preview_handoff.restore.skipped").
+			Str("session_id", handoff.sessionID).
+			Str("reason", s.runtimeContext().Err().Error()).
+			Msg("skipping preview restore because runtime context is canceled")
+		return nil
+	}
+
+	log.Info().
+		Str("event", "recording.preview_handoff.restore.begin").
+		Str("session_id", handoff.sessionID).
+		Strs("source_ids", handoff.plan.SourceIDs).
+		Msg("restoring suspended previews after recording")
+	if err := s.previews.RestoreSuspended(s.runtimeContext(), handoff.dslBody, handoff.plan); err != nil {
+		return err
+	}
+	log.Info().
+		Str("event", "recording.preview_handoff.restore.done").
+		Str("session_id", handoff.sessionID).
+		Strs("source_ids", handoff.plan.SourceIDs).
+		Msg("restored suspended previews after recording")
+	return nil
+}
+
+func (s *Server) handleRecordingFinished(state recordingSessionState) {
+	handoff := s.takeRecordingPreviewHandoff(state.SessionID)
+	if handoff == nil {
+		return
+	}
+
+	if err := s.restoreRecordingPreviewHandoff(handoff); err != nil {
+		log.Error().
+			Str("event", "recording.preview_handoff.restore.error").
+			Str("session_id", state.SessionID).
+			Err(err).
+			Msg("failed to restore suspended previews after recording")
+	}
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {
