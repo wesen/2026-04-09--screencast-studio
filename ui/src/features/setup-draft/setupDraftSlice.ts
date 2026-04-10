@@ -12,7 +12,15 @@ export interface SetupDraftState extends SetupDraftDocument {
 }
 
 const initialState: SetupDraftState = {
+  schema: '',
   sessionId: '',
+  destinationTemplates: {},
+  audioMixTemplate: '',
+  audioOutput: {
+    codec: 'pcm_s16le',
+    sampleRateHz: 48000,
+    channels: 2,
+  },
   videoSources: [],
   audioSources: [],
   hydratedFromSessionId: '',
@@ -29,7 +37,11 @@ const setupDraftSlice = createSlice({
   reducers: {
     hydrateFromEffectiveConfig(state, action: PayloadAction<EffectiveConfig>) {
       const next = effectiveConfigToSetupDraft(action.payload);
+      state.schema = next.schema;
       state.sessionId = next.sessionId;
+      state.destinationTemplates = next.destinationTemplates;
+      state.audioMixTemplate = next.audioMixTemplate;
+      state.audioOutput = next.audioOutput;
       state.videoSources = next.videoSources;
       state.audioSources = next.audioSources;
       state.hydratedFromSessionId = action.payload.sessionId;
@@ -119,6 +131,8 @@ export const setupDraftReducer = setupDraftSlice.reducer;
 
 export const selectSetupDraftSessionId = (state: { setupDraft: SetupDraftState }) =>
   state.setupDraft.sessionId;
+export const selectSetupDraftDocument = (state: { setupDraft: SetupDraftState }) =>
+  state.setupDraft;
 export const selectSetupDraftVideoSources = (state: { setupDraft: SetupDraftState }) =>
   state.setupDraft.videoSources;
 export const selectSetupDraftAudioSources = (state: { setupDraft: SetupDraftState }) =>

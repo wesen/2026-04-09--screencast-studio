@@ -1,6 +1,6 @@
 import { create } from '@bufbuild/protobuf';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useGetHealthQuery } from '@/api/discoveryApi';
+import { useGetDiscoveryQuery, useGetHealthQuery } from '@/api/discoveryApi';
 import {
   useEnsurePreviewMutation,
   useReleasePreviewMutation,
@@ -54,7 +54,19 @@ import {
   selectNormalizeErrors,
   selectNormalizeWarnings,
 } from '@/features/setup/setupSlice';
-import { hydrateFromEffectiveConfig } from '@/features/setup-draft/setupDraftSlice';
+import {
+  createCameraSourceDraft,
+  createDisplaySourceDraft,
+  createRegionSourceDraft,
+  createWindowSourceDraft,
+  renderSetupDraftAsDsl,
+  type RegionPreset,
+} from '@/features/setup-draft/conversion';
+import {
+  addVideoSource,
+  hydrateFromEffectiveConfig,
+  selectSetupDraftDocument,
+} from '@/features/setup-draft/setupDraftSlice';
 import {
   clearOwnedPreview,
   selectOwnedPreviewIdBySourceId,
@@ -62,7 +74,7 @@ import {
   trackOwnedPreview,
   upsertPreview,
 } from '@/features/previews/previewSlice';
-import { MenuBar, SourceGrid, OutputPanel, MicPanel, StatusPanel } from '@/components/studio';
+import { MenuBar, SourceGrid, OutputPanel, MicPanel, SourcePicker, StatusPanel } from '@/components/studio';
 import { LogPanel } from '@/components/log-panel';
 import { DSLEditor } from '@/components/dsl-editor';
 import { Btn } from '@/components/primitives/Btn';
@@ -159,6 +171,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const wsConnected = useAppSelector(selectWsConnected);
   const activeTab = useAppSelector(selectActiveTab);
   const dslText = useAppSelector(selectDslText);
+  const setupDraft = useAppSelector(selectSetupDraftDocument);
   const compileWarnings = useAppSelector(selectCompileWarnings);
   const compileErrors = useAppSelector(selectCompileErrors);
   const isCompiling = useAppSelector(selectIsCompiling);
@@ -172,6 +185,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const pendingPreviewEnsuresRef = useRef<Set<string>>(new Set());
   const pendingPreviewReleasesRef = useRef<Map<string, string>>(new Map());
   const { data: healthData } = useGetHealthQuery();
+  const { data: discoveryData } = useGetDiscoveryQuery();
   const { data: currentSessionData } = useGetCurrentSessionQuery();
   const [startRecording, startRecordingState] = useStartRecordingMutation();
   const [stopRecording, stopRecordingState] = useStopRecordingMutation();
@@ -179,6 +193,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const [normalizeSetup] = useNormalizeSetupMutation();
   const [ensurePreview] = useEnsurePreviewMutation();
   const [releasePreview] = useReleasePreviewMutation();
+  const [sourcePickerKind, setSourcePickerKind] = useState<StudioSource['kind'] | null>(null);
 
   const isRecording = session.active;
   const isPaused = false;
@@ -431,6 +446,22 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     })();
   };
 
+  const applyAddedSource = (
+    source: ReturnType<typeof createDisplaySourceDraft>
+  ) => {
+    const nextDraft = {
+      ...setupDraft,
+      videoSources: [...setupDraft.videoSources, source],
+    };
+    dispatch(addVideoSource(source));
+    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+    setSourcePickerKind(null);
+  };
+
+  const displays = discoveryData?.displays ?? [];
+  const windows = discoveryData?.windows ?? [];
+  const cameras = discoveryData?.cameras ?? [];
+
   return (
     <div className={className} style={{ minHeight: '100vh' }}>
       <MenuBar
@@ -469,7 +500,30 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
               sources={sources}
               isRecording={isRecording}
               editable={false}
+              onAdd={(kind) => setSourcePickerKind(kind)}
             />
+
+            {sourcePickerKind && (
+              <SourcePicker
+                kind={sourcePickerKind}
+                displays={displays}
+                windows={windows}
+                cameras={cameras}
+                onClose={() => setSourcePickerKind(null)}
+                onPickDisplay={(display) => {
+                  applyAddedSource(createDisplaySourceDraft(display, setupDraft));
+                }}
+                onPickWindow={(window) => {
+                  applyAddedSource(createWindowSourceDraft(window, setupDraft));
+                }}
+                onPickCamera={(camera) => {
+                  applyAddedSource(createCameraSourceDraft(camera, setupDraft));
+                }}
+                onPickRegion={(display, preset: RegionPreset) => {
+                  applyAddedSource(createRegionSourceDraft(display, preset, setupDraft));
+                }}
+              />
+            )}
 
             <div className="studio-content-row">
               <OutputPanel

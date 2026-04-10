@@ -76,8 +76,18 @@ export interface SetupDraftAudioSource {
   denoise: boolean;
 }
 
+export interface SetupDraftAudioOutput {
+  codec: string;
+  sampleRateHz: number;
+  channels: number;
+}
+
 export interface SetupDraftDocument {
+  schema: string;
   sessionId: string;
+  destinationTemplates: Record<string, string>;
+  audioMixTemplate: string;
+  audioOutput: SetupDraftAudioOutput;
   videoSources: SetupDraftVideoSource[];
   audioSources: SetupDraftAudioSource[];
 }

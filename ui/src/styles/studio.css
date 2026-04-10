@@ -400,6 +400,41 @@
   padding: 8px;
 }
 
+.studio-source-picker {
+  margin-top: 8px;
+}
+
+.studio-source-picker__list,
+.studio-source-picker__regions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.studio-source-picker__empty {
+  font-size: 10px;
+  color: var(--studio-dark);
+  padding: 4px 2px;
+}
+
+.studio-source-picker__region-group {
+  border: 1px dashed var(--studio-mid);
+  border-radius: var(--studio-border-radius-sm);
+  padding: 6px;
+}
+
+.studio-source-picker__region-title {
+  font-size: 10px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.studio-source-picker__region-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 /* ── Transport Controls ── */
 .studio-transport {
   margin-top: 8px;

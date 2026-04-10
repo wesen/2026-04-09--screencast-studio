@@ -38,13 +38,13 @@ Acceptance criteria:
 
 ## Phase 3: Discovery-Driven Source Creation
 
-- [ ] Add a source-picker flow that uses backend discovery data.
-- [ ] Let the user add displays, windows, cameras, and regions from actual discovered resources.
-- [ ] Define how region creation works:
+- [x] Add a source-picker flow that uses backend discovery data.
+- [x] Let the user add displays, windows, cameras, and regions from actual discovered resources.
+- [x] Define how region creation works:
   - choose a display
   - choose preset region
   - or input/edit a custom rectangle
-- [ ] Make the “Add Source” control real in the mounted app.
+- [x] Make the “Add Source” control real in the mounted app.
 
 Acceptance criteria:
 
@@ -124,7 +124,7 @@ Acceptance criteria:
 ## Suggested Commit Boundaries
 
 - [x] Commit 1: structured setup draft model and conversion rules
-- [ ] Commit 2: source-picker and source creation flow
+- [x] Commit 2: source-picker and source creation flow
 - [ ] Commit 3: source editing, reorder, and removal
 - [ ] Commit 4: structured/raw DSL synchronization and validation
 - [ ] Commit 5: preview integration adjustments
@@ -133,3 +133,4 @@ Acceptance criteria:
 ## Progress Notes
 
 - 2026-04-09: Completed the initial audit and introduced the new `setup-draft` feature with explicit structured source types, reducer actions, and hydration from normalized backend config.
+- 2026-04-09: Added a mounted source-picker that uses discovery data for display, window, camera, and preset region creation, then renders the updated setup draft back into DSL text.

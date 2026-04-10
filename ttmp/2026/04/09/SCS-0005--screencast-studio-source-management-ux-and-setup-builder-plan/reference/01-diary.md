@@ -21,7 +21,7 @@ RelatedFiles:
       Note: Current app-level owner for structured source management work
 ExternalSources: []
 Summary: Chronological record of creating the source-management and setup-builder follow-on ticket and implementing it slice by slice.
-LastUpdated: 2026-04-09T21:55:00-04:00
+LastUpdated: 2026-04-09T22:15:00-04:00
 WhatFor: Preserve why the source-management work was split into its own ticket and what it should cover.
 WhenToUse: Read when starting implementation or reviewing the intended scope of the structured source builder.
 ---
@@ -153,3 +153,97 @@ docmgr doctor --ticket SCS-0005 --stale-after 30
 ### Next step
 
 The next slice should make the builder visible by wiring discovery-backed source creation into the mounted Studio page and using the draft state as the owner of new sources.
+
+## Step 3: Add Discovery-Backed Source Creation In The Mounted App
+
+The next slice turned the source builder from architecture into behavior. The mounted `StudioPage` now has a real add-source flow backed by discovery data and the new setup-draft state.
+
+### What I implemented
+
+- Extended the setup-draft document so it carries the config-level fields needed to render canonical DSL:
+  - schema
+  - destination templates
+  - audio mix template
+  - audio output settings
+- Added draft-rendering logic that emits full DSL from the structured setup document.
+- Added source-factory helpers for:
+  - display sources
+  - window sources
+  - camera sources
+  - region sources using preset rectangles
+- Added a new `SourcePicker` component in `ui/src/components/studio/SourcePicker.tsx`.
+- Changed `SourceGrid` so the mounted page can expose `Add Source` without forcing all source cards into edit mode yet.
+- Wired `StudioPage` to:
+  - fetch discovery data
+  - open the picker from the mounted source grid
+  - create a draft source from the chosen resource
+  - append that source to the setup draft
+  - render the next DSL text
+  - feed that DSL back into the existing normalize pipeline
+
+### Why this approach
+
+I deliberately reused the existing normalize path instead of inventing a second client-side source-of-truth for execution. That keeps:
+
+- backend normalization
+- preview leasing
+- compile behavior
+- raw DSL visibility
+
+on the same path they already use today. The structured builder mutates the setup document, but the canonical runtime path still flows through DSL and backend normalization.
+
+### Region behavior in this slice
+
+For regions, the picker currently supports preset rectangles per discovered display:
+
+- full display
+- top half
+- bottom half
+- left half
+- right half
+
+This is enough to make the mounted app meaningfully useful before the dedicated region-rectangle editor lands in the later editing slice.
+
+### Important limitation recorded here
+
+The current backend runtime still treats `target.display` as an X11 display string, not a monitor identifier. That means the new display-source picker currently uses discovery data for naming and selection flow, but still emits `:0.0` as the underlying display target. Region sources are more precise because they render absolute rectangles from discovered monitor geometry.
+
+That limitation should be revisited later, but it does not block the source-builder flow from becoming useful now.
+
+### Smoke validation
+
+I ran a live smoke test against the real server:
+
+```bash
+tmux new-session -d -s scs-scs0005-smoke 'cd /home/manuel/code/wesen/2026-04-09--screencast-studio && go run ./cmd/screencast-studio serve --addr :18080 --static-dir ui/dist'
+```
+
+Then, in the browser:
+
+- opened the mounted Studio page
+- clicked `Add Source`
+- chose `Window`
+- selected a discovered window
+- switched to `Raw DSL`
+
+Observed result:
+
+- the header changed from `1 source armed` to `2 sources armed`
+- the raw DSL contained a second `video_sources` entry with:
+  - `type: "window"`
+  - `window_id: "0x..."`
+  - `destination_template: "per_source"`
+
+That confirms the mounted source-creation flow now drives the real normalized setup path.
+
+### Validation commands
+
+```bash
+pnpm --dir ui build
+pnpm --dir ui lint
+docmgr doctor --ticket SCS-0005 --stale-after 30
+```
+
+### Next step
+
+The next slice should make existing source cards editable for rename/enable/remove/reorder and keep the structured setup + DSL text coherent when those edits happen.

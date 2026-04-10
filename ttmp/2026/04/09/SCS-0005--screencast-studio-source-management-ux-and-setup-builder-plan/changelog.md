@@ -31,3 +31,22 @@ Implemented the first source-management foundation slice:
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/setupDraftSlice.ts — Reducer and selectors for source-management state
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/app/store.ts — Store registration for the new slice
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Draft hydration from normalized config
+
+## 2026-04-09
+
+Implemented the discovery-backed source-creation slice:
+
+- extended the setup-draft document so it can render full DSL
+- added source-factory helpers for display/window/camera/region creation
+- added a mounted `SourcePicker` flow driven by discovery data
+- wired `StudioPage` to append selected sources and rewrite DSL text through the existing normalize path
+- confirmed in a live smoke test that selecting a discovered window creates a new `window` source in raw DSL
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/conversion.ts — DSL rendering plus source factory helpers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/types.ts — Expanded setup document with config-level fields
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/setupDraftSlice.ts — Expanded draft state selectors
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourcePicker.tsx — New mounted source-picker component
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourceGrid.tsx — Add-source affordance now available without full edit mode
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Discovery-backed source creation orchestration

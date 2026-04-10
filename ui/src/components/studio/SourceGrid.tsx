@@ -41,7 +41,7 @@ export const SourceGrid: React.FC<SourceGridProps> = ({
             onChangeScene={onChangeScene ? (scene) => onChangeScene(source.id, scene) : undefined}
           />
         ))}
-        {editable && onAdd ? <AddSourceButton onAdd={onAdd} /> : null}
+        {onAdd ? <AddSourceButton onAdd={onAdd} /> : null}
       </div>
     </Win>
   );
