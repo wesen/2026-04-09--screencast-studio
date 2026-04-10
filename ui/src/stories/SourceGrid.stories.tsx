@@ -20,7 +20,6 @@ const createSource = (
   kind: 'Display',
   scene: 'Desktop 1',
   armed: true,
-  solo: false,
   label: 'Display 1',
   ...overrides,
 });

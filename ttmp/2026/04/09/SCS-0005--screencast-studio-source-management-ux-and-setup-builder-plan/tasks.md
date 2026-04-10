@@ -62,7 +62,7 @@ Acceptance criteria:
   - enabled toggle
 - [x] Allow reordering sources.
 - [x] Allow removing sources.
-- [ ] Decide whether “solo” survives as a real feature or should be removed until it has backend meaning.
+- [x] Decide whether “solo” survives as a real feature or should be removed until it has backend meaning.
 
 Acceptance criteria:
 
@@ -135,3 +135,4 @@ Acceptance criteria:
 - 2026-04-09: Completed the initial audit and introduced the new `setup-draft` feature with explicit structured source types, reducer actions, and hydration from normalized backend config.
 - 2026-04-09: Added a mounted source-picker that uses discovery data for display, window, camera, and preset region creation, then renders the updated setup draft back into DSL text.
 - 2026-04-09: Replaced the fake scene selector on mounted source cards with real rename, enable/disable, remove, and reorder actions backed by the setup draft and DSL sync. Target re-selection is still pending.
+- 2026-04-09: Added real target editors for window sources, camera sources, and region rectangles/presets. Removed the dead `solo` concept from the mounted source model. Full per-monitor display selection remains blocked on a backend target-model change.

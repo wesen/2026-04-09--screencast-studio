@@ -290,7 +290,7 @@ export const createCameraSourceDraft = (
 
 export type RegionPreset = 'full' | 'top-half' | 'bottom-half' | 'left-half' | 'right-half';
 
-const presetRectForDisplay = (
+export const presetRectForDisplay = (
   display: DisplayDescriptor,
   preset: RegionPreset
 ): SetupDraftRect => {

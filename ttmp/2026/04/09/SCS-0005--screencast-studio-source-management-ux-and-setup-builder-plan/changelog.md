@@ -67,3 +67,21 @@ Implemented the mounted source-editing slice:
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourceGrid.tsx — Mounted grid now forwards reorder actions
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Draft-owned source edits and DSL synchronization
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/styles/studio.css — Input/detail styling for mounted source cards
+
+## 2026-04-09
+
+Implemented the target-editor cleanup slice:
+
+- added real target editors for window, camera, and region sources
+- added region preset buttons derived from discovered display geometry
+- removed the dead `solo` concept from the mounted source model and stories
+- made the display-source limitation explicit instead of pretending monitor selection works
+- confirmed in a live smoke test that changing a window source target updates both the source name and `window_id` in Raw DSL
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Target-specific editor rendering and source update flow
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/SourceCard.tsx — Generic card now renders injected editor content
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourceGrid.tsx — Source grid now forwards editor render content
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/conversion.ts — Region preset geometry helper export
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/styles/studio.css — Styling for the companion target editor

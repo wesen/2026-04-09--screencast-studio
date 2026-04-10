@@ -6,7 +6,6 @@ export interface StudioSource {
   kind: StudioSourceKind;
   scene: string;
   armed: boolean;
-  solo: boolean;
   label: string;
   detail?: string;
   previewId?: string;

@@ -13,7 +13,10 @@ import {
 import { useCompileSetupMutation, useNormalizeSetupMutation } from '@/api/setupApi';
 import type {
   ApiErrorResponse,
+  CameraDescriptor,
+  DisplayDescriptor,
   PreviewDescriptor,
+  WindowDescriptor,
 } from '@/api/types';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import type { StudioSource } from '@/components/source-card';
@@ -58,6 +61,7 @@ import {
   createDisplaySourceDraft,
   createRegionSourceDraft,
   createWindowSourceDraft,
+  presetRectForDisplay,
   renderSetupDraftAsDsl,
   type RegionPreset,
 } from '@/features/setup-draft/conversion';
@@ -66,9 +70,9 @@ import {
   hydrateFromEffectiveConfig,
   moveVideoSource,
   removeVideoSource,
-  replaceVideoSources,
   selectSetupDraftDocument,
   setVideoSourceEnabled,
+  updateVideoSource,
 } from '@/features/setup-draft/setupDraftSlice';
 import {
   clearOwnedPreview,
@@ -171,7 +175,6 @@ const toStudioSource = (
     kind,
     scene: source.name,
     armed: source.enabled,
-    solo: false,
     label: source.name,
     detail: describeSource(source),
     previewId: preview?.id,
@@ -465,11 +468,6 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     })();
   };
 
-  const applyDraft = (nextDraft: typeof setupDraft) => {
-    dispatch(replaceVideoSources(nextDraft.videoSources));
-    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
-  };
-
   const applyAddedSource = (source: ReturnType<typeof createDisplaySourceDraft>) => {
     const nextDraft = {
       ...setupDraft,
@@ -480,16 +478,26 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     setSourcePickerKind(null);
   };
 
-  const handleRenameSource = (sourceId: string, name: string) => {
+  const applyUpdatedSource = (updatedSource: SetupDraftVideoSource) => {
     const nextDraft = {
       ...setupDraft,
       videoSources: setupDraft.videoSources.map((source) => (
-        source.id === sourceId
-          ? { ...source, name }
-          : source
+        source.id === updatedSource.id ? updatedSource : source
       )),
     };
-    applyDraft(nextDraft);
+    dispatch(updateVideoSource(updatedSource));
+    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+  };
+
+  const handleRenameSource = (sourceId: string, name: string) => {
+    const source = setupDraft.videoSources.find((item) => item.id === sourceId);
+    if (!source) {
+      return;
+    }
+    applyUpdatedSource({
+      ...source,
+      name,
+    });
   };
 
   const handleToggleSourceEnabled = (sourceId: string) => {
@@ -542,6 +550,170 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const windows = discoveryData?.windows ?? [];
   const cameras = discoveryData?.cameras ?? [];
 
+  const renderTargetEditor = (studioSource: StudioSource): React.ReactNode => {
+    const source = setupDraft.videoSources.find((item) => item.id === studioSource.id);
+    if (!source) {
+      return null;
+    }
+
+    const selectClassName = 'studio-source-card__editor';
+    switch (source.kind) {
+      case 'window':
+        return (
+          <div className={selectClassName}>
+            <label>
+              Window
+              <select
+                value={source.target.windowId}
+                onChange={(event) => applyUpdatedSource({
+                  ...source,
+                  name: windows.find((window) => window.id === event.target.value)?.title || source.name,
+                  target: {
+                    windowId: event.target.value,
+                  },
+                })}
+              >
+                {windows.map((window: WindowDescriptor) => (
+                  <option key={window.id} value={window.id}>
+                    {window.title || window.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        );
+      case 'camera':
+        return (
+          <div className={selectClassName}>
+            <label>
+              Camera Device
+              <select
+                value={source.target.deviceId}
+                onChange={(event) => applyUpdatedSource({
+                  ...source,
+                  name: cameras.find((camera) => camera.device === event.target.value)?.label || source.name,
+                  target: {
+                    deviceId: event.target.value,
+                  },
+                })}
+              >
+                {cameras.map((camera: CameraDescriptor) => (
+                  <option key={camera.id} value={camera.device}>
+                    {camera.label || camera.device}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        );
+      case 'region':
+        return (
+          <div className={selectClassName}>
+            <div className="studio-source-card__editor-grid">
+              <label>
+                X
+                <input
+                  type="number"
+                  value={source.target.rect.x}
+                  onChange={(event) => applyUpdatedSource({
+                    ...source,
+                    target: {
+                      ...source.target,
+                      rect: {
+                        ...source.target.rect,
+                        x: Number(event.target.value) || 0,
+                      },
+                    },
+                  })}
+                />
+              </label>
+              <label>
+                Y
+                <input
+                  type="number"
+                  value={source.target.rect.y}
+                  onChange={(event) => applyUpdatedSource({
+                    ...source,
+                    target: {
+                      ...source.target,
+                      rect: {
+                        ...source.target.rect,
+                        y: Number(event.target.value) || 0,
+                      },
+                    },
+                  })}
+                />
+              </label>
+              <label>
+                Width
+                <input
+                  type="number"
+                  value={source.target.rect.w}
+                  onChange={(event) => applyUpdatedSource({
+                    ...source,
+                    target: {
+                      ...source.target,
+                      rect: {
+                        ...source.target.rect,
+                        w: Number(event.target.value) || 0,
+                      },
+                    },
+                  })}
+                />
+              </label>
+              <label>
+                Height
+                <input
+                  type="number"
+                  value={source.target.rect.h}
+                  onChange={(event) => applyUpdatedSource({
+                    ...source,
+                    target: {
+                      ...source.target,
+                      rect: {
+                        ...source.target.rect,
+                        h: Number(event.target.value) || 0,
+                      },
+                    },
+                  })}
+                />
+              </label>
+            </div>
+            <div className="studio-source-card__editor-note">
+              Presets from discovered displays:
+            </div>
+            <div className="studio-source-card__editor-actions">
+              {displays.map((display: DisplayDescriptor) => (
+                <Btn
+                  key={display.id}
+                  onClick={() => applyUpdatedSource({
+                    ...source,
+                    target: {
+                      ...source.target,
+                      rect: presetRectForDisplay(display, 'full'),
+                    },
+                  })}
+                  style={{ fontSize: '9px', padding: '2px 6px' }}
+                >
+                  {display.name}
+                </Btn>
+              ))}
+            </div>
+          </div>
+        );
+      case 'display':
+      default:
+        return (
+          <div className={selectClassName}>
+            <div className="studio-source-card__editor-note">
+              Full-display sources still use the runtime&apos;s root X11 target (`:0.0`).
+              Per-monitor display selection needs a backend target-model change, so this source type is currently name/edit/reorder only.
+            </div>
+          </div>
+        );
+    }
+  };
+
   return (
     <div className={className} style={{ minHeight: '100vh' }}>
       <MenuBar
@@ -580,6 +752,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
               sources={sources}
               isRecording={isRecording}
               editable
+              renderEditor={renderTargetEditor}
               onRemove={handleRemoveSource}
               onToggleArmed={handleToggleSourceEnabled}
               onChangeScene={handleRenameSource}

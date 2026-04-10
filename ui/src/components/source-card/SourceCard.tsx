@@ -7,6 +7,7 @@ interface SourceCardProps {
   source: StudioSource;
   isRecording: boolean;
   editable?: boolean;
+  editor?: React.ReactNode;
   onRemove?: () => void;
   onToggleArmed?: () => void;
   onChangeScene?: (scene: string) => void;
@@ -26,6 +27,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
   source,
   isRecording,
   editable = true,
+  editor,
   onRemove,
   onToggleArmed,
   onChangeScene,
@@ -90,6 +92,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
               {source.detail ? (
                 <div className="studio-source-card__detail">{source.detail}</div>
               ) : null}
+              {editor}
               <div className="studio-source-card__toolbar">
                 <Btn
                   active={source.armed}

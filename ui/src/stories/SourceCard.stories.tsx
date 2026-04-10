@@ -17,7 +17,6 @@ const createSource = (overrides: Partial<StudioSource> = {}): StudioSource => ({
   kind: 'Display',
   scene: 'Desktop 1',
   armed: true,
-  solo: false,
   label: 'Display 1',
   ...overrides,
 });
@@ -41,14 +40,6 @@ export const DisplayArmed: Story = {
 export const DisplayDisarmed: Story = {
   args: {
     source: createSource({ kind: 'Display', label: 'Display 1', armed: false }),
-    isRecording: false,
-    ...defaultHandlers,
-  },
-};
-
-export const DisplaySolo: Story = {
-  args: {
-    source: createSource({ kind: 'Display', label: 'Display 1', solo: true }),
     isRecording: false,
     ...defaultHandlers,
   },

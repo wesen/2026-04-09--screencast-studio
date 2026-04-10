@@ -17,7 +17,6 @@ const createSource = (id: string, label: string, armed: boolean): StudioSource =
   kind: 'Display',
   scene: 'Desktop 1',
   armed,
-  solo: false,
   label,
 });
 

@@ -21,7 +21,7 @@ RelatedFiles:
       Note: Current app-level owner for structured source management work
 ExternalSources: []
 Summary: Chronological record of creating the source-management and setup-builder follow-on ticket and implementing it slice by slice.
-LastUpdated: 2026-04-09T22:20:00-04:00
+LastUpdated: 2026-04-09T21:47:00-04:00
 WhatFor: Preserve why the source-management work was split into its own ticket and what it should cover.
 WhenToUse: Read when starting implementation or reviewing the intended scope of the structured source builder.
 ---
@@ -312,3 +312,70 @@ The next slice should finish the remaining target-editing gaps:
 - choose a different window target
 - choose a different camera device
 - edit region rectangles directly
+
+## Step 5: Add Real Target Editors And Remove Dead Solo UI
+
+This slice finished most of the remaining source-editing work for v1 by adding target-specific editors where the backend/source model can support them today.
+
+### What changed
+
+- Added companion editor content inside mounted source cards rather than growing `SourceCard` into a giant source-type switch.
+- Implemented real target editing for:
+  - window sources via a discovered-window `<select>`
+  - camera sources via a discovered-camera `<select>`
+  - region sources via:
+    - direct numeric `x/y/w/h` editing
+    - preset buttons derived from discovered display geometry
+- Removed the dead `solo` field from the mounted source model and Storybook fixtures.
+
+### Why the companion-editor approach
+
+The mounted card still owns common controls:
+
+- name
+- enabled state
+- remove
+- reorder
+
+But the target editor is injected by `StudioPage`, which has the actual draft source plus the latest discovery payload. That keeps the generic card reusable and keeps the source-type branching near the real setup orchestration.
+
+### Important display-source limitation
+
+I did **not** fake per-monitor display selection for `display` sources.
+
+Current backend/runtime reality:
+
+- display sources still capture a root X11 display string like `:0.0`
+- discovered monitors are monitor descriptors, not a first-class runtime target in the DSL
+
+So the mounted editor now shows an explicit note for display sources instead of pretending monitor selection works. That is the correct product behavior until the backend target model changes.
+
+### Smoke validation
+
+I ran a live smoke test against the real server and verified the new window target editor:
+
+1. add a new window source from discovery
+2. use the inline `Window` selector on that source card
+3. switch to `Raw DSL`
+
+Observed result:
+
+- the source `name` changed to the newly selected window title
+- `target.window_id` changed to the selected discovered window ID
+
+That confirms the target editor writes through the structured setup and canonical DSL path.
+
+### Validation commands
+
+```bash
+pnpm --dir ui build
+pnpm --dir ui lint
+docmgr doctor --ticket SCS-0005 --stale-after 30
+```
+
+### Remaining work after this slice
+
+- decide where raw DSL should live in the finished product
+- add structured/raw conflict handling and unsupported-shape behavior
+- make previews react more clearly to source reconfiguration
+- add validation states and stronger smoke coverage

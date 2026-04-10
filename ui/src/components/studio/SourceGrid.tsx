@@ -7,6 +7,7 @@ interface SourceGridProps {
   sources: StudioSource[];
   isRecording: boolean;
   editable?: boolean;
+  renderEditor?: (source: StudioSource) => React.ReactNode;
   onRemove?: (id: string) => void;
   onToggleArmed?: (id: string) => void;
   onChangeScene?: (id: string, scene: string) => void;
@@ -20,6 +21,7 @@ export const SourceGrid: React.FC<SourceGridProps> = ({
   sources,
   isRecording,
   editable = true,
+  renderEditor,
   onRemove,
   onToggleArmed,
   onChangeScene,
@@ -37,6 +39,7 @@ export const SourceGrid: React.FC<SourceGridProps> = ({
             source={source}
             isRecording={isRecording}
             editable={editable}
+            editor={renderEditor?.(source)}
             onRemove={onRemove ? () => onRemove(source.id) : undefined}
             onToggleArmed={onToggleArmed ? () => onToggleArmed(source.id) : undefined}
             onChangeScene={onChangeScene ? (scene) => onChangeScene(source.id, scene) : undefined}
