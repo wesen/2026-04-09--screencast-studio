@@ -84,3 +84,96 @@ Create a small implementation guide and then implement, commit, keep a diary."
 
 ### Technical details
 - Ticket workspace: `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/10/SCS-0008--suspend-previews-during-recording-and-restore-after`
+
+## Step 2: Implement the backend preview handoff and verify it with tests
+
+I implemented the fix in the backend runtime instead of the UI. The preview manager now has explicit suspend and restore operations, the server stores one suspended-preview handoff per active recording session, and the recording manager invokes a post-finish callback so previews come back only after the recording session has really finished.
+
+That shape kept the bug fix small while still handling the full recording lifecycle. A failed start now restores previews immediately, and a successful run restores previews only after the recording manager finishes finalizing session state. This means the fix works both for manual stop and for natural recording completion without relying on frontend timing.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 1)
+
+**Assistant interpretation:** Implement the preview handoff with focused backend changes, verify the behavior with tests, commit the code, and record the exact outcome.
+
+**Inferred user intent:** Land a real fix for preview-versus-recording device contention while leaving behind an auditable implementation record.
+
+**Commit (code):** `4634a75` — `recording: hand off previews around sessions`
+
+### What I did
+- Added `PreviewManager.SuspendAll(...)` and `PreviewManager.RestoreSuspended(...)` in `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go`.
+- Added a recording post-finish hook in `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go`.
+- Added server-owned handoff storage and restore logic in `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`.
+- Updated `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go` so `/api/recordings/start` suspends previews first and restores them if recording start fails.
+- Added focused tests in `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/manager_shutdown_test.go` and `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`.
+- Ran:
+
+```bash
+gofmt -w internal/web/session_manager.go internal/web/preview_manager.go internal/web/server.go internal/web/handlers_api.go internal/web/manager_shutdown_test.go internal/web/server_test.go
+go test ./internal/web -count=1
+go test ./... -count=1
+```
+
+### Why
+- The server owns both preview and recording managers, so it is the right place to remember which previews need to be restored.
+- The recording manager is the correct place to know when a session is truly finished.
+- A UI-only fix would not reliably cover natural finish, failed starts, or server-side lifecycle edges.
+
+### What worked
+- The preview-manager suspend/restore abstraction was enough to express the handoff cleanly.
+- The recording post-finish hook let preview restore happen after session finalization instead of racing the stop request.
+- The focused tests caught the right lifecycle boundaries:
+  - suspend and restore in the preview manager,
+  - suspend before recording,
+  - restore after recording stop,
+  - restore after a failed recording start.
+
+### What didn't work
+- I briefly ran `gofmt` against the Markdown ticket files as well as the Go files. That failed immediately with errors like:
+
+```text
+ttmp/2026/04/10/SCS-0008--suspend-previews-during-recording-and-restore-after/README.md:1:1: illegal character U+0023 '#'
+ttmp/2026/04/10/SCS-0008--suspend-previews-during-recording-and-restore-after/index.md:1:1: expected 'package', found '--'
+```
+
+- The fix was simply to rerun `gofmt` on the actual Go files only.
+
+### What I learned
+- The existing manager split was already strong enough for this bug; the missing piece was explicit handoff state between managers.
+- Restoring previews from recording-finish callbacks is much cleaner than trying to infer completion from stop requests.
+- The preview ID remains stable for the same source signature, which helps the UI tolerate preview teardown and recreation.
+
+### What was tricky to build
+- The main tricky part was the boundary between request time and lifecycle completion time. Preview suspension has to happen before the start request launches recording, but preview restore has to happen only after the recording manager has fully finished the session. Those two phases live in different layers, so the implementation needed a narrow bridge rather than scattering logic across handlers and UI code.
+- Another tricky part was failed start behavior. Once previews are suspended, a compile/start error would otherwise leave the user with no previews. The final implementation restores suspended previews immediately on start failure to avoid that regression.
+
+### What warrants a second pair of eyes
+- Whether restoring previews from the original recording DSL is the right long-term behavior if a user edits the setup during a recording.
+- Whether future work should narrow the suspend behavior to camera previews only instead of all active previews.
+- Whether preview restore should eventually emit a stronger explicit event for UI ownership reconciliation, even though the current stable preview IDs already make the flow work.
+
+### What should be done in the future
+- Consider whether preview restore should use the latest normalized setup rather than the recording-start DSL if mid-recording setup edits become a supported workflow.
+- If preview/recording concurrency grows more complex, consider a shared capture/fanout design rather than repeated device handoff.
+
+### Code review instructions
+- Start with `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go` to see the new suspend-before-start flow.
+- Then read `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go` for handoff storage and restore on finish.
+- Then read `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go` for the actual suspend/restore operations.
+- Finish with `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go` and `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/manager_shutdown_test.go`.
+
+### Technical details
+- New core methods:
+  - `PreviewManager.SuspendAll(ctx, reason)`
+  - `PreviewManager.RestoreSuspended(ctx, dslBody, plan)`
+  - `Server.storeRecordingPreviewHandoff(...)`
+  - `Server.handleRecordingFinished(...)`
+- Validation results:
+
+```text
+ok  	github.com/wesen/2026-04-09--screencast-studio/internal/web	0.507s
+ok  	github.com/wesen/2026-04-09--screencast-studio/internal/web	0.505s
+ok  	github.com/wesen/2026-04-09--screencast-studio/pkg/dsl	0.003s
+ok  	github.com/wesen/2026-04-09--screencast-studio/pkg/recording	0.003s
+```
