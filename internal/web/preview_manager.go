@@ -47,17 +47,18 @@ type managedPreview struct {
 }
 
 type PreviewManager struct {
-	app     ApplicationService
-	publish func(ServerEvent)
-	limit   int
-	runner  PreviewRunner
+	app       ApplicationService
+	publish   func(ServerEvent)
+	parentCtx context.Context
+	limit     int
+	runner    PreviewRunner
 
 	mu          sync.RWMutex
 	byID        map[string]*managedPreview
 	bySignature map[string]*managedPreview
 }
 
-func NewPreviewManager(application ApplicationService, publish func(ServerEvent), limit int, runner PreviewRunner) *PreviewManager {
+func NewPreviewManager(parentCtx context.Context, application ApplicationService, publish func(ServerEvent), limit int, runner PreviewRunner) *PreviewManager {
 	if publish == nil {
 		publish = func(ServerEvent) {}
 	}
@@ -67,14 +68,25 @@ func NewPreviewManager(application ApplicationService, publish func(ServerEvent)
 	if runner == nil {
 		runner = FFmpegPreviewRunner{}
 	}
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
 	return &PreviewManager{
 		app:         application,
 		publish:     publish,
+		parentCtx:   parentCtx,
 		limit:       limit,
 		runner:      runner,
 		byID:        map[string]*managedPreview{},
 		bySignature: map[string]*managedPreview{},
 	}
+}
+
+func (m *PreviewManager) parentContext() context.Context {
+	if m.parentCtx == nil {
+		return context.Background()
+	}
+	return m.parentCtx
 }
 
 func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID string) (previewSnapshot, error) {
@@ -129,7 +141,7 @@ func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID st
 		return previewSnapshot{}, ErrPreviewLimitExceeded
 	}
 
-	previewCtx, cancel := context.WithCancel(context.Background())
+	previewCtx, cancel := context.WithCancel(m.parentContext())
 	preview := &managedPreview{
 		id:        "preview-" + signature[:12],
 		signature: signature,

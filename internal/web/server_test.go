@@ -118,7 +118,7 @@ func (f *fakePreviewRunner) Run(ctx context.Context, source dsl.EffectiveVideoSo
 func TestHealthz(t *testing.T) {
 	t.Parallel()
 
-	server := NewServer(&fakeApplication{}, Config{
+	server := NewServer(context.Background(), &fakeApplication{}, Config{
 		Addr:         ":0",
 		PreviewLimit: 7,
 	})
@@ -145,7 +145,7 @@ func TestHealthz(t *testing.T) {
 func TestDiscoveryEndpoint(t *testing.T) {
 	t.Parallel()
 
-	server := NewServer(&fakeApplication{
+	server := NewServer(context.Background(), &fakeApplication{
 		discoverySnapshot: &discovery.Snapshot{
 			Displays: []discovery.Display{{ID: "display-1", Name: "Primary"}},
 			Windows:  []discovery.Window{{ID: "0x01", Title: "Editor"}},
@@ -175,7 +175,7 @@ func TestDiscoveryEndpoint(t *testing.T) {
 func TestNormalizeAndCompileEndpoints(t *testing.T) {
 	t.Parallel()
 
-	server := NewServer(&fakeApplication{
+	server := NewServer(context.Background(), &fakeApplication{
 		normalizeConfig: &dsl.EffectiveConfig{
 			Schema:               dsl.SchemaVersion,
 			SessionID:            "session-1",
@@ -224,7 +224,7 @@ func TestRecordingLifecycleEndpoints(t *testing.T) {
 		recordDelay:   10 * time.Second,
 		recordStarted: make(chan struct{}, 1),
 	}
-	server := NewServer(fakeApp, Config{})
+	server := NewServer(context.Background(), fakeApp, Config{})
 
 	startReq := httptest.NewRequest(http.MethodPost, "/api/recordings/start", bytes.NewBufferString(`{"dsl":"test"}`))
 	startRec := httptest.NewRecorder()
@@ -310,8 +310,8 @@ func TestPreviewLifecycleEndpoints(t *testing.T) {
 		},
 	}
 	runner := &fakePreviewRunner{started: make(chan struct{}, 1)}
-	server := NewServer(fakeApp, Config{PreviewLimit: 2})
-	server.previews = NewPreviewManager(fakeApp, server.events.Publish, 2, runner)
+	server := NewServer(context.Background(), fakeApp, Config{PreviewLimit: 2})
+	server.previews = NewPreviewManager(context.Background(), fakeApp, server.events.Publish, 2, runner)
 
 	ensureReq := httptest.NewRequest(http.MethodPost, "/api/previews/ensure", bytes.NewBufferString(`{"dsl":"test","sourceId":"display-1"}`))
 	ensureRec := httptest.NewRecorder()
@@ -373,8 +373,8 @@ func TestPreviewMJPEGStream(t *testing.T) {
 		},
 	}
 	runner := &fakePreviewRunner{started: make(chan struct{}, 1)}
-	server := NewServer(fakeApp, Config{PreviewLimit: 2})
-	server.previews = NewPreviewManager(fakeApp, server.events.Publish, 2, runner)
+	server := NewServer(context.Background(), fakeApp, Config{PreviewLimit: 2})
+	server.previews = NewPreviewManager(context.Background(), fakeApp, server.events.Publish, 2, runner)
 
 	ts := httptest.NewServer(server.Handler())
 	defer ts.Close()
@@ -422,7 +422,7 @@ func TestPreviewMJPEGStream(t *testing.T) {
 func TestWebsocketEndpoint(t *testing.T) {
 	t.Parallel()
 
-	server := NewServer(&fakeApplication{
+	server := NewServer(context.Background(), &fakeApplication{
 		compilePlan: &dsl.CompiledPlan{
 			SessionID: "session-ws",
 			Outputs: []dsl.PlannedOutput{

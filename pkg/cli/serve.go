@@ -57,15 +57,15 @@ func (c *serveCommand) RunIntoGlazeProcessor(ctx context.Context, vals *values.V
 		return errors.Wrap(err, "decode serve settings")
 	}
 
-	server := web.NewServer(c.app, web.Config{
+	serverCtx, stopSignals := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+
+	server := web.NewServer(serverCtx, c.app, web.Config{
 		Addr:            settings.Addr,
 		StaticDir:       settings.StaticDir,
 		PreviewLimit:    settings.PreviewLimit,
 		ShutdownTimeout: durationSeconds(settings.ShutdownTimeout),
 	})
-
-	serverCtx, stopSignals := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
-	defer stopSignals()
 
 	return server.ListenAndServe(serverCtx)
 }

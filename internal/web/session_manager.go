@@ -43,21 +43,33 @@ type managedRecording struct {
 }
 
 type RecordingManager struct {
-	app     ApplicationService
-	publish func(ServerEvent)
+	app       ApplicationService
+	publish   func(ServerEvent)
+	parentCtx context.Context
 
 	mu      sync.RWMutex
 	current *managedRecording
 }
 
-func NewRecordingManager(application ApplicationService, publish func(ServerEvent)) *RecordingManager {
+func NewRecordingManager(parentCtx context.Context, application ApplicationService, publish func(ServerEvent)) *RecordingManager {
 	if publish == nil {
 		publish = func(ServerEvent) {}
 	}
-	return &RecordingManager{
-		app:     application,
-		publish: publish,
+	if parentCtx == nil {
+		parentCtx = context.Background()
 	}
+	return &RecordingManager{
+		app:       application,
+		publish:   publish,
+		parentCtx: parentCtx,
+	}
+}
+
+func (m *RecordingManager) parentContext() context.Context {
+	if m.parentCtx == nil {
+		return context.Background()
+	}
+	return m.parentCtx
 }
 
 func (m *RecordingManager) Current() recordingSessionState {
@@ -91,7 +103,7 @@ func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.D
 		return current, ErrRecordingAlreadyActive
 	}
 
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(m.parentContext())
 	current := &managedRecording{
 		cancel: cancel,
 		done:   make(chan struct{}),

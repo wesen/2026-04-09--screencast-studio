@@ -32,7 +32,7 @@ type Server struct {
 	telemetry  *TelemetryManager
 }
 
-func NewServer(application ApplicationService, cfg Config) *Server {
+func NewServer(parentCtx context.Context, application ApplicationService, cfg Config) *Server {
 	if cfg.Addr == "" {
 		cfg.Addr = ":8080"
 	}
@@ -42,6 +42,9 @@ func NewServer(application ApplicationService, cfg Config) *Server {
 	if cfg.ShutdownTimeout <= 0 {
 		cfg.ShutdownTimeout = 5 * time.Second
 	}
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
 
 	events := NewEventHub()
 	server := &Server{
@@ -49,8 +52,8 @@ func NewServer(application ApplicationService, cfg Config) *Server {
 		config:     cfg,
 		mux:        http.NewServeMux(),
 		events:     events,
-		recordings: NewRecordingManager(application, events.Publish),
-		previews:   NewPreviewManager(application, events.Publish, cfg.PreviewLimit, nil),
+		recordings: NewRecordingManager(parentCtx, application, events.Publish),
+		previews:   NewPreviewManager(parentCtx, application, events.Publish, cfg.PreviewLimit, nil),
 		telemetry:  NewTelemetryManager(events.Publish),
 	}
 	server.registerRoutes()
@@ -69,6 +72,11 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
+
+	log.Info().
+		Str("event", "runtime.context.bind").
+		Msg("recording and preview managers already bound to serve runtime context")
+
 	group.Go(func() error {
 		log.Info().
 			Str("event", "runtime.http.start").
