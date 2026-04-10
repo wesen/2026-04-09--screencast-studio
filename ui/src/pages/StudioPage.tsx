@@ -13,7 +13,6 @@ import {
 import { useCompileSetupMutation, useNormalizeSetupMutation } from '@/api/setupApi';
 import type {
   ApiErrorResponse,
-  EffectiveVideoSource,
   PreviewDescriptor,
 } from '@/api/types';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -65,7 +64,11 @@ import {
 import {
   addVideoSource,
   hydrateFromEffectiveConfig,
+  moveVideoSource,
+  removeVideoSource,
+  replaceVideoSources,
   selectSetupDraftDocument,
+  setVideoSourceEnabled,
 } from '@/features/setup-draft/setupDraftSlice';
 import {
   clearOwnedPreview,
@@ -79,6 +82,7 @@ import { LogPanel } from '@/components/log-panel';
 import { DSLEditor } from '@/components/dsl-editor';
 import { Btn } from '@/components/primitives/Btn';
 import { ProcessLogSchema } from '@/gen/proto/screencast/studio/v1/web_pb';
+import type { SetupDraftVideoSource } from '@/features/setup-draft/types';
 
 interface StudioPageProps {
   className?: string;
@@ -134,16 +138,30 @@ const previewStreamUrl = (previewId?: string): string | undefined => (
   previewId ? `/api/previews/${previewId}/mjpeg` : undefined
 );
 
+const describeSource = (source: SetupDraftVideoSource): string => {
+  switch (source.kind) {
+    case 'display':
+      return `X11 display ${source.target.displayId}`;
+    case 'window':
+      return `Window ${source.target.windowId}`;
+    case 'region':
+      return `${source.target.rect.w}x${source.target.rect.h} at ${source.target.rect.x},${source.target.rect.y}`;
+    case 'camera':
+      return `Device ${source.target.deviceId}`;
+    default:
+      return '';
+  }
+};
+
 const toStudioSource = (
-  source: EffectiveVideoSource,
+  source: SetupDraftVideoSource,
   preview?: PreviewDescriptor
 ): StudioSource => {
-  const normalizedType = source.type.trim().toLowerCase();
-  const kind = normalizedType === 'window'
+  const kind = source.kind === 'window'
     ? 'Window'
-    : normalizedType === 'region'
+    : source.kind === 'region'
       ? 'Region'
-      : normalizedType === 'camera'
+      : source.kind === 'camera'
         ? 'Camera'
         : 'Display';
 
@@ -155,6 +173,7 @@ const toStudioSource = (
     armed: source.enabled,
     solo: false,
     label: source.name,
+    detail: describeSource(source),
     previewId: preview?.id,
     previewState: preview?.state,
     previewReason: preview?.reason,
@@ -204,12 +223,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     session.state === 'starting' ||
     session.state === 'stopping';
   const sources = useMemo(
-    () => normalizedConfig?.videoSources.map((source) => {
+    () => setupDraft.videoSources.map((source) => {
       const previewId = ownedPreviewIdBySourceId[source.id];
       const preview = previewId ? previewsById[previewId] : undefined;
       return toStudioSource(source, preview);
-    }) ?? [],
-    [normalizedConfig, ownedPreviewIdBySourceId, previewsById]
+    }),
+    [ownedPreviewIdBySourceId, previewsById, setupDraft.videoSources]
   );
   const armedSources = useMemo(
     () => sources.filter((source) => source.armed),
@@ -446,9 +465,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     })();
   };
 
-  const applyAddedSource = (
-    source: ReturnType<typeof createDisplaySourceDraft>
-  ) => {
+  const applyDraft = (nextDraft: typeof setupDraft) => {
+    dispatch(replaceVideoSources(nextDraft.videoSources));
+    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+  };
+
+  const applyAddedSource = (source: ReturnType<typeof createDisplaySourceDraft>) => {
     const nextDraft = {
       ...setupDraft,
       videoSources: [...setupDraft.videoSources, source],
@@ -456,6 +478,64 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     dispatch(addVideoSource(source));
     dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
     setSourcePickerKind(null);
+  };
+
+  const handleRenameSource = (sourceId: string, name: string) => {
+    const nextDraft = {
+      ...setupDraft,
+      videoSources: setupDraft.videoSources.map((source) => (
+        source.id === sourceId
+          ? { ...source, name }
+          : source
+      )),
+    };
+    applyDraft(nextDraft);
+  };
+
+  const handleToggleSourceEnabled = (sourceId: string) => {
+    const source = setupDraft.videoSources.find((item) => item.id === sourceId);
+    if (!source) {
+      return;
+    }
+    const nextDraft = {
+      ...setupDraft,
+      videoSources: setupDraft.videoSources.map((item) => (
+        item.id === sourceId
+          ? { ...item, enabled: !item.enabled }
+          : item
+      )),
+    };
+    dispatch(setVideoSourceEnabled({ sourceId, enabled: !source.enabled }));
+    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+  };
+
+  const handleRemoveSource = (sourceId: string) => {
+    const nextDraft = {
+      ...setupDraft,
+      videoSources: setupDraft.videoSources.filter((source) => source.id !== sourceId),
+    };
+    dispatch(removeVideoSource(sourceId));
+    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+  };
+
+  const handleMoveSource = (sourceId: string, direction: 'up' | 'down') => {
+    const index = setupDraft.videoSources.findIndex((source) => source.id === sourceId);
+    if (index === -1) {
+      return;
+    }
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= setupDraft.videoSources.length) {
+      return;
+    }
+    const nextSources = [...setupDraft.videoSources];
+    const [source] = nextSources.splice(index, 1);
+    nextSources.splice(targetIndex, 0, source);
+    const nextDraft = {
+      ...setupDraft,
+      videoSources: nextSources,
+    };
+    dispatch(moveVideoSource({ sourceId, direction }));
+    dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
   };
 
   const displays = discoveryData?.displays ?? [];
@@ -499,7 +579,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
             <SourceGrid
               sources={sources}
               isRecording={isRecording}
-              editable={false}
+              editable
+              onRemove={handleRemoveSource}
+              onToggleArmed={handleToggleSourceEnabled}
+              onChangeScene={handleRenameSource}
+              onMoveUp={(sourceId) => handleMoveSource(sourceId, 'up')}
+              onMoveDown={(sourceId) => handleMoveSource(sourceId, 'down')}
               onAdd={(kind) => setSourcePickerKind(kind)}
             />
 

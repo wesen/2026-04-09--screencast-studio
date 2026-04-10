@@ -21,7 +21,7 @@ RelatedFiles:
       Note: Current app-level owner for structured source management work
 ExternalSources: []
 Summary: Chronological record of creating the source-management and setup-builder follow-on ticket and implementing it slice by slice.
-LastUpdated: 2026-04-09T22:15:00-04:00
+LastUpdated: 2026-04-09T22:20:00-04:00
 WhatFor: Preserve why the source-management work was split into its own ticket and what it should cover.
 WhenToUse: Read when starting implementation or reviewing the intended scope of the structured source builder.
 ---
@@ -247,3 +247,68 @@ docmgr doctor --ticket SCS-0005 --stale-after 30
 ### Next step
 
 The next slice should make existing source cards editable for rename/enable/remove/reorder and keep the structured setup + DSL text coherent when those edits happen.
+
+## Step 4: Make The Mounted Source Cards Actually Edit The Setup
+
+The third slice focused on the mounted source cards themselves. Before this change, the cards still exposed a fake scene selector that looked interactive but did not represent real source editing. I replaced that with controls that operate on the structured setup draft and immediately rewrite the canonical DSL.
+
+### What changed
+
+- The mounted source grid now renders from `setupDraft.videoSources` instead of only from `normalizedConfig.videoSources`.
+- `StudioPage` now treats the setup draft as the owner of:
+  - rename
+  - enable/disable
+  - remove
+  - reorder
+- After each edit, `StudioPage` renders the next DSL text and feeds it back into the existing normalize path.
+- `SourceCard` no longer uses the placeholder scene dropdown in the mounted product path.
+- `SourceCard` now shows:
+  - a text input for the source name
+  - a short target detail line
+  - enable/disable
+  - move up
+  - move down
+  - remove in the title bar
+
+### Important UI decision
+
+I kept the target-specific re-selection work out of this slice. The mounted cards now support honest editing for source identity and ordering, but they still do not yet let the user retarget:
+
+- display source target
+- window source target
+- camera device target
+- region rectangle
+
+That keeps this slice coherent while still removing the fake scene-selector behavior.
+
+### Smoke validation
+
+I ran another live smoke test against the real server and verified:
+
+- the mounted source card shows a real editable name field
+- editing the name updates the raw DSL after the normalize debounce
+
+Observed example:
+
+- source card name changed from `Full Desktop` to `Primary Desktop`
+- the Raw DSL tab then showed:
+  - `name: "Primary Desktop"`
+
+That confirms the mounted card edits are now writing through the same canonical path as the rest of the app.
+
+### Validation commands
+
+```bash
+pnpm --dir ui build
+pnpm --dir ui lint
+docmgr doctor --ticket SCS-0005 --stale-after 30
+```
+
+### Next step
+
+The next slice should finish the remaining target-editing gaps:
+
+- choose a different discovered display target
+- choose a different window target
+- choose a different camera device
+- edit region rectangles directly

@@ -25,8 +25,9 @@ const createSource = (overrides: Partial<StudioSource> = {}): StudioSource => ({
 const defaultHandlers = {
   onRemove: () => {},
   onToggleArmed: () => {},
-  onToggleSolo: () => {},
   onChangeScene: () => {},
+  onMoveUp: () => {},
+  onMoveDown: () => {},
 };
 
 export const DisplayArmed: Story = {

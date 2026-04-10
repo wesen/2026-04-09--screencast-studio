@@ -9,8 +9,9 @@ interface SourceGridProps {
   editable?: boolean;
   onRemove?: (id: string) => void;
   onToggleArmed?: (id: string) => void;
-  onToggleSolo?: (id: string) => void;
   onChangeScene?: (id: string, scene: string) => void;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
   onAdd?: (kind: StudioSourceKind) => void;
   className?: string;
 }
@@ -21,8 +22,9 @@ export const SourceGrid: React.FC<SourceGridProps> = ({
   editable = true,
   onRemove,
   onToggleArmed,
-  onToggleSolo,
   onChangeScene,
+  onMoveUp,
+  onMoveDown,
   onAdd,
   className,
 }) => {
@@ -37,8 +39,9 @@ export const SourceGrid: React.FC<SourceGridProps> = ({
             editable={editable}
             onRemove={onRemove ? () => onRemove(source.id) : undefined}
             onToggleArmed={onToggleArmed ? () => onToggleArmed(source.id) : undefined}
-            onToggleSolo={onToggleSolo ? () => onToggleSolo(source.id) : undefined}
             onChangeScene={onChangeScene ? (scene) => onChangeScene(source.id, scene) : undefined}
+            onMoveUp={onMoveUp ? () => onMoveUp(source.id) : undefined}
+            onMoveDown={onMoveDown ? () => onMoveDown(source.id) : undefined}
           />
         ))}
         {onAdd ? <AddSourceButton onAdd={onAdd} /> : null}

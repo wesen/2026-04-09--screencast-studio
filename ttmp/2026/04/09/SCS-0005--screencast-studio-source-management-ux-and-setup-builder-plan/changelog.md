@@ -50,3 +50,20 @@ Implemented the discovery-backed source-creation slice:
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourcePicker.tsx — New mounted source-picker component
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourceGrid.tsx — Add-source affordance now available without full edit mode
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Discovery-backed source creation orchestration
+
+## 2026-04-09
+
+Implemented the mounted source-editing slice:
+
+- source cards now edit the setup draft instead of exposing the fake scene selector
+- rename, enable/disable, remove, and reorder all rewrite the canonical DSL through the existing normalize path
+- the mounted grid now renders from the setup draft so structured edits appear immediately
+- confirmed in a live smoke test that renaming a source updates the raw DSL
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/SourceCard.tsx — Real mounted editing controls
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/source-card/types.ts — Studio source metadata now includes editable detail text
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/SourceGrid.tsx — Mounted grid now forwards reorder actions
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Draft-owned source edits and DSL synchronization
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/styles/studio.css — Input/detail styling for mounted source cards
