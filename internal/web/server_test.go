@@ -422,7 +422,52 @@ func TestPreviewMJPEGStream(t *testing.T) {
 func TestWebsocketEndpoint(t *testing.T) {
 	t.Parallel()
 
-	server := NewServer(&fakeApplication{}, Config{})
+	server := NewServer(&fakeApplication{
+		compilePlan: &dsl.CompiledPlan{
+			SessionID: "session-ws",
+			Outputs: []dsl.PlannedOutput{
+				{Kind: "video", Name: "Display", Path: "/tmp/session-ws/display.mkv"},
+			},
+			AudioJobs: []dsl.AudioMixJob{
+				{
+					Name: "audio-mix",
+					Sources: []dsl.EffectiveAudioSource{
+						{ID: "mic-1", Name: "Mic", Device: "default", Enabled: true},
+					},
+					OutputPath: "/tmp/session-ws/audio.wav",
+				},
+			},
+		},
+	}, Config{})
+	server.telemetry.UpdateFromPlan(&dsl.CompiledPlan{
+		SessionID: "session-ws",
+		Outputs: []dsl.PlannedOutput{
+			{Kind: "video", Name: "Display", Path: "/tmp/session-ws/display.mkv"},
+		},
+		AudioJobs: []dsl.AudioMixJob{
+			{
+				Name: "audio-mix",
+				Sources: []dsl.EffectiveAudioSource{
+					{ID: "mic-1", Name: "Mic", Device: "default", Enabled: true},
+				},
+				OutputPath: "/tmp/session-ws/audio.wav",
+			},
+		},
+	})
+	server.telemetry.setAudioMeter(audioMeterSnapshot{
+		DeviceID:   "default",
+		LeftLevel:  0.4,
+		RightLevel: 0.35,
+		Available:  true,
+	})
+	server.telemetry.setDiskStatus(diskTelemetrySnapshot{
+		Path:        "/tmp/session-ws",
+		Filesystem:  "/tmp",
+		UsedPercent: 20,
+		FreeGiB:     10,
+		TotalGiB:    50,
+		Available:   true,
+	})
 	ts := httptest.NewServer(server.Handler())
 	defer ts.Close()
 
@@ -451,6 +496,26 @@ func TestWebsocketEndpoint(t *testing.T) {
 	decodeProtoResponse(t, previewMessage, previewEvent)
 	if previewEvent.GetPreviewList() == nil {
 		t.Fatalf("second websocket event = %+v, want previewList", previewEvent)
+	}
+
+	_, audioMessage, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read audio meter event: %v", err)
+	}
+	audioEvent := &studiov1.ServerEvent{}
+	decodeProtoResponse(t, audioMessage, audioEvent)
+	if audioEvent.GetAudioMeter() == nil {
+		t.Fatalf("third websocket event = %+v, want audioMeter", audioEvent)
+	}
+
+	_, diskMessage, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read disk status event: %v", err)
+	}
+	diskEvent := &studiov1.ServerEvent{}
+	decodeProtoResponse(t, diskMessage, diskEvent)
+	if diskEvent.GetDiskStatus() == nil {
+		t.Fatalf("fourth websocket event = %+v, want diskStatus", diskEvent)
 	}
 }
 

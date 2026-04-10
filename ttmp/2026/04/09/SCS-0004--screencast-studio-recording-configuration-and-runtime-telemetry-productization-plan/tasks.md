@@ -75,7 +75,7 @@ Acceptance criteria:
 
 ## Phase 4: Backend Recording-Configuration Surface
 
-- [ ] Implement any backend endpoint or request-shape expansion needed for:
+- [x] Implement any backend endpoint or request-shape expansion needed for:
   - recording name
   - destination root directory
   - output path preview
@@ -84,7 +84,7 @@ Acceptance criteria:
   - normalize response
   - compile response
   - dedicated preview endpoint
-- [ ] Add validation for invalid or unsafe destination inputs.
+- [x] Add validation for invalid or unsafe destination inputs.
 
 Acceptance criteria:
 
@@ -148,14 +148,14 @@ Acceptance criteria:
 
 ## Phase 9: Validation And Smoke Tests
 
-- [ ] Add Go tests for new request validation and websocket telemetry mapping.
-- [ ] Add frontend tests or Storybook states for:
+- [x] Add Go tests for new request validation and websocket telemetry mapping.
+- [x] Add frontend tests or Storybook states for:
   - valid destination preview
   - invalid destination
   - meter active
   - meter unavailable
   - low disk warning
-- [ ] Run a manual smoke test that verifies:
+- [x] Run a manual smoke test that verifies:
   - changing recording name changes resolved output names
   - changing destination changes resolved output paths
   - the meter moves while audio is active
@@ -180,5 +180,5 @@ Acceptance criteria:
 - [x] Commit 2: backend destination preview and validation
 - [x] Commit 3: backend telemetry collection and websocket events
 - [x] Commit 4: frontend recording configuration UI
-- [ ] Commit 5: frontend meter and disk telemetry rendering
-- [ ] Commit 6: tests, docs, and smoke validation
+- [x] Commit 5: frontend meter and disk telemetry rendering
+- [x] Commit 6: tests, docs, and smoke validation

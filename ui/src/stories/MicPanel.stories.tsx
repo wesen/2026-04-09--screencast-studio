@@ -121,3 +121,17 @@ export const HighGain: Story = {
     onGainChange: () => {},
   },
 };
+
+export const Unavailable: Story = {
+  args: {
+    micInput: 'default',
+    micOptions: [
+      { value: 'default', label: 'Built-in Mic' },
+      { value: 'usb', label: 'USB Interface' },
+    ],
+    gain: 55,
+    isRecording: false,
+    onMicInputChange: () => {},
+    onGainChange: () => {},
+  },
+};

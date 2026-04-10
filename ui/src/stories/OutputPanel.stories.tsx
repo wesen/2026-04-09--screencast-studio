@@ -168,3 +168,12 @@ export const AdvancedTemplatesLocked: Story = {
     destinationRootReason: 'Advanced destination templates are active. Edit Raw DSL to change output paths.',
   },
 };
+
+export const InvalidDestination: Story = {
+  args: {
+    ...Default.args,
+    destinationRoot: '/root/forbidden',
+    outputPreviewErrors: ['compile failed: destination template rendered to an invalid or unwritable path'],
+    outputs: [],
+  },
+};

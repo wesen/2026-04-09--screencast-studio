@@ -307,6 +307,94 @@ tmux new-session -d -s scs-0004 'cd /home/manuel/code/wesen/2026-04-09--screenca
 curl -sSf http://127.0.0.1:18082/api/healthz
 ```
 
+## Step 5: Finish The Validation Pass And Close The Ticket
+
+The last slice was about tightening proof rather than adding more product surface. By this point the feature was already working, but the ticket still needed explicit backend assertions for the new websocket telemetry events, clearer Storybook coverage for failure/unavailable states, and a fully recorded live browser smoke. I finished those pieces so `SCS-0004` could close without hand-wavy “basically done” language.
+
+The practical outcome is that the ticket now reads like a complete piece of work rather than a half-finished implementation plus verbal assurances. That matters because this repo is using the ticket docs as durable handoff material for an intern, not just as a temporary scratchpad.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 2)
+
+**Assistant interpretation:** Continue until the current ticket slice is genuinely handled end to end, including verification and documentation.
+
+**Inferred user intent:** Avoid stopping at “feature mostly works”; finish the validation and bookkeeping cleanly.
+
+### What I did
+
+- Added a websocket test that now asserts the initial audio-meter and disk-status protobuf events:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`
+- Added Storybook states for:
+  - unavailable microphone telemetry
+  - invalid destination preview
+- Rebuilt Storybook and reran backend tests.
+- Verified the mounted browser UI against the live server:
+  - name and destination edits change the planned outputs
+  - disk telemetry renders real values
+  - switching to the active mic input removes the unavailable fallback
+- Marked the remaining ticket tasks complete and updated changelog/diary entries.
+
+### Why
+
+- The feature needed proof, not just implementation.
+- The websocket path had grown new event variants and needed an explicit backend assertion.
+- The UI now has both “good” and “degraded” states that future work will rely on; Storybook should show both.
+
+### What worked
+
+- `go test ./internal/web` passed with the stronger websocket assertions.
+- `pnpm --dir ui build-storybook` passed with the new stories.
+- The live browser smoke showed the status panel rendering:
+  - `Disk 20%`
+  - `Free: 361.4 GiB / 1829.7 GiB`
+- The mounted mic panel stopped showing `Live meter unavailable` after switching to the active input source.
+
+### What didn't work
+
+- N/A
+
+### What I learned
+
+- The final “validation slice” is where most tickets either become trustworthy or stay ambiguous. This one needed a short but explicit close-out pass to become durable.
+
+### What was tricky to build
+
+- The subtle part was making sure the final proof covered both transport and UI. Backend unit tests alone would not prove the mounted page updated correctly, and the browser smoke alone would not protect the protobuf websocket contract. The right close-out here was to do both.
+
+### What warrants a second pair of eyes
+
+- The meter smoke was validated by behavior on the mounted page rather than by a deterministic fixture audio source. If we ever need CI-level confidence for the audio meter path, we should add a narrower fake PCM producer around the telemetry manager.
+
+### What should be done in the future
+
+- `SCS-0004` is complete. The next work should move to the next product ticket rather than keep polishing this one.
+
+### Code review instructions
+
+- Start with the test proof:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`
+- Then review the UI fallback stories:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/MicPanel.stories.tsx`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/OutputPanel.stories.tsx`
+- Finally compare the closed task list against:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0004--screencast-studio-recording-configuration-and-runtime-telemetry-productization-plan/tasks.md`
+
+### Technical details
+
+Validation commands used in this step:
+
+```bash
+gofmt -w internal/web/server_test.go
+go test ./internal/web
+go test ./...
+go build ./...
+pnpm --dir ui lint
+pnpm --dir ui build
+pnpm --dir ui build-storybook
+docmgr doctor --ticket SCS-0004 --stale-after 30
+```
+
 ## Step 4: Add Protobuf Telemetry Events And Server-Owned Audio/Disk Publishers
 
 The second code slice handled the part that genuinely belongs outside DSL: live telemetry. I added protobuf websocket messages for audio meter and disk status, introduced a server-owned telemetry manager, and wired the frontend session layer so the mounted `MicPanel` and `StatusPanel` consume generated telemetry events instead of placeholder props.

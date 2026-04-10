@@ -37,3 +37,14 @@ Added schema-first runtime telemetry for the mounted studio: protobuf audio-mete
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go — Sends initial telemetry snapshots to websocket clients
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/session/wsClient.ts — Consumes generated telemetry websocket events
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/studio/StatusPanel.tsx — Renders real disk percentage and capacity context
+
+## 2026-04-10
+
+Finished the `SCS-0004` hardening pass by asserting websocket telemetry events in backend tests, adding Storybook states for unavailable meter and invalid destination preview, and closing the remaining validation tasks with a successful live browser smoke against the rebuilt server.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — Websocket test now asserts initial audio-meter and disk-status events
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/MicPanel.stories.tsx — Added explicit unavailable-meter story
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/stories/OutputPanel.stories.tsx — Added invalid-destination preview story
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/09/SCS-0004--screencast-studio-recording-configuration-and-runtime-telemetry-productization-plan/tasks.md — Ticket tasks now fully checked off
