@@ -21,7 +21,7 @@ RelatedFiles:
       Note: Current app-level owner for structured source management work
 ExternalSources: []
 Summary: Chronological record of creating the source-management and setup-builder follow-on ticket and implementing it slice by slice.
-LastUpdated: 2026-04-09T22:20:00-04:00
+LastUpdated: 2026-04-09T22:26:00-04:00
 WhatFor: Preserve why the source-management work was split into its own ticket and what it should cover.
 WhenToUse: Read when starting implementation or reviewing the intended scope of the structured source builder.
 ---
@@ -484,3 +484,81 @@ Review these files together:
 ### Next step
 
 The next slice should make preview ownership react explicitly to meaningful source reconfiguration by releasing and recreating previews on target changes instead of leaving same-ID sources on stale preview leases.
+
+## Step 8: Add Hard-Cutover Preview Restart On Meaningful Source Edits
+
+The next slice made preview lifecycle ownership explicit instead of trying to infer it indirectly from source IDs alone. Before this change, target edits like window changes or region rectangle changes kept the same source ID, so the existing ensure loop had no reason to request a fresh preview. That left room for stale previews to remain attached to updated sources.
+
+### Product behavior after this slice
+
+Preview behavior is now intentionally simple:
+
+- previews are only desired for enabled Studio-tab sources
+- rename-only edits do not restart previews
+- meaningful target edits bump the preview generation for that source
+- if an owned preview exists, it is released first
+- the normal ensure loop then creates a new preview for the updated source
+- if an older in-flight ensure completes after the source changed, that stale preview is released instead of being tracked
+
+This is a hard cutover. Flicker is acceptable. Correctness is more important than continuity.
+
+### What I implemented
+
+- Reworked `ui/src/pages/StudioPage.tsx` preview orchestration so it now has:
+  - a preview generation ref per source
+  - an explicit `restartPreviewForSource(...)` path
+  - separate handling for releasing owned previews vs releasing stale detached previews
+  - a local preview-sync nonce to force the ensure loop to reevaluate same-ID source edits
+- Updated the desired preview set so only enabled sources are previewed.
+- Hooked preview restart into meaningful source changes:
+  - window target selection
+  - camera device selection
+  - region rectangle edits and presets
+- Left rename-only edits alone so they do not churn previews.
+
+### Live smoke result
+
+I ran the real server in tmux and exercised the mounted app through Playwright. The important evidence came from the server log when changing a window source from one discovered window to another:
+
+- `POST /api/previews/release`
+- immediately followed by `POST /api/previews/ensure`
+
+That confirms the hard-cutover path is actually firing on same-ID source reconfiguration instead of silently holding onto the old preview lease.
+
+### Validation
+
+Commands run:
+
+```bash
+pnpm --dir ui build
+pnpm --dir ui lint
+docmgr doctor --ticket SCS-0005 --stale-after 30
+```
+
+Live smoke commands used:
+
+```bash
+lsof-who -p 18080 -k || true
+tmux new-session -d -s scs-0005-preview-smoke 'cd /home/manuel/code/wesen/2026-04-09--screencast-studio && go run ./cmd/screencast-studio serve --addr :18080 --static-dir ui/dist'
+tmux capture-pane -pt scs-0005-preview-smoke
+curl -sSf http://127.0.0.1:18080/api/previews
+tmux kill-session -t scs-0005-preview-smoke
+```
+
+### Review focus
+
+Review these sections in:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+
+Pay particular attention to:
+
+- `desiredPreviewSourceIds`
+- `releaseOwnedPreviewForSource`
+- `releaseDetachedPreview`
+- `restartPreviewForSource`
+- the generation check inside the ensure loop
+
+### Next step
+
+The remaining work in `SCS-0005` is now mostly validation, unsupported-source guardrails, and deciding how far the structured editor should go before deferring to Raw DSL.

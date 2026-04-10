@@ -1,5 +1,5 @@
 import { create } from '@bufbuild/protobuf';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGetDiscoveryQuery, useGetHealthQuery } from '@/api/discoveryApi';
 import {
   useEnsurePreviewMutation,
@@ -219,6 +219,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const ownedPreviewIdBySourceIdRef = useRef<Record<string, string>>({});
   const pendingPreviewEnsuresRef = useRef<Set<string>>(new Set());
   const pendingPreviewReleasesRef = useRef<Map<string, string>>(new Map());
+  const previewGenerationRef = useRef<Record<string, number>>({});
   const { data: healthData } = useGetHealthQuery();
   const { data: discoveryData } = useGetDiscoveryQuery();
   const { data: currentSessionData } = useGetCurrentSessionQuery();
@@ -228,6 +229,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const [ensurePreview] = useEnsurePreviewMutation();
   const [releasePreview] = useReleasePreviewMutation();
   const [sourcePickerKind, setSourcePickerKind] = useState<StudioSource['kind'] | null>(null);
+  const [previewSyncNonce, setPreviewSyncNonce] = useState(0);
 
   const visibleVideoSources = useMemo(
     () => (
@@ -260,7 +262,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   );
   const desiredPreviewSourceIds = useMemo(
     () => activeTab === 'studio'
-      ? sources.slice(0, previewLimit).map((source) => source.sourceId)
+      ? sources.filter((source) => source.armed).slice(0, previewLimit).map((source) => source.sourceId)
       : [],
     [activeTab, previewLimit, sources]
   );
@@ -349,6 +351,74 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     ownedPreviewIdBySourceIdRef.current = ownedPreviewIdBySourceId;
   }, [ownedPreviewIdBySourceId]);
 
+  const requestPreviewSync = useCallback(() => {
+    setPreviewSyncNonce((value) => value + 1);
+  }, []);
+
+  const releaseDetachedPreview = useCallback((previewId: string, sourceId: string) => {
+    void (async () => {
+      try {
+        const response = await releasePreview({ previewId }).unwrap();
+        if (response.preview) {
+          dispatch(upsertPreview(response.preview));
+        }
+      } catch (error) {
+        if (apiErrorCodeFromUnknown(error) !== 'preview_not_found') {
+          dispatch(addLog(create(ProcessLogSchema, {
+            timestamp: new Date().toISOString(),
+            processLabel: 'ui.preview',
+            stream: 'stderr',
+            message: `failed to release stale preview ${previewId} for ${sourceId}: ${errorMessageFromUnknown(error)}`,
+          })));
+        }
+      } finally {
+        requestPreviewSync();
+      }
+    })();
+  }, [dispatch, releasePreview, requestPreviewSync]);
+
+  const releaseOwnedPreviewForSource = useCallback((sourceId: string, previewId: string) => {
+    if (pendingPreviewReleasesRef.current.has(sourceId)) {
+      return;
+    }
+
+    pendingPreviewReleasesRef.current.set(sourceId, previewId);
+    void (async () => {
+      try {
+        const response = await releasePreview({ previewId }).unwrap();
+        if (response.preview) {
+          dispatch(upsertPreview(response.preview));
+        }
+        dispatch(clearOwnedPreview({ sourceId }));
+      } catch (error) {
+        if (apiErrorCodeFromUnknown(error) === 'preview_not_found') {
+          dispatch(clearOwnedPreview({ sourceId }));
+          return;
+        }
+
+        dispatch(addLog(create(ProcessLogSchema, {
+          timestamp: new Date().toISOString(),
+          processLabel: 'ui.preview',
+          stream: 'stderr',
+          message: `failed to release preview ${previewId}: ${errorMessageFromUnknown(error)}`,
+        })));
+      } finally {
+        pendingPreviewReleasesRef.current.delete(sourceId);
+        requestPreviewSync();
+      }
+    })();
+  }, [dispatch, releasePreview, requestPreviewSync]);
+
+  const restartPreviewForSource = useCallback((sourceId: string) => {
+    previewGenerationRef.current[sourceId] = (previewGenerationRef.current[sourceId] ?? 0) + 1;
+    const previewId = ownedPreviewIdBySourceIdRef.current[sourceId];
+    if (previewId) {
+      releaseOwnedPreviewForSource(sourceId, previewId);
+      return;
+    }
+    requestPreviewSync();
+  }, [releaseOwnedPreviewForSource, requestPreviewSync]);
+
   useEffect(() => {
     const desired = new Set(desiredPreviewSourceIds);
 
@@ -361,6 +431,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
       }
 
       pendingPreviewEnsuresRef.current.add(sourceId);
+      const generation = previewGenerationRef.current[sourceId] ?? 0;
       void (async () => {
         try {
           const response = await ensurePreview({
@@ -368,6 +439,11 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
             sourceId,
           }).unwrap();
           if (response.preview) {
+            const currentGeneration = previewGenerationRef.current[sourceId] ?? 0;
+            if (currentGeneration !== generation) {
+              releaseDetachedPreview(response.preview.id, sourceId);
+              return;
+            }
             dispatch(upsertPreview(response.preview));
             dispatch(trackOwnedPreview({
               sourceId,
@@ -388,37 +464,11 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     }
 
     for (const [sourceId, previewId] of Object.entries(ownedPreviewIdBySourceId)) {
-      if (
-        desired.has(sourceId) ||
-        pendingPreviewReleasesRef.current.has(sourceId)
-      ) {
+      if (desired.has(sourceId) || pendingPreviewReleasesRef.current.has(sourceId)) {
         continue;
       }
 
-      pendingPreviewReleasesRef.current.set(sourceId, previewId);
-      void (async () => {
-        try {
-          const response = await releasePreview({ previewId }).unwrap();
-          if (response.preview) {
-            dispatch(upsertPreview(response.preview));
-          }
-          dispatch(clearOwnedPreview({ sourceId }));
-        } catch (error) {
-          if (apiErrorCodeFromUnknown(error) === 'preview_not_found') {
-            dispatch(clearOwnedPreview({ sourceId }));
-            return;
-          }
-
-          dispatch(addLog(create(ProcessLogSchema, {
-            timestamp: new Date().toISOString(),
-            processLabel: 'ui.preview',
-            stream: 'stderr',
-            message: `failed to release preview ${previewId}: ${errorMessageFromUnknown(error)}`,
-          })));
-        } finally {
-          pendingPreviewReleasesRef.current.delete(sourceId);
-        }
-      })();
+      releaseOwnedPreviewForSource(sourceId, previewId);
     }
   }, [
     desiredPreviewSourceIds,
@@ -426,7 +476,10 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     dslText,
     ensurePreview,
     ownedPreviewIdBySourceId,
+    previewSyncNonce,
+    releaseDetachedPreview,
     releasePreview,
+    releaseOwnedPreviewForSource,
   ]);
 
   useEffect(() => {
@@ -553,7 +606,10 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     setSourcePickerKind(null);
   };
 
-  const applyUpdatedSource = (updatedSource: SetupDraftVideoSource) => {
+  const applyUpdatedSource = (
+    updatedSource: SetupDraftVideoSource,
+    options?: { restartPreview?: boolean }
+  ) => {
     if (structuredEditingLocked) {
       return;
     }
@@ -565,6 +621,9 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
     };
     dispatch(updateVideoSource(updatedSource));
     dispatch(setDslText(renderSetupDraftAsDsl(nextDraft)));
+    if (options?.restartPreview) {
+      restartPreviewForSource(updatedSource.id);
+    }
   };
 
   const handleRenameSource = (sourceId: string, name: string) => {
@@ -649,7 +708,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                   target: {
                     windowId: event.target.value,
                   },
-                })}
+                }, { restartPreview: true })}
               >
                 {windows.map((window: WindowDescriptor) => (
                   <option key={window.id} value={window.id}>
@@ -673,7 +732,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                   target: {
                     deviceId: event.target.value,
                   },
-                })}
+                }, { restartPreview: true })}
               >
                 {cameras.map((camera: CameraDescriptor) => (
                   <option key={camera.id} value={camera.device}>
@@ -702,7 +761,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                         x: Number(event.target.value) || 0,
                       },
                     },
-                  })}
+                  }, { restartPreview: true })}
                 />
               </label>
               <label>
@@ -719,7 +778,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                         y: Number(event.target.value) || 0,
                       },
                     },
-                  })}
+                  }, { restartPreview: true })}
                 />
               </label>
               <label>
@@ -736,7 +795,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                         w: Number(event.target.value) || 0,
                       },
                     },
-                  })}
+                  }, { restartPreview: true })}
                 />
               </label>
               <label>
@@ -753,7 +812,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                         h: Number(event.target.value) || 0,
                       },
                     },
-                  })}
+                  }, { restartPreview: true })}
                 />
               </label>
             </div>
@@ -770,7 +829,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
                       ...source.target,
                       rect: presetRectForDisplay(display, 'full'),
                     },
-                  })}
+                  }, { restartPreview: true })}
                   style={{ fontSize: '9px', padding: '2px 6px' }}
                 >
                   {display.name}

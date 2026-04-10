@@ -102,3 +102,17 @@ Implemented the Raw DSL advanced-mode ownership slice:
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/compatibility.ts — Builder compatibility comparison helper
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/dsl-editor/DSLEditor.tsx — Explicit advanced-mode apply/reset controls
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Apply flow, builder lock banner, and read-only Studio fallback
+
+## 2026-04-09
+
+Implemented the preview hard-cutover slice:
+
+- preview ownership is now generation-aware for same-ID source edits
+- meaningful source target changes release the old preview and then re-ensure a new one
+- stale in-flight preview responses are released instead of being reattached
+- only enabled sources are included in the desired preview set
+- a live smoke test confirmed `release` followed by `ensure` when switching a window source target
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx — Preview generation tracking, restart path, and enabled-source preview policy

@@ -102,9 +102,9 @@ Acceptance criteria:
 
 ## Phase 6: Preview Integration With Source Editing
 
-- [ ] Ensure previews react correctly as sources are added, removed, renamed, or reconfigured.
-- [ ] Make preview ownership robust when source IDs change.
-- [ ] Decide whether previews should pause while a source is being edited or immediately re-ensure.
+- [x] Ensure previews react correctly as sources are added, removed, renamed, or reconfigured.
+- [x] Make preview ownership robust when source IDs change.
+- [x] Decide whether previews should pause while a source is being edited or immediately re-ensure.
 
 Acceptance criteria:
 
@@ -120,15 +120,15 @@ Acceptance criteria:
 
 ### Concrete Implementation Tasks
 
-- [ ] Preview only enabled sources in the mounted Studio page.
-- [ ] Introduce an explicit `restart preview for source` path in `StudioPage`.
-- [ ] Restart previews on:
+- [x] Preview only enabled sources in the mounted Studio page.
+- [x] Introduce an explicit `restart preview for source` path in `StudioPage`.
+- [x] Restart previews on:
   - window target changes
   - camera device changes
   - region rectangle changes
   - other preview-relevant source changes as needed
-- [ ] Do not restart previews on rename-only edits.
-- [ ] Verify that the hard-cutover path does not leave orphaned preview leases.
+- [x] Do not restart previews on rename-only edits.
+- [x] Verify that the hard-cutover path does not leave orphaned preview leases.
 
 ## Phase 7: Validation And UX Guardrails
 
@@ -165,7 +165,7 @@ Acceptance criteria:
 - [x] Commit 2: source-picker and source creation flow
 - [x] Commit 3: source editing, reorder, and removal
 - [x] Commit 4: structured/raw DSL synchronization and validation
-- [ ] Commit 5: preview integration adjustments
+- [x] Commit 5: preview integration adjustments
 - [ ] Commit 6: tests, stories, and smoke validation
 
 ## Progress Notes
@@ -176,3 +176,4 @@ Acceptance criteria:
 - 2026-04-09: Added real target editors for window sources, camera sources, and region rectangles/presets. Removed the dead `solo` concept from the mounted source model. Full per-monitor display selection remains blocked on a backend target-model change.
 - 2026-04-09: Agreed product policy for the remaining work: Raw DSL becomes an explicit advanced apply flow, and preview reconfiguration uses simple hard-cutover release/re-ensure behavior.
 - 2026-04-09: Implemented Raw DSL as an explicit advanced apply flow with separate applied vs draft text, builder-compatibility lockout, and a read-only Studio fallback for unsupported advanced shapes.
+- 2026-04-09: Implemented hard-cutover preview restart for meaningful source edits, limited previews to enabled sources, and verified release-then-ensure behavior in a live smoke test.
