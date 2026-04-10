@@ -39,6 +39,10 @@ type fakePreviewRunner struct {
 	runs    atomic.Int32
 }
 
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 func decodeProtoResponse(t *testing.T, body []byte, msg proto.Message) {
 	t.Helper()
 	if err := protojson.Unmarshal(body, msg); err != nil {
@@ -125,6 +129,71 @@ func (f *fakePreviewRunner) Run(ctx context.Context, source dsl.EffectiveVideoSo
 	onFrame([]byte{0xff, 0xd8, 0xff, 0xd9})
 	<-ctx.Done()
 	return nil
+}
+
+func TestComputePreviewSignatureIsStableForEquivalentSources(t *testing.T) {
+	t.Parallel()
+
+	sourceA := dsl.EffectiveVideoSource{
+		ID:      "camera-1",
+		Name:    "Camera 1",
+		Type:    "camera",
+		Enabled: true,
+		Target: dsl.VideoTarget{
+			Device: "/dev/video0",
+			Rect: &dsl.Rect{
+				X: 1,
+				Y: 2,
+				W: 3,
+				H: 4,
+			},
+		},
+		Capture: dsl.VideoCaptureSettings{
+			FPS:          30,
+			Cursor:       boolPtr(false),
+			FollowResize: boolPtr(false),
+			Mirror:       boolPtr(true),
+			Size:         "1280x720",
+		},
+		Output: dsl.VideoOutputSettings{
+			Container:  "mov",
+			VideoCodec: "h264",
+			Quality:    80,
+		},
+		DestinationTemplate: "default",
+	}
+	sourceB := dsl.EffectiveVideoSource{
+		ID:      "camera-1",
+		Name:    "Camera 1",
+		Type:    "camera",
+		Enabled: true,
+		Target: dsl.VideoTarget{
+			Device: "/dev/video0",
+			Rect: &dsl.Rect{
+				X: 1,
+				Y: 2,
+				W: 3,
+				H: 4,
+			},
+		},
+		Capture: dsl.VideoCaptureSettings{
+			FPS:          30,
+			Cursor:       boolPtr(false),
+			FollowResize: boolPtr(false),
+			Mirror:       boolPtr(true),
+			Size:         "1280x720",
+		},
+		Output: dsl.VideoOutputSettings{
+			Container:  "mov",
+			VideoCodec: "h264",
+			Quality:    80,
+		},
+		DestinationTemplate: "default",
+	}
+
+	if gotA, gotB := computePreviewSignature(sourceA), computePreviewSignature(sourceB); gotA != gotB {
+		t.Fatalf("preview signature mismatch for equivalent sources: %q != %q", gotA, gotB)
+	}
 }
 
 func TestHealthz(t *testing.T) {

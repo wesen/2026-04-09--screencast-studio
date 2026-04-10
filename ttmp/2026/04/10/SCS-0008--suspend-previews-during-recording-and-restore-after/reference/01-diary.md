@@ -177,3 +177,78 @@ ok  	github.com/wesen/2026-04-09--screencast-studio/internal/web	0.505s
 ok  	github.com/wesen/2026-04-09--screencast-studio/pkg/dsl	0.003s
 ok  	github.com/wesen/2026-04-09--screencast-studio/pkg/recording	0.003s
 ```
+
+## Step 3: Fix unstable preview signatures after observing real runtime logs
+
+After the first implementation landed, a real `serve` run showed a second bug: restored previews came back correctly after recording, but later `/api/previews/ensure` calls created new preview workers instead of reusing the restored ones. That reintroduced the camera contention problem because the UI was effectively creating a second camera preview after restore.
+
+The log evidence pointed to preview identity rather than lifecycle ordering. The backend restore path had already recreated both previews successfully, so the reason later `ensure` calls created new previews had to be that the existing preview signature key no longer matched the later normalized source value. That turned out to be true.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 1)
+
+**Assistant interpretation:** Continue from the runtime evidence, diagnose the follow-up regression, and patch the implementation so preview reuse works after restore.
+
+**Inferred user intent:** Ensure the preview handoff fix works in the real running app, not only in narrow tests.
+
+**Commit (code):** Pending at the time of this diary step update
+
+### What I did
+- Inspected the live logs showing restore success followed by duplicate preview creation.
+- Re-read `computePreviewSignature(...)` in `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_runner.go`.
+- Replaced the signature input from `fmt.Sprintf("%#v", source)` to `json.Marshal(source)` so the hash is based on source values rather than Go pointer identity.
+- Added a regression test in `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go` proving equivalent sources with different pointer allocations produce the same preview signature.
+- Re-ran:
+
+```bash
+go test ./internal/web -count=1
+go test ./... -count=1
+```
+
+### Why
+- `EffectiveVideoSource` contains pointer fields such as `*bool` and `*Rect`.
+- `fmt.Sprintf("%#v", source)` can encode pointer identity, not just values.
+- Re-normalizing the same DSL can therefore produce a semantically identical source that hashes differently, which breaks preview reuse.
+
+### What worked
+- The runtime logs were specific enough to isolate the failure quickly.
+- Switching to JSON-based hashing preserved semantic identity across normalize calls.
+- The regression test now covers the actual failure mode instead of relying on visual inspection of logs.
+
+### What didn't work
+- The original signature implementation was too clever and not value-stable:
+
+```go
+func computePreviewSignature(source dsl.EffectiveVideoSource) string {
+    sum := sha1.Sum([]byte(fmt.Sprintf("%#v", source)))
+    return hex.EncodeToString(sum[:])
+}
+```
+
+- That implementation was safe for simple scalar-only structs but not for normalized structs with pointer fields.
+
+### What I learned
+- Preview identity needs to be value-based, not Go-representation-based.
+- Real runtime logs were necessary here; the first implementation tests did not catch the signature instability because they did not compare separately normalized-but-equivalent sources.
+
+### What was tricky to build
+- The tricky part was that the first fix genuinely worked at the handoff layer, so the regression initially looked like a lifecycle bug. The real issue was subtler: the restore path and the later UI ensure path were both correct individually, but they disagreed on preview identity because the signature function depended on allocation details.
+
+### What warrants a second pair of eyes
+- Whether JSON marshaling is the preferred long-term identity input or whether a dedicated hand-written signature payload would be clearer.
+- Whether other similar “identity by `%#v`” helpers exist elsewhere in the repo.
+
+### What should be done in the future
+- Audit other hashing or cache-key code for pointer-identity coupling.
+
+### Code review instructions
+- Start with `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_runner.go`.
+- Then review the new signature regression test in `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`.
+- Compare the new behavior against the earlier restore logs that showed duplicate preview creation.
+
+### Technical details
+- Failing symptom from runtime logs:
+  - restored previews were created successfully after recording stop,
+  - later `POST /api/previews/ensure` created new preview workers instead of reusing them,
+  - the new camera preview then failed with `exit status 240` because `/dev/video0` was already owned.

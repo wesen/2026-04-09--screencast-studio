@@ -6,7 +6,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
-	"fmt"
+	"encoding/json"
 	"io"
 	"os/exec"
 	"strings"
@@ -141,7 +141,16 @@ func (FFmpegPreviewRunner) Run(ctx context.Context, source dsl.EffectiveVideoSou
 }
 
 func computePreviewSignature(source dsl.EffectiveVideoSource) string {
-	sum := sha1.Sum([]byte(fmt.Sprintf("%#v", source)))
+	payload, err := json.Marshal(source)
+	if err != nil {
+		log.Error().
+			Str("event", "preview.signature.marshal.error").
+			Str("source_id", source.ID).
+			Err(err).
+			Msg("failed to marshal preview source for signature; falling back to source id")
+		payload = []byte(source.ID)
+	}
+	sum := sha1.Sum(payload)
 	return hex.EncodeToString(sum[:])
 }
 
