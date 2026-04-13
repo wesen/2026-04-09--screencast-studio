@@ -43,16 +43,15 @@ type managedRecording struct {
 }
 
 type RecordingManager struct {
-	app         ApplicationService
-	afterFinish func(recordingSessionState)
-	publish     func(ServerEvent)
-	parentCtx   context.Context
+	app       ApplicationService
+	publish   func(ServerEvent)
+	parentCtx context.Context
 
 	mu      sync.RWMutex
 	current *managedRecording
 }
 
-func NewRecordingManager(parentCtx context.Context, application ApplicationService, publish func(ServerEvent), afterFinish func(recordingSessionState)) *RecordingManager {
+func NewRecordingManager(parentCtx context.Context, application ApplicationService, publish func(ServerEvent)) *RecordingManager {
 	if publish == nil {
 		publish = func(ServerEvent) {}
 	}
@@ -60,10 +59,9 @@ func NewRecordingManager(parentCtx context.Context, application ApplicationServi
 		parentCtx = context.Background()
 	}
 	return &RecordingManager{
-		app:         application,
-		afterFinish: afterFinish,
-		publish:     publish,
-		parentCtx:   parentCtx,
+		app:       application,
+		publish:   publish,
+		parentCtx: parentCtx,
 	}
 }
 
@@ -148,10 +146,7 @@ func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.D
 				m.applyRunEvent(plan.SessionID, event)
 			},
 		})
-		finishedState, ok := m.finish(plan.SessionID, summary, recordErr)
-		if ok && m.afterFinish != nil {
-			m.afterFinish(finishedState)
-		}
+		_, _ = m.finish(plan.SessionID, summary, recordErr)
 		return nil
 	})
 

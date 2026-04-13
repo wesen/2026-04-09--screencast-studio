@@ -22,7 +22,7 @@ func TestRecordingManagerShutdownWaitsForActiveSession(t *testing.T) {
 		recordStarted: make(chan struct{}, 1),
 	}
 
-	manager := NewRecordingManager(context.Background(), fakeApp, nil, nil)
+	manager := NewRecordingManager(context.Background(), fakeApp, nil)
 	if _, err := manager.Start([]byte("test"), 0, 0); err != nil {
 		t.Fatalf("start recording session: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestRecordingManagerShutdownWaitsForActiveSession(t *testing.T) {
 func TestRecordingManagerShutdownTimesOutWhenSessionDoesNotFinish(t *testing.T) {
 	t.Parallel()
 
-	manager := NewRecordingManager(context.Background(), &fakeApplication{}, nil, nil)
+	manager := NewRecordingManager(context.Background(), &fakeApplication{}, nil)
 	done := make(chan struct{})
 	manager.current = &managedRecording{
 		cancel: func() {},
