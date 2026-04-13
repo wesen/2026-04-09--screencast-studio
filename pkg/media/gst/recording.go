@@ -2,6 +2,7 @@ package gst
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,11 @@ import (
 
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
+)
+
+var (
+	errRecordingStopRequested = stderrors.New("recording stop requested")
+	errRecordingMaxDuration   = stderrors.New("max duration reached")
 )
 
 type RecordingRuntime struct{}
@@ -37,12 +43,23 @@ func (RecordingRuntime) StartRecording(ctx context.Context, plan *dsl.CompiledPl
 		ctx = context.Background()
 	}
 
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := context.WithCancelCause(ctx)
+	if opts.MaxDuration > 0 {
+		go func() {
+			timer := time.NewTimer(opts.MaxDuration)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+				cancel(fmt.Errorf("%w after %s", errRecordingMaxDuration, opts.MaxDuration))
+			case <-runCtx.Done():
+			}
+		}()
+	}
 	workers := make([]*recordingWorker, 0, len(plan.VideoJobs)+len(plan.AudioJobs))
 	for _, job := range plan.VideoJobs {
 		worker, err := startVideoRecordingWorker(runCtx, job)
 		if err != nil {
-			cancel()
+			cancel(err)
 			for _, started := range workers {
 				_ = started.stop(250 * time.Millisecond)
 				started.cleanup()
@@ -54,7 +71,7 @@ func (RecordingRuntime) StartRecording(ctx context.Context, plan *dsl.CompiledPl
 	for _, job := range plan.AudioJobs {
 		worker, err := startAudioRecordingWorker(runCtx, job)
 		if err != nil {
-			cancel()
+			cancel(err)
 			for _, started := range workers {
 				_ = started.stop(250 * time.Millisecond)
 				started.cleanup()
@@ -73,7 +90,7 @@ func (RecordingRuntime) StartRecording(ctx context.Context, plan *dsl.CompiledPl
 }
 
 type recordingSession struct {
-	cancel context.CancelFunc
+	cancel context.CancelCauseFunc
 	done   chan struct{}
 
 	mu     sync.RWMutex
@@ -103,7 +120,7 @@ func (s *recordingSession) Stop(ctx context.Context) error {
 		return nil
 	}
 	if s.cancel != nil {
-		s.cancel()
+		s.cancel(errRecordingStopRequested)
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -126,6 +143,7 @@ func (s *recordingSession) run(ctx context.Context, plan *dsl.CompiledPlan, opts
 	emitRecordingEvent(opts.EventSink, media.RecordingEvent{Type: media.RecordingEventStateChanged, Timestamp: startedAt, State: media.RecordingStateStarting, Reason: "gstreamer recording session created"})
 	for _, worker := range workers {
 		emitRecordingEvent(opts.EventSink, media.RecordingEvent{Type: media.RecordingEventProcessStarted, ProcessLabel: worker.label, OutputPath: worker.outputPath})
+		emitRecordingEvent(opts.EventSink, media.RecordingEvent{Type: media.RecordingEventProcessLog, ProcessLabel: worker.label, OutputPath: worker.outputPath, Stream: "system", Message: "gstreamer pipeline started"})
 	}
 	emitRecordingEvent(opts.EventSink, media.RecordingEvent{Type: media.RecordingEventStateChanged, State: media.RecordingStateRunning, Reason: "all gstreamer recording pipelines started"})
 
@@ -149,23 +167,34 @@ func (s *recordingSession) run(ctx context.Context, plan *dsl.CompiledPlan, opts
 	}
 
 	remaining := len(workers)
-	canceled := false
+	stoppingEmitted := false
 	for remaining > 0 {
 		select {
 		case wr := <-results:
 			remaining--
 			if wr.err != nil && result.State != media.RecordingStateFailed {
+				reason := fmt.Sprintf("%s failed: %v", wr.worker.label, wr.err)
+				emitRecordingEvent(opts.EventSink, media.RecordingEvent{Type: media.RecordingEventProcessLog, ProcessLabel: wr.worker.label, OutputPath: wr.worker.outputPath, Stream: "stderr", Message: reason})
+				if !stoppingEmitted {
+					emitRecordingEvent(opts.EventSink, media.RecordingEvent{Type: media.RecordingEventStateChanged, State: media.RecordingStateStopping, Reason: reason})
+					stoppingEmitted = true
+				}
 				result.State = media.RecordingStateFailed
-				result.Reason = fmt.Sprintf("%s failed: %v", wr.worker.label, wr.err)
+				result.Reason = reason
 				if s.cancel != nil {
-					s.cancel()
+					s.cancel(errors.New(reason))
 				}
 			}
 		case <-ctx.Done():
-			if !canceled {
-				canceled = true
+			if !stoppingEmitted {
+				reason := recordingContextReason(ctx)
+				emitRecordingEvent(opts.EventSink, media.RecordingEvent{Type: media.RecordingEventStateChanged, State: media.RecordingStateStopping, Reason: reason})
+				for _, worker := range workers {
+					emitRecordingEvent(opts.EventSink, media.RecordingEvent{Type: media.RecordingEventProcessLog, ProcessLabel: worker.label, OutputPath: worker.outputPath, Stream: "system", Message: "stopping gstreamer pipeline via EOS"})
+				}
 				result.State = media.RecordingStateFinished
-				result.Reason = ctx.Err().Error()
+				result.Reason = reason
+				stoppingEmitted = true
 			}
 		}
 	}
@@ -584,4 +613,24 @@ func emitRecordingEvent(sink func(media.RecordingEvent), event media.RecordingEv
 		event.Timestamp = time.Now()
 	}
 	sink(event)
+}
+
+func recordingContextReason(ctx context.Context) string {
+	if ctx == nil {
+		return "recording stopped"
+	}
+	cause := context.Cause(ctx)
+	switch {
+	case cause == nil:
+		if ctx.Err() != nil {
+			return ctx.Err().Error()
+		}
+		return "recording stopped"
+	case stderrors.Is(cause, errRecordingStopRequested):
+		return "recording stop requested"
+	case stderrors.Is(cause, errRecordingMaxDuration):
+		return cause.Error()
+	default:
+		return cause.Error()
+	}
 }

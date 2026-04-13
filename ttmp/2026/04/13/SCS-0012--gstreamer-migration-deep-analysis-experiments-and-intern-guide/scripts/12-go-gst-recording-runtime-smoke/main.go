@@ -25,14 +25,19 @@ func main() {
 	}
 
 	fmt.Println("=== GStreamer Recording Runtime Smoke Test ===")
+	contextTimeout := durationSecondsEnvOr("CONTEXT_TIMEOUT_SECONDS", 3)
+	maxDuration := durationSecondsEnvOr("MAX_DURATION_SECONDS", 0)
 	fmt.Printf("source type: %s\n", source.Type)
 	fmt.Printf("output path: %s\n", outPath)
+	fmt.Printf("context timeout: %s\n", contextTimeout)
+	fmt.Printf("max duration:    %s\n", maxDuration)
 	fmt.Println()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 
 	session, err := runtime.StartRecording(ctx, plan, media.RecordingOptions{
+		MaxDuration: maxDuration,
 		EventSink: func(event media.RecordingEvent) {
 			fmt.Printf("event: type=%s state=%s reason=%q label=%q path=%q\n", event.Type, event.State, event.Reason, event.ProcessLabel, event.OutputPath)
 		},
@@ -111,6 +116,17 @@ func parseRect(value string) *dsl.Rect {
 		vals[i] = n
 	}
 	return &dsl.Rect{X: vals[0], Y: vals[1], W: vals[2], H: vals[3]}
+}
+
+func durationSecondsEnvOr(key string, def int) time.Duration {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			fatal("parse %s: %v", key, err)
+		}
+		return time.Duration(parsed) * time.Second
+	}
+	return time.Duration(def) * time.Second
 }
 
 func envOr(key, def string) string {
