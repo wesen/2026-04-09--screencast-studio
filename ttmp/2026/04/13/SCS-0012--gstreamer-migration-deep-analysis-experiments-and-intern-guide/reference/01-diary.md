@@ -46,6 +46,7 @@ RelatedFiles:
       Note: |-
         Step 15 native GStreamer video recording runtime
         Step 16 added native GStreamer audio mixing/runtime support
+        Step 18 recording lifecycle/state/event/max-duration refinements
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
@@ -57,15 +58,20 @@ RelatedFiles:
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/11-web-gst-preview-e2e/main.go
       Note: Step 14 end-to-end HTTP validation harness for GStreamer preview
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/12-go-gst-recording-runtime-smoke/main.go
-      Note: Step 15 smoke harness for validating real MP4 output
+      Note: |-
+        Step 15 smoke harness for validating real MP4 output
+        Step 18 max-duration validation extension
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/13-go-gst-audio-recording-runtime-smoke/main.go
       Note: Step 16 smoke harness for WAV/Opus/mixed audio validation
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/14-web-gst-recording-e2e/main.go
+      Note: Step 18 end-to-end recording validation harness
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -1545,3 +1551,250 @@ mixer output:
 - Current supported GStreamer audio codecs in this runtime slice:
   - `wav` / `pcm_s16le`
   - `opus`
+
+---
+
+## Step 17: Obsidian Vault Project Report for Intern Onboarding
+
+Before continuing the remaining migration phases, I created a durable project report in the Obsidian vault so an intern can understand the project without reading raw ticket artifacts first. This note is not a changelog. It is a project-level technical guide that explains the architecture, the migration shape, and the media concepts behind the work.
+
+I treated this as a new dated vault note rather than overwriting the older Screencast Studio note. That keeps the existing FFmpeg-centered architecture note intact while giving the vault a dedicated GStreamer-migration and intern-guide companion note.
+
+### Prompt Context
+
+**User prompt (verbatim):** "do it all up to (including) phase 4. Task by task, commit at appropriate intervals, keep a detailed diary. 
+
+But before you start, write a detailed project report in our obsidian vault, with a deep technical dive into the concepts, such that an intern can read the project report and understand everything."
+
+**Assistant interpretation:** Create a durable Obsidian project note first, written as a deep technical intern guide, and only then continue the remaining implementation phases.
+
+**Inferred user intent:** Preserve the migration knowledge in a long-lived, human-readable place outside the ticket workspace, so onboarding and later understanding do not depend only on transient ticket docs.
+
+### What I did
+
+- Read the vault style exemplars:
+  - `PROJ - ZK Tool`
+  - `ARTICLE - Playbook - Self-Contained Go Wasm and JavaScript Browser Applications`
+- Read the existing Screencast Studio vault note:
+  - `Projects/2026/04/10/PROJ - Screencast Studio - Architecture and Runtime Deep Dive.md`
+- Created a new dated project note in the vault:
+  - `/home/manuel/code/wesen/obsidian-vault/Projects/2026/04/13/PROJ - Screencast Studio - GStreamer Migration and Media Runtime Intern Guide.md`
+- Wrote a detailed note covering:
+  - what Screencast Studio is
+  - how the migration fits into the existing architecture
+  - the media concepts an intern needs (source/transform/sink, codec vs container, live vs bounded pipelines, EOS, caps, pads, bus messages)
+  - the runtime seam and why it matters
+  - what parts of the GStreamer runtime now exist
+  - why preview and recording are different workloads
+  - why window preview needed geometry fallback
+  - migration phases and current status
+  - what an intern should read first in the repo
+  - practical engineering rules and failure modes
+
+### Why
+
+The ticket docs are excellent for active implementation work, but they are still ticket docs. An intern needs a more stable project report that explains the system in prose-first language and gives a mental model before they start reading code.
+
+### What worked
+
+- The older Screencast Studio note provided a good baseline for tone and project framing
+- The new note could focus on the GStreamer migration specifically without needing to replace the older FFmpeg/runtime-architecture note
+- The resulting note is structured as a project note, not a worklog, which makes it much better for onboarding
+
+### What didn't work
+
+- Nothing blocked this step
+
+### What I learned
+
+- The vault already had the right place for this kind of document: a new dated `PROJ - ...` note rather than a ticket export or an `ARTICLE - ...` note
+- The best intern-facing explanation is not “here are the commits” but “here is the mental model of the project and the media system”
+
+### What was tricky to build
+
+- The tricky part was balancing project-specific detail with reusable concepts. If the note were too project-specific, an intern would still struggle to understand the media vocabulary. If it were too abstract, it would stop being a useful project report.
+- The solution was to interleave the two:
+  - explain the media concepts directly,
+  - then anchor each one in the actual Screencast Studio architecture and migration work.
+
+### What warrants a second pair of eyes
+
+- Whether the vault should also get a companion `ARTICLE - ...` note later for reusable GStreamer migration patterns beyond this project
+
+### What should be done in the future
+
+- Keep the vault note updated as the migration progresses through Phases 3 and 4
+
+### Code review instructions
+
+- Review the new vault note directly:
+  - `/home/manuel/code/wesen/obsidian-vault/Projects/2026/04/13/PROJ - Screencast Studio - GStreamer Migration and Media Runtime Intern Guide.md`
+- Compare it with the older project note to ensure the two notes complement rather than duplicate each other
+
+### Technical details
+
+- New vault note path:
+  - `/home/manuel/code/wesen/obsidian-vault/Projects/2026/04/13/PROJ - Screencast Studio - GStreamer Migration and Media Runtime Intern Guide.md`
+- Related older note:
+  - `/home/manuel/code/wesen/obsidian-vault/Projects/2026/04/10/PROJ - Screencast Studio - Architecture and Runtime Deep Dive.md`
+
+---
+
+## Step 18: Finish Phase 2 — Graceful Stop Semantics, Max Duration, and Recording E2E Validation
+
+This step closed out Phase 2 of the migration. The earlier recording slices proved that native GStreamer video and audio pipelines could be built and could write valid files, but that was not yet enough to claim a usable recording runtime. The remaining work was lifecycle discipline: proper `stopping` states, better event parity with the old FFmpeg-backed session model, internal max-duration handling, and a browser/API-level validation path that proves recording still behaves correctly when previews are active.
+
+This is the step where the native GStreamer recording runtime stopped being “a pipeline that happens to work” and became “a session-oriented runtime that behaves like part of the application.”
+
+### Prompt Context
+
+**User prompt (verbatim):** "go ahead"
+
+**Assistant interpretation:** Continue directly into the next recording tasks without pausing for confirmation.
+
+**Inferred user intent:** Finish the remaining Phase 2 work and keep momentum through the migration plan.
+
+**Commit (code):** 8adcd278fbee22f6199a0fff596ac99d7ded6bad — "Refine GStreamer recording lifecycle and validation"
+
+### What I did
+
+- Refined `pkg/media/gst/recording.go` so the runtime now models recording lifecycles more explicitly:
+  - `starting`
+  - `running`
+  - `stopping`
+  - `finished` / `failed`
+- Added synthetic `process_log` events so the existing session manager receives a closer analogue to the older FFmpeg path even though GStreamer is not naturally producing FFmpeg-style stderr logs
+- Switched the recording runtime from plain `context.WithCancel(...)` to `context.WithCancelCause(...)`
+- Added explicit internal max-duration handling:
+  - Go timer triggers cancellation cause `max duration reached after <duration>`
+  - worker cancellation still shuts pipelines down via EOS and waits for file finalization
+- Added a helper to normalize recording stop reasons (`recordingContextReason(...)`)
+- Extended the existing recording smoke harness (`scripts/12-...`) so it can validate:
+  - outer context timeout
+  - internal `MaxDuration`
+- Added a combined web/API-level end-to-end harness:
+  - `ttmp/.../scripts/14-web-gst-recording-e2e/main.go`
+  - `ttmp/.../scripts/14-web-gst-recording-e2e.sh`
+- The web harness validates three concrete cases:
+  1. video recording with an active preview and an explicit `/api/recordings/stop`
+  2. audio recording stopped by `maxDurationSeconds`
+  3. recording canceled by parent runtime context cancellation
+- Re-ran full test suite:
+  - `go test ./... -count=1`
+- Checked tasks:
+  - 2.3 graceful stop / EOS finalization
+  - 2.4 state/event mapping parity
+  - 2.5 max-duration timeout handling
+  - 2.6 end-to-end recording validation
+
+### Why
+
+The migration only becomes believable when the media runtime behaves like a first-class application subsystem instead of a fragile tech demo. The app already has session managers, browser state, preview suspension/restoration, and end-user expectations around stop behavior. The GStreamer runtime needed to fit that world cleanly.
+
+### What worked
+
+- Internal max-duration handling now works independently of outer context timeout
+- Validation command:
+
+```bash
+CONTEXT_TIMEOUT_SECONDS=10 MAX_DURATION_SECONDS=2 OUT_PATH=/tmp/scs-gst-recording-maxduration.mp4 \
+  bash ttmp/.../scripts/12-go-gst-recording-runtime-smoke.sh
+```
+
+- Result:
+  - emitted `stopping` with reason `max duration reached after 2s`
+  - emitted final `finished` with same reason
+  - produced valid MP4
+  - `ffprobe` duration was exactly `2.000000`
+- Browser/API-level end-to-end recording validation passed:
+  - **Case 1:** active preview + video recording + explicit stop request
+    - preview suspended during recording
+    - preview restored after finish
+    - MP4 file valid
+  - **Case 2:** audio recording + max-duration timeout
+    - WAV file valid
+    - session finished with `max duration reached after 2s`
+  - **Case 3:** parent runtime cancellation
+    - recording stopped cleanly
+    - MP4 file valid
+- Full test suite stayed green after these changes
+
+### What didn't work
+
+- There is still an observable semantic mismatch at the top-level web/API path for explicit stop requests.
+- In the web end-to-end case, `/api/recordings/stop` currently results in a final session reason of `context canceled` instead of a nicer semantic reason like `recording stop requested`.
+- This is because `RecordingManager.Stop()` cancels the manager-owned session context, and the GStreamer runtime sees a parent context cancellation rather than a direct `RecordingSession.Stop(...)` call.
+- So the behavior is correct operationally, but the final reason string is less expressive than it could be.
+
+### What I learned
+
+- There are two distinct layers of “stop semantics”:
+  1. runtime-internal stop handling
+  2. higher-level manager/application stop intent
+- It is possible for the runtime to be correct while the top-level reason string is still somewhat generic
+- `context.WithCancelCause(...)` is very helpful for preserving intent in the runtime layer, especially for max-duration vs. generic cancellation
+- The preview/recording interaction still behaves correctly under the current suspend/restore model when both runtimes are GStreamer-backed
+
+### What was tricky to build
+
+- The trickiest part was making the runtime more expressive without reintroducing ownership confusion.
+- The symptom to avoid was a system where:
+  - the manager thinks it owns stop semantics,
+  - the runtime thinks it owns stop semantics,
+  - and neither layer can explain afterward why the recording stopped.
+- The solution was to improve the runtime’s own lifecycle vocabulary first (`starting/running/stopping/finished/failed`, process logs, cancel causes), then validate it through the existing manager layer rather than rewriting the manager at the same time.
+- The remaining `context canceled` reason in the explicit stop case is therefore a known top-layer semantics issue, not a pipeline finalization bug.
+
+### What warrants a second pair of eyes
+
+- Whether `RecordingManager` should eventually own a richer stop-reason model instead of relying on generic context cancellation
+- Whether `context canceled` is acceptable as the current externally visible stop reason until the later phases remove and simplify old runtime assumptions
+- Whether we want a browser-facing distinction between:
+  - user stop,
+  - max duration reached,
+  - parent shutdown,
+  - worker failure
+
+### What should be done in the future
+
+- Move into Phase 3: screenshots, live effects, and VU meter support
+- Revisit top-level stop-reason wording later if it becomes user-visible enough to matter
+- Use the new web recording harness as a regression tool whenever recording-runtime behavior changes
+
+### Code review instructions
+
+- Start with the runtime lifecycle changes:
+  - `pkg/media/gst/recording.go`
+- Then review the enhanced smoke harness:
+  - `ttmp/.../scripts/12-go-gst-recording-runtime-smoke/main.go`
+- Then review the browser/API harness:
+  - `ttmp/.../scripts/14-web-gst-recording-e2e/main.go`
+  - `ttmp/.../scripts/14-web-gst-recording-e2e.sh`
+- Validate with:
+  - `go test ./... -count=1`
+  - max-duration runtime validation command above
+  - `bash ttmp/.../scripts/14-web-gst-recording-e2e.sh`
+
+### Technical details
+
+- Recording runtime now uses:
+
+```go
+runCtx, cancel := context.WithCancelCause(ctx)
+```
+
+- Max duration is implemented as:
+
+```text
+Go timer fires
+  -> cancel cause = max duration reached after N
+  -> worker wait sees ctx.Done()
+  -> worker sends EOS to pipeline
+  -> worker waits for bus EOS
+  -> session emits stopping then finished
+```
+
+- End-to-end harness cases covered in this step:
+  - active preview + explicit stop + MP4 validation
+  - audio max duration + WAV validation
+  - parent context cancellation + MP4 validation

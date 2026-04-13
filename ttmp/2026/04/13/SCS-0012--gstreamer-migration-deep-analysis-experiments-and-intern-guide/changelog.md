@@ -80,3 +80,14 @@ Extended the native GStreamer recording runtime to support audio jobs: one pulse
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go — Added native GStreamer audio branch/mixer/output support to the recording runtime
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/13-go-gst-audio-recording-runtime-smoke/main.go — Smoke harness for WAV
 
+
+## 2026-04-13
+
+Finished Phase 2 of the GStreamer migration: refined recording lifecycle semantics (starting/running/stopping/finished/failed), added synthetic process_log parity, implemented internal max-duration shutdown via cancel causes + EOS, extended the runtime smoke harness for max-duration testing, and added a browser/API-level recording E2E harness covering explicit stop, max-duration timeout, parent cancel, active preview suspension, preview restore, valid MP4 output, and valid WAV output (commit 8adcd278fbee22f6199a0fff596ac99d7ded6bad).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go — Phase 2 lifecycle semantics
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/12-go-gst-recording-runtime-smoke/main.go — Extended smoke harness for internal max-duration recording validation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/14-web-gst-recording-e2e/main.go — Browser/API-level recording validation for stop
+
