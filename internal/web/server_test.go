@@ -18,6 +18,7 @@ import (
 	apppkg "github.com/wesen/2026-04-09--screencast-studio/pkg/app"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/discovery"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
+	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/recording"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -37,6 +38,10 @@ type fakeApplication struct {
 type fakePreviewRunner struct {
 	started chan struct{}
 	runs    atomic.Int32
+}
+
+type fakePreviewSession struct {
+	ctx context.Context
 }
 
 func boolPtr(v bool) *bool {
@@ -117,7 +122,7 @@ func (f *fakeApplication) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan
 	}, nil
 }
 
-func (f *fakePreviewRunner) Run(ctx context.Context, source dsl.EffectiveVideoSource, onFrame func([]byte), onLog func(string, string)) error {
+func (f *fakePreviewRunner) StartPreview(ctx context.Context, source dsl.EffectiveVideoSource, opts media.PreviewOptions) (media.PreviewSession, error) {
 	f.runs.Add(1)
 	if f.started != nil {
 		select {
@@ -125,10 +130,33 @@ func (f *fakePreviewRunner) Run(ctx context.Context, source dsl.EffectiveVideoSo
 		default:
 		}
 	}
-	onLog("stderr", "fake preview started")
-	onFrame([]byte{0xff, 0xd8, 0xff, 0xd9})
-	<-ctx.Done()
+	if opts.OnLog != nil {
+		opts.OnLog("stderr", "fake preview started")
+	}
+	if opts.OnFrame != nil {
+		opts.OnFrame([]byte{0xff, 0xd8, 0xff, 0xd9})
+	}
+	return &fakePreviewSession{ctx: ctx}, nil
+}
+
+func (s *fakePreviewSession) Wait() error {
+	if s == nil || s.ctx == nil {
+		return nil
+	}
+	<-s.ctx.Done()
 	return nil
+}
+
+func (s *fakePreviewSession) Stop(ctx context.Context) error {
+	return nil
+}
+
+func (s *fakePreviewSession) LatestFrame() ([]byte, error) {
+	return []byte{0xff, 0xd8, 0xff, 0xd9}, nil
+}
+
+func (s *fakePreviewSession) TakeScreenshot(ctx context.Context, opts media.ScreenshotOptions) ([]byte, error) {
+	return s.LatestFrame()
 }
 
 func TestComputePreviewSignatureIsStableForEquivalentSources(t *testing.T) {

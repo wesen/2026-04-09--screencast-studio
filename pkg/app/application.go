@@ -9,13 +9,36 @@ import (
 
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/discovery"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
+	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
+	ffmpegmedia "github.com/wesen/2026-04-09--screencast-studio/pkg/media/ffmpeg"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/recording"
 )
 
-type Application struct{}
+type Application struct {
+	recordingRuntime media.RecordingRuntime
+}
 
-func New() *Application {
-	return &Application{}
+type Option func(*Application)
+
+func WithRecordingRuntime(runtime media.RecordingRuntime) Option {
+	return func(a *Application) {
+		a.recordingRuntime = runtime
+	}
+}
+
+func New(opts ...Option) *Application {
+	a := &Application{
+		recordingRuntime: ffmpegmedia.NewRecordingRuntime(),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(a)
+		}
+	}
+	if a.recordingRuntime == nil {
+		a.recordingRuntime = ffmpegmedia.NewRecordingRuntime()
+	}
+	return a
 }
 
 type CompileSummary struct {
@@ -166,10 +189,29 @@ func (a *Application) RecordFile(ctx context.Context, file string, options Recor
 }
 
 func (a *Application) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, options RecordOptions) (*RecordSummary, error) {
-	result, err := recording.Run(ctx, plan, recording.RunOptions{
+	runtime := a.recordingRuntime
+	if runtime == nil {
+		runtime = ffmpegmedia.NewRecordingRuntime()
+	}
+
+	session, err := runtime.StartRecording(ctx, plan, media.RecordingOptions{
 		GracePeriod: options.GracePeriod,
 		MaxDuration: options.MaxDuration,
-		EventSink:   options.EventSink,
+		EventSink: func(event media.RecordingEvent) {
+			if options.EventSink == nil {
+				return
+			}
+			options.EventSink(recording.RunEvent{
+				Type:         recording.RunEventType(event.Type),
+				Timestamp:    event.Timestamp,
+				State:        recording.SessionState(event.State),
+				Reason:       event.Reason,
+				ProcessLabel: event.ProcessLabel,
+				OutputPath:   event.OutputPath,
+				Stream:       event.Stream,
+				Message:      event.Message,
+			})
+		},
 		Logger: func(format string, args ...any) {
 			log.Info().Msgf(format, args...)
 		},
@@ -179,6 +221,11 @@ func (a *Application) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, op
 		Outputs:   append([]dsl.PlannedOutput(nil), plan.Outputs...),
 		Warnings:  append([]string(nil), plan.Warnings...),
 	}
+	if err != nil {
+		return summary, err
+	}
+
+	result, err := session.Wait()
 	if result != nil {
 		summary.State = string(result.State)
 		summary.Reason = result.Reason

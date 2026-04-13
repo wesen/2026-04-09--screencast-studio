@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 
 	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
+	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
+	ffmpegmedia "github.com/wesen/2026-04-09--screencast-studio/pkg/media/ffmpeg"
 )
 
 var (
@@ -48,6 +49,7 @@ type managedPreview struct {
 	source    dsl.EffectiveVideoSource
 	cancel    context.CancelFunc
 	done      chan struct{}
+	session   media.PreviewSession
 
 	state       string
 	reason      string
@@ -62,22 +64,22 @@ type PreviewManager struct {
 	publish   func(ServerEvent)
 	parentCtx context.Context
 	limit     int
-	runner    PreviewRunner
+	runtime   media.PreviewRuntime
 
 	mu          sync.RWMutex
 	byID        map[string]*managedPreview
 	bySignature map[string]*managedPreview
 }
 
-func NewPreviewManager(parentCtx context.Context, application ApplicationService, publish func(ServerEvent), limit int, runner PreviewRunner) *PreviewManager {
+func NewPreviewManager(parentCtx context.Context, application ApplicationService, publish func(ServerEvent), limit int, runtime media.PreviewRuntime) *PreviewManager {
 	if publish == nil {
 		publish = func(ServerEvent) {}
 	}
 	if limit <= 0 {
 		limit = 4
 	}
-	if runner == nil {
-		runner = FFmpegPreviewRunner{}
+	if runtime == nil {
+		runtime = ffmpegmedia.NewPreviewRuntime()
 	}
 	if parentCtx == nil {
 		parentCtx = context.Background()
@@ -87,7 +89,7 @@ func NewPreviewManager(parentCtx context.Context, application ApplicationService
 		publish:     publish,
 		parentCtx:   parentCtx,
 		limit:       limit,
-		runner:      runner,
+		runtime:     runtime,
 		byID:        map[string]*managedPreview{},
 		bySignature: map[string]*managedPreview{},
 	}
@@ -177,17 +179,11 @@ func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID st
 
 	m.publishPreviewState(snapshot)
 
-	group, groupCtx := errgroup.WithContext(previewCtx)
-	group.Go(func() error {
-		defer close(preview.done)
-		log.Info().
-			Str("event", "preview.run.begin").
-			Str("preview_id", preview.id).
-			Str("source_id", source.ID).
-			Msg("preview runner starting")
-		err := m.runner.Run(groupCtx, source, func(frame []byte) {
+	session, err := m.runtime.StartPreview(previewCtx, source, media.PreviewOptions{
+		OnFrame: func(frame []byte) {
 			m.storePreviewFrame(preview.id, frame)
-		}, func(stream, line string) {
+		},
+		OnLog: func(stream, line string) {
 			logTimestamp := time.Now()
 			m.publish(ServerEvent{
 				Type:      "preview.log",
@@ -199,10 +195,31 @@ func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID st
 					Message:      line,
 				},
 			})
-		})
-		m.finishPreview(preview.id, err)
-		return nil
+		},
 	})
+	if err != nil {
+		m.mu.Lock()
+		delete(m.byID, preview.id)
+		delete(m.bySignature, preview.signature)
+		m.mu.Unlock()
+		cancel()
+		return previewSnapshot{}, err
+	}
+
+	m.mu.Lock()
+	preview.session = session
+	m.mu.Unlock()
+
+	go func() {
+		defer close(preview.done)
+		log.Info().
+			Str("event", "preview.run.begin").
+			Str("preview_id", preview.id).
+			Str("source_id", source.ID).
+			Msg("preview session waiting")
+		err := session.Wait()
+		m.finishPreview(preview.id, err)
+	}()
 
 	return snapshot, nil
 }
