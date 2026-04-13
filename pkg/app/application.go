@@ -14,6 +14,11 @@ import (
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/recording"
 )
 
+type recordingControlRuntime interface {
+	SetAudioGain(sessionID, sourceID string, gain float64) error
+	SetAudioCompressorEnabled(sessionID string, enabled bool) error
+}
+
 type Application struct {
 	recordingRuntime media.RecordingRuntime
 }
@@ -210,6 +215,10 @@ func (a *Application) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, op
 				OutputPath:   event.OutputPath,
 				Stream:       event.Stream,
 				Message:      event.Message,
+				DeviceID:     event.DeviceID,
+				LeftLevel:    event.LeftLevel,
+				RightLevel:   event.RightLevel,
+				Available:    event.Available,
 			})
 		},
 		Logger: func(format string, args ...any) {
@@ -236,6 +245,22 @@ func (a *Application) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, op
 		return summary, err
 	}
 	return summary, nil
+}
+
+func (a *Application) SetRecordingAudioGain(ctx context.Context, sessionID, sourceID string, gain float64) error {
+	_ = ctx
+	if runtime, ok := a.recordingRuntime.(recordingControlRuntime); ok {
+		return runtime.SetAudioGain(sessionID, sourceID, gain)
+	}
+	return fmt.Errorf("recording runtime does not support live audio gain control")
+}
+
+func (a *Application) SetRecordingCompressorEnabled(ctx context.Context, sessionID string, enabled bool) error {
+	_ = ctx
+	if runtime, ok := a.recordingRuntime.(recordingControlRuntime); ok {
+		return runtime.SetAudioCompressorEnabled(sessionID, enabled)
+	}
+	return fmt.Errorf("recording runtime does not support live audio compressor control")
 }
 
 func (a *Application) compileFileAt(file string, now time.Time) (*dsl.CompiledPlan, error) {

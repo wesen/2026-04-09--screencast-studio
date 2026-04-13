@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/rs/zerolog/log"
@@ -135,6 +136,46 @@ func (s *Server) handleRecordingStop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeProtoJSON(w, http.StatusOK, mapSessionEnvelope(s.recordings.Stop()))
+}
+
+type audioEffectsRequest struct {
+	SourceID          string   `json:"source_id"`
+	Gain              *float64 `json:"gain,omitempty"`
+	CompressorEnabled *bool    `json:"compressor_enabled,omitempty"`
+}
+
+func (s *Server) handleAudioEffects(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+		return
+	}
+	current := s.recordings.Current()
+	if !current.Active || current.SessionID == "" {
+		writeError(w, http.StatusConflict, "recording_not_active", "recording is not active")
+		return
+	}
+	var request audioEffectsRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_audio_effects_request", err.Error())
+		return
+	}
+	if request.Gain == nil && request.CompressorEnabled == nil {
+		writeError(w, http.StatusBadRequest, "invalid_audio_effects_request", "at least one effect field is required")
+		return
+	}
+	if request.Gain != nil {
+		if err := s.app.SetRecordingAudioGain(r.Context(), current.SessionID, request.SourceID, *request.Gain); err != nil {
+			writeError(w, http.StatusBadRequest, "audio_gain_update_failed", err.Error())
+			return
+		}
+	}
+	if request.CompressorEnabled != nil {
+		if err := s.app.SetRecordingCompressorEnabled(r.Context(), current.SessionID, *request.CompressorEnabled); err != nil {
+			writeError(w, http.StatusBadRequest, "audio_compressor_update_failed", err.Error())
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func decodeDSLRequest(w http.ResponseWriter, r *http.Request) (*studiov1.DslRequest, bool) {

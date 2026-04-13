@@ -275,6 +275,18 @@ func (m *RecordingManager) applyRunEvent(sessionID string, event recording.RunEv
 			Str("process_label", event.ProcessLabel).
 			Str("output_path", event.OutputPath).
 			Msg("recording subprocess started event received")
+	case recording.RunEventAudioLevel:
+		m.publish(ServerEvent{
+			Type:      "telemetry.audio_meter",
+			Timestamp: event.Timestamp,
+			Payload: &studiov1.AudioMeterEvent{
+				DeviceId:   event.DeviceID,
+				LeftLevel:  event.LeftLevel,
+				RightLevel: event.RightLevel,
+				Available:  event.Available,
+			},
+		})
+		return
 	}
 
 	snapshot := cloneRecordingState(m.current.state)

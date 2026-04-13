@@ -82,7 +82,13 @@ func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	previewID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/previews/"), "/mjpeg")
+	path := strings.TrimPrefix(r.URL.Path, "/api/previews/")
+	if strings.HasSuffix(path, "/screenshot") {
+		s.handlePreviewScreenshot(w, r)
+		return
+	}
+
+	previewID := strings.TrimSuffix(path, "/mjpeg")
 	if previewID == "" {
 		writeError(w, http.StatusBadRequest, "missing_preview_id", "missing preview id")
 		return
@@ -140,4 +146,25 @@ func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 		}
 	}
+}
+
+func (s *Server) handlePreviewScreenshot(w http.ResponseWriter, r *http.Request) {
+	previewID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/previews/"), "/screenshot")
+	if previewID == "" {
+		writeError(w, http.StatusBadRequest, "missing_preview_id", "missing preview id")
+		return
+	}
+	shot, _, err := s.previews.TakeScreenshot(r.Context(), previewID)
+	if err != nil {
+		if err == ErrPreviewNotFound {
+			writeError(w, http.StatusNotFound, "preview_not_found", err.Error())
+			return
+		}
+		writeError(w, http.StatusBadRequest, "preview_screenshot_failed", err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(shot)
 }

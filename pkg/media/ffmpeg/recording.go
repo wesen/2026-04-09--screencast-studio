@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/pkg/errors"
+
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/recording"
@@ -97,6 +99,17 @@ func (s *recordingSession) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (s *recordingSession) SetAudioGain(sourceID string, gain float64) error {
+	_ = sourceID
+	_ = gain
+	return errors.New("ffmpeg recording runtime does not support live audio gain control")
+}
+
+func (s *recordingSession) SetAudioCompressorEnabled(enabled bool) error {
+	_ = enabled
+	return errors.New("ffmpeg recording runtime does not support live audio compressor control")
 }
 
 func (s *recordingSession) setResult(result *recording.RunResult, err error) {

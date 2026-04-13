@@ -15,6 +15,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/recordings/start", s.handleRecordingStart)
 	s.mux.HandleFunc("/api/recordings/stop", s.handleRecordingStop)
 	s.mux.HandleFunc("/api/recordings/current", s.handleSessionCurrent)
+	s.mux.HandleFunc("/api/audio/effects", s.handleAudioEffects)
 	s.mux.HandleFunc("/api/previews/ensure", s.handlePreviewEnsure)
 	s.mux.HandleFunc("/api/previews/release", s.handlePreviewRelease)
 	s.mux.HandleFunc("/api/previews", s.handlePreviewList)

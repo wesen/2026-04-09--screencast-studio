@@ -549,6 +549,29 @@ func (m *PreviewManager) LatestFrame(previewID string) ([]byte, uint64, previewS
 	return frame, preview.frameSeq, snapshotPreview(preview), true
 }
 
+func (m *PreviewManager) TakeScreenshot(ctx context.Context, previewID string) ([]byte, previewSnapshot, error) {
+	m.mu.RLock()
+	preview, ok := m.byID[previewID]
+	if !ok {
+		m.mu.RUnlock()
+		return nil, previewSnapshot{}, ErrPreviewNotFound
+	}
+	if preview.session == nil {
+		snapshot := snapshotPreview(preview)
+		m.mu.RUnlock()
+		return nil, snapshot, errors.New("preview session not available")
+	}
+	session := preview.session
+	snapshot := snapshotPreview(preview)
+	m.mu.RUnlock()
+
+	shot, err := session.TakeScreenshot(ctx, media.ScreenshotOptions{})
+	if err != nil {
+		return nil, snapshot, err
+	}
+	return shot, snapshot, nil
+}
+
 func (m *PreviewManager) storePreviewFrame(previewID string, frame []byte) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

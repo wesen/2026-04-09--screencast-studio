@@ -73,6 +73,21 @@ func (f *fakeApplication) CompileDSL(ctx context.Context, body []byte) (*dsl.Com
 	return f.compilePlan, nil
 }
 
+func (f *fakeApplication) SetRecordingAudioGain(ctx context.Context, sessionID, sourceID string, gain float64) error {
+	_ = ctx
+	_ = sessionID
+	_ = sourceID
+	_ = gain
+	return nil
+}
+
+func (f *fakeApplication) SetRecordingCompressorEnabled(ctx context.Context, sessionID string, enabled bool) error {
+	_ = ctx
+	_ = sessionID
+	_ = enabled
+	return nil
+}
+
 func (f *fakeApplication) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, options apppkg.RecordOptions) (*apppkg.RecordSummary, error) {
 	if f.recordStarted != nil {
 		select {

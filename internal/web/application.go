@@ -13,6 +13,8 @@ type ApplicationService interface {
 	NormalizeDSL(ctx context.Context, body []byte) (*dsl.EffectiveConfig, error)
 	CompileDSL(ctx context.Context, body []byte) (*dsl.CompiledPlan, error)
 	RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, options app.RecordOptions) (*app.RecordSummary, error)
+	SetRecordingAudioGain(ctx context.Context, sessionID, sourceID string, gain float64) error
+	SetRecordingCompressorEnabled(ctx context.Context, sessionID string, enabled bool) error
 }
 
 var _ ApplicationService = (*app.Application)(nil)

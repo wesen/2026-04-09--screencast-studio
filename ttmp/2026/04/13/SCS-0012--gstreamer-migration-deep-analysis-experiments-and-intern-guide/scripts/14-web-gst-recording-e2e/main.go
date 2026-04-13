@@ -42,6 +42,22 @@ func (a *runtimeBackedApp) CompileDSL(ctx context.Context, body []byte) (*dsl.Co
 	return a.compilePlan, nil
 }
 
+func (a *runtimeBackedApp) SetRecordingAudioGain(ctx context.Context, sessionID, sourceID string, gain float64) error {
+	_ = ctx
+	if runtime, ok := a.recordingRuntime.(*gstreamer.RecordingRuntime); ok {
+		return runtime.SetAudioGain(sessionID, sourceID, gain)
+	}
+	return fmt.Errorf("recording runtime does not support audio gain control")
+}
+
+func (a *runtimeBackedApp) SetRecordingCompressorEnabled(ctx context.Context, sessionID string, enabled bool) error {
+	_ = ctx
+	if runtime, ok := a.recordingRuntime.(*gstreamer.RecordingRuntime); ok {
+		return runtime.SetAudioCompressorEnabled(sessionID, enabled)
+	}
+	return fmt.Errorf("recording runtime does not support compressor control")
+}
+
 func (a *runtimeBackedApp) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, options apppkg.RecordOptions) (*apppkg.RecordSummary, error) {
 	session, err := a.recordingRuntime.StartRecording(ctx, plan, media.RecordingOptions{
 		GracePeriod: options.GracePeriod,

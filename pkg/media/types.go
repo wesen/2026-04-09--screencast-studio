@@ -25,6 +25,8 @@ type RecordingRuntime interface {
 type RecordingSession interface {
 	Wait() (*RecordingResult, error)
 	Stop(ctx context.Context) error
+	SetAudioGain(sourceID string, gain float64) error
+	SetAudioCompressorEnabled(enabled bool) error
 }
 
 type PreviewOptions struct {
@@ -47,6 +49,7 @@ const (
 	RecordingEventStateChanged   RecordingEventType = "state_changed"
 	RecordingEventProcessStarted RecordingEventType = "process_started"
 	RecordingEventProcessLog     RecordingEventType = "process_log"
+	RecordingEventAudioLevel     RecordingEventType = "audio_level"
 )
 
 type RecordingState string
@@ -68,6 +71,10 @@ type RecordingEvent struct {
 	OutputPath   string             `json:"output_path,omitempty"`
 	Stream       string             `json:"stream,omitempty"`
 	Message      string             `json:"message,omitempty"`
+	DeviceID     string             `json:"device_id,omitempty"`
+	LeftLevel    float64            `json:"left_level,omitempty"`
+	RightLevel   float64            `json:"right_level,omitempty"`
+	Available    bool               `json:"available,omitempty"`
 }
 
 type RecordingResult struct {
