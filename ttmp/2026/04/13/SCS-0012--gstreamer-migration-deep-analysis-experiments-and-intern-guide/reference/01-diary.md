@@ -22,6 +22,8 @@ RelatedFiles:
       Note: |-
         Application runtime seam work recorded in Step 10
         RecordPlan rewired through media runtime seam (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
+    - Path: pkg/discovery/service.go
+      Note: Step 13 exported WindowGeometry for preview runtime reuse
     - Path: pkg/media/ffmpeg/preview.go
       Note: |-
         FFmpeg preview adapter introduced in Step 10
@@ -35,19 +37,24 @@ RelatedFiles:
     - Path: pkg/media/gst/pipeline.go
       Note: Step 11 pipeline assembly helpers (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
     - Path: pkg/media/gst/preview.go
-      Note: Step 11 native GStreamer preview runtime (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
+      Note: |-
+        Step 11 native GStreamer preview runtime (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
+        Step 13 geometry fallback fix for window preview
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
         Phase 0 runtime seam interfaces (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke/main.go
       Note: Step 11 reproducible preview runtime smoke test (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/10-window-preview-investigation.sh
+      Note: Step 13 investigation script for unreliable XID window capture
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -831,3 +838,239 @@ StartPreview(ctx, source, opts)
   - region ✓
   - camera ✓
   - window ✗ (BadMatch / MIT-SHM failure)
+
+---
+
+## Step 12: Window Preview Investigation Plan
+
+Before touching the GStreamer preview code again, I want a reproducible explanation for why `window` preview currently fails while `display`, `region`, and `camera` succeed. The failure reproduces outside Go, so the next step is to debug the X11/GStreamer behavior directly rather than guessing inside the runtime implementation.
+
+This step stores the plan before execution so the subsequent investigation stays scoped, reviewable, and reproducible.
+
+### Prompt Context
+
+**User prompt (verbatim):** "store the investigation plan, and then do it, keeping diary as you go"
+
+**Assistant interpretation:** Save a concrete plan into the ticket docs first, then execute the investigation incrementally and document what actually happened.
+
+**Inferred user intent:** Avoid ad-hoc debugging; turn the window-preview issue into a traceable investigation with preserved commands, evidence, and next actions.
+
+### What I plan to do
+
+1. **Minimize the failing case**
+   - Reproduce the `ximagesrc xid=...` failure using the smallest possible `gst-launch-1.0` pipeline.
+   - Vary relevant properties one at a time (`remote`, `show-pointer`, `use-damage`) to determine whether the failure is specific to one property or to `xid` capture itself.
+
+2. **Inspect the target window with X11 tools**
+   - Use `xwininfo -id ...` and `xprop -id ...` to capture geometry, mapping state, depth/visual hints, and root/display relationships.
+   - Confirm the XID is valid and the window is actually viewable.
+
+3. **Compare XID capture with geometry capture**
+   - Resolve the same window to `(x, y, width, height)`.
+   - Run `ximagesrc startx/starty/endx/endy` against the same rectangle.
+   - If region capture works while `xid` fails, treat `xid` as the broken path and geometry capture as the likely implementation direction.
+
+4. **Test multiple windows**
+   - Try at least a terminal/editor window and one browser/app window.
+   - Determine whether the issue is generic to all `xid` capture in this environment or specific to certain windows/compositor states.
+
+5. **Compare with FFmpeg**
+   - Run a minimal FFmpeg `-window_id` capture for at least one of the same windows.
+   - Determine whether the current FFmpeg path really relies on window-ID capture successfully in this environment.
+
+6. **Only then change code**
+   - If geometry capture is clearly the reliable path, update the GStreamer preview runtime so `window` sources are implemented via resolved geometry rather than `xid`.
+   - Re-run the preview smoke tests and then check task 1.5 if all source types are covered.
+
+### What warrants a second pair of eyes
+
+- Whether the correct long-term model for “window capture” should be “capture by XID” or “resolve geometry and capture that rectangle”
+- Whether the environment-specific MIT-SHM behavior means we should avoid `xid` entirely in X11 mode
+
+### What should be done in the future
+
+- Execute the plan immediately after this step and record each result in the next diary entry
+
+### Code review instructions
+
+- For this step, just review that the plan covers the raw pipeline, X11 inspection, FFmpeg comparison, and code-change decision point before implementation.
+
+### Technical details
+
+- Current failing command from Step 11:
+
+```text
+SOURCE_TYPE=window WINDOW_ID=0x05c0000e bash .../09-go-gst-preview-runtime-smoke.sh
+
+X Error of failed request:  BadMatch (invalid parameter attributes)
+  Major opcode of failed request:  130 (MIT-SHM)
+  Minor opcode of failed request:  4 (X_ShmGetImage)
+```
+
+---
+
+## Step 13: Window Preview Investigation Results and Geometry Fallback Fix
+
+This step executed the investigation plan from Step 12 and produced a concrete answer: `ximagesrc xid=...` is not universally broken, but it is unreliable for some windows that show up as `IsUnviewable` under `xwininfo`. For those windows, geometry-based capture of the same on-screen rectangle works reliably, and that is the safer implementation strategy for preview.
+
+The outcome was not just a diagnosis. I used the evidence to update the native GStreamer preview runtime so `window` sources are resolved to geometry first and then captured as a region instead of relying on the fragile XID path.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 12)
+
+**Assistant interpretation:** Execute the stored investigation, keep the evidence reproducible, and apply the fix if the results clearly point to one.
+
+**Inferred user intent:** Use evidence to drive the implementation, not guesses.
+
+**Commit (code):** b247f270b07600df025c5652317023b03a6f347d — "Use geometry fallback for GStreamer window preview"
+
+### What I did
+
+- Wrote a reproducible investigation script:
+  - `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/10-window-preview-investigation.sh`
+- The script records, per window:
+  - `xwininfo` summary
+  - `xprop` summary
+  - `gst-launch-1.0` XID capture result
+  - `gst-launch-1.0` geometry capture result
+  - FFmpeg `-window_id` capture result
+  - FFmpeg geometry capture result
+- Ran the script against two real windows:
+  - `0x03c00005`
+  - `0x0200026c`
+- Ran the existing preview smoke test again with the previously failing window ID
+- Implemented a runtime fix in `pkg/media/gst/preview.go`:
+  - before building a `window` preview pipeline, resolve its geometry via `xwininfo`
+  - populate `source.Target.Rect`
+  - capture the resolved rectangle with `ximagesrc startx/starty/endx/endy`
+  - stop using `ximagesrc xid=...` in the preview runtime
+- Exported `discovery.WindowGeometry(...)` from `pkg/discovery/service.go` so the preview runtime can reuse the same X11 geometry logic the discovery layer already trusts
+- Re-ran validation:
+  - `go test ./... -count=1`
+  - display preview smoke test
+  - region preview smoke test
+  - camera preview smoke test
+  - previously failing window preview smoke test
+- Checked task:
+  - 1.5 source-type handling
+
+### Why
+
+The investigation showed a more nuanced reality than the original hypothesis. Some window IDs worked directly with `xid`, some did not, and the dividing line was not “all window capture is broken” but “some windows in this environment are not reliably capturable by XID.”
+
+Because the system already has geometry for windows and rectangle capture is more reliable, geometry fallback is the more robust preview implementation.
+
+### What worked
+
+- The investigation script produced a clear contrast between two windows:
+  - **Window `0x03c00005`**
+    - `Map state: IsUnviewable`
+    - GStreamer XID capture: **failed**
+    - GStreamer geometry capture: **succeeded**
+    - FFmpeg geometry capture: **succeeded**
+  - **Window `0x0200026c`**
+    - `Map state: IsViewable`
+    - GStreamer XID capture: **succeeded**
+    - GStreamer geometry capture: **succeeded**
+    - FFmpeg XID capture: **succeeded**
+- The old failing preview now works after the geometry fallback:
+  - command: `SOURCE_TYPE=window WINDOW_ID=0x03c00005 bash .../09-go-gst-preview-runtime-smoke.sh`
+  - result: 15 frames captured successfully
+- After the fix, all four preview source types were validated with the smoke test:
+  - display ✓
+  - region ✓
+  - camera ✓
+  - window ✓
+- `go test ./... -count=1` still passed after the code change
+
+### What didn't work
+
+- The raw XID path remains unreliable for some windows in this environment.
+- The most important failure reproduced by the investigation was:
+
+```text
+X Error of failed request:  BadMatch (invalid parameter attributes)
+  Major opcode of failed request:  130 (MIT-SHM)
+  Minor opcode of failed request:  4 (X_ShmGetImage)
+```
+
+- This was observed on an `IsUnviewable` window and reproduced outside the Go runtime with direct `gst-launch-1.0`.
+
+### What I learned
+
+- The right conclusion was **not** “window preview is broken in GStreamer.”
+- The real conclusion is:
+  - direct XID capture works for some windows,
+  - fails for others,
+  - and geometry capture is consistently safer.
+- Discovery already relies on `xwininfo`-based window geometry, so reusing that logic in the preview runtime is consistent with the rest of the app rather than a special-case hack.
+- The earlier failed window preview test was misleading because it happened to use an especially bad XID for direct capture.
+
+### What was tricky to build
+
+- The subtle part was resisting the urge to overgeneralize after the first failing window.
+- After the first experiments, it looked like `xid` capture might be universally broken. The symptom changed once I tested more than one window: one XID failed hard while another succeeded cleanly. That meant the problem was environmental/window-specific, not a blanket GStreamer bug.
+- The solution was to move one level up conceptually:
+  1. stop asking “why does XID fail sometimes?” as the only question,
+  2. ask “what capture strategy is robust across the windows the app discovers?”
+  3. use geometry, because the app already has it and it works for both the good and bad cases.
+
+### What warrants a second pair of eyes
+
+- Whether the preview runtime should always use geometry for `window` sources long-term, or whether there is still value in preserving an optional direct-XID path for special cases
+- Whether the recording runtime should make the same change when GStreamer recording support lands
+- Whether the FFmpeg path should eventually receive the same window-geometry fallback if we want current window recording/preview behavior to become more robust before FFmpeg is removed
+
+### What should be done in the future
+
+- Finish task 1.6 by wiring the GStreamer preview runtime through the web layer in an end-to-end path and validating browser MJPEG streaming plus suspend/restore behavior
+- Consider adding an automated integration test that exercises the window-preview path with a fake/Xvfb-style display if practical
+- Revisit FFmpeg `window_id` behavior separately if the current FFmpeg runtime also suffers from the same unreliable XID issue in production use
+
+### Code review instructions
+
+- Start with the investigation script:
+  - `ttmp/.../scripts/10-window-preview-investigation.sh`
+- Then review the exported geometry hook:
+  - `pkg/discovery/service.go` (`WindowGeometry`)
+- Then review the runtime behavior change:
+  - `pkg/media/gst/preview.go`
+- Reproduce with:
+  - `bash ttmp/.../scripts/10-window-preview-investigation.sh 0x03c00005 0x0200026c`
+  - `SOURCE_TYPE=window WINDOW_ID=0x03c00005 bash ttmp/.../scripts/09-go-gst-preview-runtime-smoke.sh`
+  - `go test ./... -count=1`
+
+### Technical details
+
+- Investigation evidence from the script:
+
+```text
+Window 0x03c00005
+  Map state: IsUnviewable
+  gst xid capture: failed
+  gst geometry capture: succeeded
+  ffmpeg geometry capture: succeeded
+
+Window 0x0200026c
+  Map state: IsViewable
+  gst xid capture: succeeded
+  gst geometry capture: succeeded
+  ffmpeg xid capture: succeeded
+```
+
+- New runtime flow for `window` preview:
+
+```text
+StartPreview(window source)
+  -> discovery.WindowGeometry(ctx, windowID)
+  -> source.Target.Rect = resolved geometry
+  -> ximagesrc startx/starty/endx/endy
+  -> videoconvert -> videoscale -> videorate -> jpegenc -> appsink
+```
+
+- Validation after the fix:
+  - display: 15 frames
+  - region: 15 frames
+  - camera: 15 frames
+  - previously failing window: 15 frames

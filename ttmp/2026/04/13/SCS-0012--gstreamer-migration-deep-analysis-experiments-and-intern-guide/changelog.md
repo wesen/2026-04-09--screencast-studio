@@ -39,3 +39,14 @@ Implemented the first in-repo native GStreamer preview runtime with go-gst: apps
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview.go — Native GStreamer preview runtime implementation
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke/main.go — Reproducible runtime smoke test for display/region/camera/window preview paths
 
+
+## 2026-04-13
+
+Investigated unreliable window preview capture and fixed the native GStreamer preview runtime to resolve window geometry first, then capture the rectangle instead of relying on fragile ximagesrc XID capture. Added a reproducible investigation script and validated all preview source types, including the previously failing window case (commit b247f270b07600df025c5652317023b03a6f347d).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/discovery/service.go — Exported WindowGeometry for reuse by the GStreamer preview runtime
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview.go — Window preview now resolves geometry and captures via region-style ximagesrc settings
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/10-window-preview-investigation.sh — Reproducible evidence for XID-vs-geometry window capture behavior
+
