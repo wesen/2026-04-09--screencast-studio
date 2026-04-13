@@ -351,6 +351,8 @@ type recordingWorker struct {
 	resultCh   chan error
 	events     chan media.RecordingEvent
 	audio      *audioControls
+	stopFn     func(time.Duration) error
+	cleanupFn  func()
 }
 
 func startVideoRecordingWorker(ctx context.Context, job dsl.VideoJob, eventCh chan media.RecordingEvent) (*recordingWorker, error) {
@@ -361,48 +363,45 @@ func startVideoRecordingWorker(ctx context.Context, job dsl.VideoJob, eventCh ch
 	if err := os.MkdirAll(filepath.Dir(job.OutputPath), 0o755); err != nil {
 		return nil, fmt.Errorf("create output directory: %w", err)
 	}
-	pipeline, err := buildVideoRecordingPipeline(resolvedSource, job.OutputPath)
-	if err != nil {
-		return nil, err
-	}
-	bus := pipeline.GetPipelineBus()
-	resultCh := make(chan error, 1)
-	watch, err := startBusWatch(bus, func(msg *gst.Message) bool {
-		switch msg.Type() {
-		case gst.MessageError:
-			gstErr := msg.ParseError()
-			err := fmt.Errorf("recording pipeline error: %w", gstErr)
+	recorder, err := StartExperimentalSharedVideoRecorder(ctx, resolvedSource, ExperimentalSharedVideoRecorderOptions{
+		OutputPath: job.OutputPath,
+		Container:  resolvedSource.Output.Container,
+		FPS:        resolvedSource.Capture.FPS,
+		OnLog: func(stream, message string) {
+			if eventCh == nil {
+				return
+			}
 			select {
-			case resultCh <- err:
+			case eventCh <- media.RecordingEvent{Type: media.RecordingEventProcessLog, ProcessLabel: resolvedSource.Name, OutputPath: job.OutputPath, Stream: stream, Message: message}:
 			default:
 			}
-			return false
-		case gst.MessageEOS:
-			select {
-			case resultCh <- nil:
-			default:
-			}
-			return false
-		default:
-			return true
-		}
+		},
 	})
 	if err != nil {
-		pipeline.BlockSetState(gst.StateNull)
 		return nil, err
 	}
-	if err := pipeline.SetState(gst.StatePlaying); err != nil {
-		watch.Stop()
-		pipeline.BlockSetState(gst.StateNull)
-		return nil, fmt.Errorf("start recording pipeline: %w", err)
-	}
+	resultCh := make(chan error, 1)
+	go func() {
+		resultCh <- recorder.Wait()
+	}()
 	log.Info().
 		Str("event", "recording.gst.start").
 		Str("process_label", resolvedSource.Name).
 		Str("output_path", job.OutputPath).
 		Str("source_type", resolvedSource.Type).
+		Str("recording_mode", "shared-source-bridge").
 		Msg("started gstreamer recording pipeline")
-	return &recordingWorker{label: resolvedSource.Name, outputPath: job.OutputPath, pipeline: pipeline, watch: watch, resultCh: resultCh, events: eventCh}, nil
+	return &recordingWorker{
+		label:      resolvedSource.Name,
+		outputPath: job.OutputPath,
+		resultCh:   resultCh,
+		events:     eventCh,
+		stopFn: func(timeout time.Duration) error {
+			stopCtx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			return recorder.Stop(stopCtx)
+		},
+	}, nil
 }
 
 func (w *recordingWorker) wait(ctx context.Context) error {
@@ -416,7 +415,13 @@ func (w *recordingWorker) wait(ctx context.Context) error {
 }
 
 func (w *recordingWorker) stop(timeout time.Duration) error {
-	if w == nil || w.pipeline == nil {
+	if w == nil {
+		return nil
+	}
+	if w.stopFn != nil {
+		return w.stopFn(timeout)
+	}
+	if w.pipeline == nil {
 		return nil
 	}
 	sendEOS(w.pipeline)
@@ -429,6 +434,13 @@ func (w *recordingWorker) stop(timeout time.Duration) error {
 }
 
 func (w *recordingWorker) cleanup() {
+	if w == nil {
+		return
+	}
+	if w.cleanupFn != nil {
+		w.cleanupFn()
+		return
+	}
 	if w.watch != nil {
 		w.watch.Stop()
 	}

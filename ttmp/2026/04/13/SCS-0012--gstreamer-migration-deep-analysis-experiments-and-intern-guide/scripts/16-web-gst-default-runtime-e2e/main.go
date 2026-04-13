@@ -34,6 +34,8 @@ func main() {
 
 	previewID := ensurePreview(ts.URL, dslBody, "display-1")
 	waitPreviewCount(ts.URL, 1, 4*time.Second, "preview active before recording")
+	initialShot := waitForScreenshot(ts.URL, previewID, 8*time.Second)
+	fmt.Printf("initial preview screenshot: %d bytes\n", len(initialShot))
 	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	must(err, "dial websocket")
@@ -43,7 +45,7 @@ func main() {
 	outputs := compileOutputs(ts.URL, dslBody)
 	videoPath := outputs["video"]
 	audioPath := outputs["audio"]
-	startRecording(ts.URL, dslBody, 4)
+	startRecording(ts.URL, dslBody, 8)
 	waitPreviewCount(ts.URL, 1, 4*time.Second, "preview still active during recording")
 	shot := waitForScreenshot(ts.URL, previewID, 4*time.Second)
 	fmt.Printf("screenshot during recording: %d bytes\n", len(shot))

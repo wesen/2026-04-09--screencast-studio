@@ -636,8 +636,12 @@ func TestRecordingStartSuspendsAndRestoresPreviews(t *testing.T) {
 		t.Fatal("timed out waiting for recording to start")
 	}
 
-	if previews := server.previews.List(); len(previews) != 0 {
-		t.Fatalf("expected previews to be suspended during recording, got %+v", previews)
+	previews := server.previews.List()
+	if len(previews) != 1 {
+		t.Fatalf("expected preview to remain active during recording, got %+v", previews)
+	}
+	if previews[0].SourceID != "display-1" {
+		t.Fatalf("preview source_id = %q, want display-1", previews[0].SourceID)
 	}
 
 	stopReq := httptest.NewRequest(http.MethodPost, "/api/recordings/stop", nil)
@@ -647,15 +651,12 @@ func TestRecordingStartSuspendsAndRestoresPreviews(t *testing.T) {
 		t.Fatalf("stop status = %d, want %d", stopRec.Code, http.StatusOK)
 	}
 
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		if runner.runs.Load() >= 2 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("expected preview to be restored, runs=%d", runner.runs.Load())
-		}
-		time.Sleep(10 * time.Millisecond)
+	if got := runner.runs.Load(); got != 1 {
+		t.Fatalf("expected preview to stay on the shared source without restart, runs=%d", got)
+	}
+	previews = server.previews.List()
+	if len(previews) != 1 {
+		t.Fatalf("expected preview to remain active after recording stop, got %+v", previews)
 	}
 }
 
@@ -706,15 +707,11 @@ func TestRecordingStartFailureRestoresSuspendedPreviews(t *testing.T) {
 		t.Fatalf("start status = %d, want %d", startRec.Code, http.StatusBadRequest)
 	}
 
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		if runner.runs.Load() >= 2 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("expected preview to be restored after start failure, runs=%d", runner.runs.Load())
-		}
-		time.Sleep(10 * time.Millisecond)
+	if got := runner.runs.Load(); got != 1 {
+		t.Fatalf("expected preview to remain active after start failure without restart, runs=%d", got)
+	}
+	if previews := server.previews.List(); len(previews) != 1 {
+		t.Fatalf("expected preview to remain active after start failure, got %+v", previews)
 	}
 }
 

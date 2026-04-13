@@ -493,7 +493,9 @@ func newBridgeVideoRecorder(caps *gst.Caps, opts ExperimentalSharedVideoRecorder
 	appsrc.Set("block", true)
 	appsrc.Set("emit-signals", false)
 	appsrc.Set("format", int(gst.FormatTime))
+	appsrc.Set("is-live", true)
 	appsrc.SetFormat(gst.FormatTime)
+	appsrc.SetDoTimestamp(true)
 	appsrc.SetAutomaticEOS(false)
 
 	videoconvert, err := gst.NewElementWithName("videoconvert", "shared-record-videoconvert")
@@ -508,6 +510,10 @@ func newBridgeVideoRecorder(caps *gst.Caps, opts ExperimentalSharedVideoRecorder
 	x264enc.Set("bframes", 0)
 	x264enc.Set("tune", 4)
 	x264enc.Set("speed-preset", 3)
+	h264parse, err := gst.NewElementWithName("h264parse", "shared-record-h264parse")
+	if err != nil {
+		return nil, err
+	}
 	mux, err := newVideoMuxer(opts.Container)
 	if err != nil {
 		return nil, err
@@ -518,10 +524,10 @@ func newBridgeVideoRecorder(caps *gst.Caps, opts ExperimentalSharedVideoRecorder
 	}
 	filesink.Set("location", opts.OutputPath)
 
-	if err := pipeline.AddMany(appsrc.Element, videoconvert, x264enc, mux, filesink); err != nil {
+	if err := pipeline.AddMany(appsrc.Element, videoconvert, x264enc, h264parse, mux, filesink); err != nil {
 		return nil, err
 	}
-	if err := gst.ElementLinkMany(appsrc.Element, videoconvert, x264enc, mux, filesink); err != nil {
+	if err := gst.ElementLinkMany(appsrc.Element, videoconvert, x264enc, h264parse, mux, filesink); err != nil {
 		return nil, err
 	}
 
@@ -588,12 +594,8 @@ func (r *bridgeVideoRecorder) pushSample(sample *gst.Sample) (gst.FlowReturn, er
 	frameDuration := r.frameDuration
 	r.mu.Unlock()
 
-	if copyBuffer.PresentationTimestamp() == gst.ClockTimeNone {
-		copyBuffer.SetPresentationTimestamp(gst.ClockTime(time.Duration(frameIndex) * frameDuration))
-	}
-	if copyBuffer.Duration() == gst.ClockTimeNone {
-		copyBuffer.SetDuration(gst.ClockTime(frameDuration))
-	}
+	copyBuffer.SetPresentationTimestamp(gst.ClockTime(time.Duration(frameIndex) * frameDuration))
+	copyBuffer.SetDuration(gst.ClockTime(frameDuration))
 	ret := r.appsrc.PushBuffer(copyBuffer)
 	if ret != gst.FlowOK {
 		return ret, fmt.Errorf("bridge recorder push buffer returned %s", ret)
