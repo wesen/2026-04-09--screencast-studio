@@ -3322,3 +3322,72 @@ I marked the FFmpeg code-path removal work complete, but I did **not** mark the 
 At this point the meaningful remaining cleanup is smaller and more specific:
 - verify the full repo/harnesses in an environment where FFmpeg is absent (`4.4a`)
 - decide whether any active docs should still keep a legacy FFmpeg appendix or if the project should present itself as GStreamer-only with no caveats (`4.4b`)
+
+---
+
+## Step 30: Closed Phase 4 with a Poisoned-FFmpeg Validation Pass and GStreamer-Only Active Docs
+
+After deleting the FFmpeg runtime path in Step 29, there was still one honest closure question for Phase 4: had we merely removed the code, or had we actually proved that the live repo and validation harnesses no longer depend on calling `ffmpeg`?
+
+To answer that cleanly without uninstalling packages from the machine, I ran the full validation pass with a **poisoned `ffmpeg` shim** placed first on `PATH`. The shim simply prints an error and exits nonzero. That means any accidental attempt to spawn `ffmpeg` would fail immediately.
+
+### Validation method
+
+I created a temporary executable named `ffmpeg` with behavior like:
+
+```bash
+#!/usr/bin/env bash
+echo "ffmpeg shim invoked unexpectedly: $*" >&2
+exit 127
+```
+
+Then I prepended that directory to `PATH` and ran:
+
+```bash
+go test ./... -count=1
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/19-go-gst-shared-preview-runtime-smoke.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/21-go-gst-appsrc-mp4-recorder-smoke.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/15-web-gst-phase3-e2e.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e.sh
+```
+
+The shim itself was verified first by running `ffmpeg -version`, which failed through the shim as expected.
+
+### Result
+
+The full repo tests and the key shared-capture/runtime harnesses all still passed with the poisoned `ffmpeg` shim on `PATH`.
+
+That is the strongest practical proof short of uninstalling the distro package entirely:
+- if any active code path still attempted to run `ffmpeg`, it would have failed loudly
+- the harnesses still proved shared preview, shared recording, preview continuity, screenshots, live audio controls, audio-meter flow, and finalized media output
+- therefore the live runtime/test path is no longer dependent on FFmpeg invocation
+
+### Documentation policy decision for Phase 4.4b
+
+I also made the documentation decision explicit:
+
+- **Active repo docs** should describe the project as **GStreamer-only**.
+- **Active ticket index/status docs** should also describe the current system as GStreamer-only.
+- **Historical migration docs** may still mention FFmpeg where they are explaining past architecture, failed experiments, migration sequencing, or postmortem lessons.
+
+That distinction matters. Removing FFmpeg from active docs prevents misleading readers about the current runtime. Keeping historical references in migration/postmortem docs preserves evidence and context for why the current design exists.
+
+### Files updated in this step
+
+Updated:
+- `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/tasks.md`
+- `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/index.md`
+
+The task list now marks Phase 4 fully complete, with 4.4 defined in terms of real no-FFmpeg-invocation proof and explicit documentation policy.
+
+### Final Phase 4 conclusion
+
+Phase 4 is now complete in the sense that matters operationally:
+- shared capture is real and validated
+- preview suspend/restore is gone
+- the old FFmpeg runtime path is deleted
+- active docs present the project as GStreamer-only
+- a poisoned `ffmpeg` binary on `PATH` does not break the repo tests or the key runtime harnesses
+
+What remains is no longer migration cleanup. The next planned work is **Phase 5: live transcription**.

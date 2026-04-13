@@ -44,9 +44,9 @@
 - [x] Phase 4.3a: Remove FFmpeg default-runtime fallbacks and dead adapter references after GStreamer-only validation is complete.
 - [x] Phase 4.3b: Delete FFmpeg-specific packages/files and update imports/build graph.
 - [x] Phase 4.3c: Update docs/README/setup guidance to remove FFmpeg dependency assumptions and emphasize GStreamer requirements.
-- [ ] Phase 4.4: Clean up internal/web/server.go to remove preview handoff logic (the code that suspends previews before recording and restores after). Verify all tests pass without FFmpeg installed.
-- [ ] Phase 4.4a: Run full repo tests and all shared-capture validation harnesses with the FFmpeg path removed.
-- [ ] Phase 4.4b: Decide whether any ticket documentation/examples still need a legacy FFmpeg appendix or whether the repo can become GStreamer-only with no caveats.
+- [x] Phase 4.4: Finalize the shared-capture cleanup and confirm the live repo/harnesses no longer invoke FFmpeg. Active repo documentation should present the project as GStreamer-only; historical migration docs may still mention FFmpeg as background/postmortem context.
+- [x] Phase 4.4a: Run full repo tests and the shared-capture validation harnesses with a poisoned `ffmpeg` shim on PATH so any accidental FFmpeg invocation fails immediately.
+- [x] Phase 4.4b: Decide documentation policy: active repo docs and active ticket index should be GStreamer-only; historical migration/investigation docs may retain FFmpeg references as evidence rather than active instructions.
 - [ ] Phase 5.1: Add transcription tee branch to the audio recording pipeline. After audiomixer, add a tee: branch 1 goes to wavenc/filesink (recording), branch 2 goes to capsfilter(16kHz/mono) -> appsink (transcription feed).
 - [ ] Phase 5.2: Implement Go-side audio chunking. In the transcription appsink callback, accumulate PCM buffers. Every 3 seconds of audio (16000*2*3 = 96000 bytes for 16kHz 16-bit mono), flush the buffer and pass to the transcription backend.
 - [ ] Phase 5.3: Integrate with a transcription backend. Start with the simplest option: invoke local whisper CLI as a subprocess, pass the audio chunk as a temp WAV file, read the text output. Publish transcription segments via WebSocket.

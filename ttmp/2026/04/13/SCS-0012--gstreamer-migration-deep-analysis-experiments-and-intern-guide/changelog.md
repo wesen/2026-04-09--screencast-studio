@@ -217,3 +217,15 @@ Updated `README.md` to describe the project as GStreamer-based rather than FFmpe
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/manager_shutdown_test.go — Removed the dedicated suspend/restore test after deleting that behavior
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/events.go — Slimmed the recording package down to event/state types still used by app/web
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/README.md — Updated active repo documentation from FFmpeg-centric wording to GStreamer-centric wording
+
+
+## 2026-04-13
+
+Closed Phase 4. Ran the repo tests and the key shared-capture/runtime harnesses with a poisoned `ffmpeg` shim first on `PATH`, so any accidental FFmpeg invocation would have failed immediately. The validation still passed, which confirms that the live repo/runtime path no longer depends on spawning `ffmpeg`.
+
+Also updated the active ticket index and task list to reflect the final documentation policy: active repo docs and active ticket status docs should describe the project as GStreamer-only, while historical migration/postmortem docs may still mention FFmpeg when explaining the old architecture and the migration path.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/tasks.md — Marked Phase 4.4 complete and documented the no-FFmpeg-invocation validation policy
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/index.md — Updated the active ticket index to reflect the current GStreamer-only architecture and Phase 5 as the next planned work
