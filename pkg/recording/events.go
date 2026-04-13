@@ -2,6 +2,16 @@ package recording
 
 import "time"
 
+type SessionState string
+
+const (
+	StateStarting SessionState = "starting"
+	StateRunning  SessionState = "running"
+	StateStopping SessionState = "stopping"
+	StateFinished SessionState = "finished"
+	StateFailed   SessionState = "failed"
+)
+
 type RunEventType string
 
 const (

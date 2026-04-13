@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,14 +31,6 @@ type previewSnapshot struct {
 	Leases      int
 	HasFrame    bool
 	LastFrameAt time.Time
-}
-
-type previewResumePlan struct {
-	SourceIDs []string
-}
-
-func (p previewResumePlan) Empty() bool {
-	return len(p.SourceIDs) == 0
 }
 
 type managedPreview struct {
@@ -350,163 +340,6 @@ func (m *PreviewManager) Shutdown(ctx context.Context) error {
 		Str("event", "preview.shutdown.done").
 		Int("preview_count", len(targets)).
 		Msg("preview manager shutdown finished")
-	return nil
-}
-
-func (m *PreviewManager) SuspendAll(ctx context.Context, reason string) (previewResumePlan, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		reason = "preview suspended"
-	}
-
-	type suspendTarget struct {
-		id       string
-		sourceID string
-		cancel   context.CancelFunc
-		done     chan struct{}
-	}
-
-	m.mu.Lock()
-	targets := make([]suspendTarget, 0, len(m.byID))
-	snapshots := make([]previewSnapshot, 0, len(m.byID))
-	sourceIDs := make([]string, 0, len(m.byID))
-	seenSources := map[string]struct{}{}
-	for _, preview := range m.byID {
-		if preview == nil {
-			continue
-		}
-		if preview.state == "finished" || preview.state == "failed" {
-			continue
-		}
-		if _, ok := seenSources[preview.source.ID]; !ok {
-			seenSources[preview.source.ID] = struct{}{}
-			sourceIDs = append(sourceIDs, preview.source.ID)
-		}
-		preview.state = "stopping"
-		preview.reason = reason
-		preview.leases = 0
-		targets = append(targets, suspendTarget{
-			id:       preview.id,
-			sourceID: preview.source.ID,
-			cancel:   preview.cancel,
-			done:     preview.done,
-		})
-		snapshots = append(snapshots, snapshotPreview(preview))
-	}
-	m.mu.Unlock()
-
-	if len(targets) == 0 {
-		log.Info().
-			Str("event", "preview.suspend.noop").
-			Msg("preview suspend requested with no active previews")
-		return previewResumePlan{}, nil
-	}
-
-	sort.Strings(sourceIDs)
-	plan := previewResumePlan{SourceIDs: sourceIDs}
-	log.Info().
-		Str("event", "preview.suspend.begin").
-		Int("preview_count", len(targets)).
-		Strs("source_ids", plan.SourceIDs).
-		Str("reason", reason).
-		Msg("preview suspend starting")
-
-	for _, snapshot := range snapshots {
-		m.publishPreviewState(snapshot)
-	}
-	for _, target := range targets {
-		log.Info().
-			Str("event", "preview.suspend.cancel").
-			Str("preview_id", target.id).
-			Str("source_id", target.sourceID).
-			Str("reason", reason).
-			Msg("preview suspend requested cancellation")
-		if target.cancel != nil {
-			target.cancel()
-		}
-	}
-
-	for i, target := range targets {
-		if target.done == nil {
-			continue
-		}
-		select {
-		case <-target.done:
-			log.Info().
-				Str("event", "preview.suspend.wait.done").
-				Str("preview_id", target.id).
-				Str("source_id", target.sourceID).
-				Int("remaining", len(targets)-i-1).
-				Msg("preview suspend wait completed")
-		case <-ctx.Done():
-			pending := []string{target.id}
-			for _, remaining := range targets[i+1:] {
-				pending = append(pending, remaining.id)
-			}
-			log.Error().
-				Str("event", "preview.suspend.timeout").
-				Strs("pending_previews", pending).
-				Err(ctx.Err()).
-				Msg("preview suspend timed out")
-			return previewResumePlan{}, fmt.Errorf("preview suspend timed out waiting for %v: %w", pending, ctx.Err())
-		}
-	}
-
-	log.Info().
-		Str("event", "preview.suspend.done").
-		Int("preview_count", len(targets)).
-		Strs("source_ids", plan.SourceIDs).
-		Msg("preview suspend finished")
-	return plan, nil
-}
-
-func (m *PreviewManager) RestoreSuspended(ctx context.Context, dslBody []byte, plan previewResumePlan) error {
-	if ctx == nil {
-		ctx = m.parentContext()
-	}
-	if plan.Empty() {
-		log.Info().
-			Str("event", "preview.restore.noop").
-			Msg("preview restore requested with no suspended previews")
-		return nil
-	}
-
-	log.Info().
-		Str("event", "preview.restore.begin").
-		Int("preview_count", len(plan.SourceIDs)).
-		Strs("source_ids", plan.SourceIDs).
-		Msg("preview restore starting")
-
-	errs := make([]string, 0)
-	for _, sourceID := range plan.SourceIDs {
-		snapshot, err := m.Ensure(ctx, dslBody, sourceID)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("%s: %v", sourceID, err))
-			log.Error().
-				Str("event", "preview.restore.ensure.error").
-				Str("source_id", sourceID).
-				Err(err).
-				Msg("failed to restore suspended preview")
-			continue
-		}
-		log.Info().
-			Str("event", "preview.restore.ensure.done").
-			Str("source_id", sourceID).
-			Str("preview_id", snapshot.ID).
-			Msg("restored suspended preview")
-	}
-	if len(errs) > 0 {
-		return fmt.Errorf("restore suspended previews: %s", strings.Join(errs, "; "))
-	}
-
-	log.Info().
-		Str("event", "preview.restore.done").
-		Int("preview_count", len(plan.SourceIDs)).
-		Strs("source_ids", plan.SourceIDs).
-		Msg("preview restore finished")
 	return nil
 }
 

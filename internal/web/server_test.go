@@ -107,7 +107,7 @@ func (f *fakeApplication) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan
 			Timestamp:    time.Now(),
 			ProcessLabel: "display-1",
 			Stream:       "stderr",
-			Message:      "fake ffmpeg log line",
+			Message:      "fake media runtime log line",
 		})
 	}
 	select {
