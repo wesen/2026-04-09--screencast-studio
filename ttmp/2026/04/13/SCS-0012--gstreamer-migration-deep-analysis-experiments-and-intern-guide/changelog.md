@@ -192,3 +192,14 @@ Uploaded the new report to reMarkable at `/ai/2026/04/13/SCS-0012` as `SCS-0012 
 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/03-screencast-studio-system-explanation-and-gstreamer-migration-postmortem-for-interns.md — New detailed intern-facing postmortem and system explanation
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/index.md — Ticket index updated to link to the new postmortem document
+
+
+## 2026-04-13
+
+Removed the remaining server-level preview handoff bookkeeping now that the no-suspend shared-capture path has been validated. `internal/web/server.go` no longer stores or restores suspended previews after recording, and `internal/web/session_manager.go` no longer carries an `afterFinish` callback solely for that legacy flow. This confirms that preview continuity is now part of the normal architecture rather than a temporary experiment.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go — Removed obsolete preview handoff storage/restore code after shared-capture validation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go — Simplified recording manager constructor by deleting the legacy after-finish preview-restore hook
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/manager_shutdown_test.go — Updated remaining constructor callsites after the recording-manager cleanup

@@ -20,17 +20,23 @@ RelatedFiles:
         Step 26 removed preview suspension from recording start for the no-suspend shared-capture path
     - Path: internal/web/handlers_preview.go
       Note: Step 19 screenshot endpoint and preview screenshot retrieval
+    - Path: internal/web/manager_shutdown_test.go
+      Note: Step 28 updated constructor callsites after recording-manager simplification
     - Path: internal/web/preview_manager.go
       Note: |-
         Preview runtime wiring and lifecycle changes recorded in Step 10
         PreviewManager now owns preview sessions via media.PreviewRuntime (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
         Step 20 default preview runtime now points to GStreamer
     - Path: internal/web/server.go
-      Note: Step 14 server option seam for preview runtime injection
+      Note: |-
+        Step 14 server option seam for preview runtime injection
+        Step 28 removed obsolete preview handoff bookkeeping after no-suspend shared capture was validated
     - Path: internal/web/server_test.go
       Note: Step 26 updated tests from suspend/restore assertions to preview continuity assertions
     - Path: internal/web/session_manager.go
-      Note: Step 19 websocket audio meter publishing from recording events
+      Note: |-
+        Step 19 websocket audio meter publishing from recording events
+        Step 28 removed the legacy after-finish callback used only for preview handoff restoration
     - Path: pkg/app/application.go
       Note: |-
         Application runtime seam work recorded in Step 10
@@ -107,6 +113,7 @@ LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -3147,3 +3154,71 @@ remarquee upload md /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2
 ### Why this matters
 
 This new report is different from the earlier docs. The older documents explain the migration plan and the Phase 4 architecture problem. This new report is the "how to understand the whole system and why the team struggled the way it did" document. It is explicitly intended to shorten the onboarding time for the next person who needs to touch preview, recording, shared capture, or FFmpeg removal.
+
+---
+
+## Step 28: Removed the Remaining Server-Level Preview Handoff Dead Code
+
+After the shared bridge rollout was validated through the real default-runtime web/app seam, the old preview handoff code in `internal/web/server.go` was just dead weight. It existed to remember which previews had been suspended before recording so they could be restored afterward, but recording start no longer suspends previews and the default-runtime harness now proves that preview continuity is the correct behavior.
+
+So I removed the remaining handoff bookkeeping instead of leaving half-dead coordination code around.
+
+### What I changed
+
+Updated:
+- `internal/web/server.go`
+- `internal/web/session_manager.go`
+- `internal/web/manager_shutdown_test.go`
+
+Specifically:
+- removed `Server.previewHandoffMu`
+- removed `Server.previewHandoff`
+- removed `recordingPreviewHandoff`
+- removed:
+  - `runtimeContext()`
+  - `storeRecordingPreviewHandoff(...)`
+  - `takeRecordingPreviewHandoff(...)`
+  - `restoreRecordingPreviewHandoff(...)`
+  - `handleRecordingFinished(...)`
+- simplified `NewRecordingManager(...)` so it no longer takes an `afterFinish` callback that existed only for the old preview-restore path
+- updated the remaining constructor callsites/tests accordingly
+
+### Why
+
+The important point is that this cleanup only became legitimate **after** the shared-capture path was proven through the real default-runtime harness. Before that, the handoff logic still represented real safety behavior. After the no-suspend path was validated, it became misleading legacy code.
+
+### Validation
+
+Re-ran:
+
+```bash
+go test ./... -count=1
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e.sh
+```
+
+Result:
+- tests green
+- default-runtime harness still passes
+- preview remains active after recording
+- video/audio outputs still finalize correctly
+
+Observed final harness output included:
+
+```text
+preview still active after recording: preview count=1
+default-runtime video ... duration=8.200000
+default-runtime audio ... duration=8.010000
+```
+
+### What this means architecturally
+
+This cleanup is the point where the server layer finally stopped pretending that preview suspension/restoration is part of the normal recording lifecycle. That behavior is no longer how the system is supposed to work. The current intended behavior is:
+
+- preview remains alive,
+- recording attaches as another consumer of the same shared source,
+- preview does not need to be reconstituted after recording,
+- and the server does not need out-of-band preview handoff bookkeeping.
+
+### What remains after this
+
+The next cleanup question is whether `PreviewManager.SuspendAll / RestoreSuspended` should be removed entirely or merely left available as an internal utility for now. That is now a much smaller follow-up decision than it was before this step.
