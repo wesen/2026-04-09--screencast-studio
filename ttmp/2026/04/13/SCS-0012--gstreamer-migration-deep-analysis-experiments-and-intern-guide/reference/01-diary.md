@@ -18,6 +18,8 @@ RelatedFiles:
       Note: |-
         Preview runtime wiring and lifecycle changes recorded in Step 10
         PreviewManager now owns preview sessions via media.PreviewRuntime (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
+    - Path: internal/web/server.go
+      Note: Step 14 server option seam for preview runtime injection
     - Path: pkg/app/application.go
       Note: |-
         Application runtime seam work recorded in Step 10
@@ -48,12 +50,15 @@ RelatedFiles:
       Note: Step 11 reproducible preview runtime smoke test (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/10-window-preview-investigation.sh
       Note: Step 13 investigation script for unreliable XID window capture
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/11-web-gst-preview-e2e/main.go
+      Note: Step 14 end-to-end HTTP validation harness for GStreamer preview
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -1074,3 +1079,159 @@ StartPreview(window source)
   - region: 15 frames
   - camera: 15 frames
   - previously failing window: 15 frames
+
+---
+
+## Step 14: HTTP End-to-End Validation of GStreamer Preview and Suspend/Restore
+
+This step finished Phase 1 by proving the native GStreamer preview runtime works through the actual web handlers, not just through direct runtime smoke tests. I added a small server-construction hook so a test harness can ask the web layer to use the GStreamer preview runtime explicitly, then exercised `/api/previews/ensure`, `/api/previews/{id}/mjpeg`, preview suspension during recording start, and restoration after recording finish.
+
+The important distinction is that this step validates the browser-facing path: preview frames flow through `PreviewManager`, the MJPEG endpoint still streams correctly, and the existing preview handoff logic still works when the preview implementation underneath is GStreamer instead of FFmpeg.
+
+### Prompt Context
+
+**User prompt (verbatim):** "continue."
+
+**Assistant interpretation:** Keep moving through the ticket tasks in order and complete the next unfinished preview task with the same commit/diary discipline.
+
+**Inferred user intent:** Finish the remaining preview-phase work before moving on to recording migration.
+
+**Commit (code):** 7db020ad31048d9b2f4f47adc9f04c8b6742ef6b — "Add web-level GStreamer preview validation hook"
+
+### What I did
+
+- Added server-level preview runtime injection in `internal/web/server.go`:
+  - `ServerOption`
+  - `WithPreviewRuntime(...)`
+  - `NewServerWithOptions(...)`
+  - `NewServer(...)` now delegates to `NewServerWithOptions(...)`
+- Kept existing call sites compatible by preserving `NewServer(...)`
+- Wrote a reproducible HTTP-level validation harness:
+  - `ttmp/.../scripts/11-web-gst-preview-e2e/main.go`
+  - `ttmp/.../scripts/11-web-gst-preview-e2e.sh`
+- The harness:
+  - starts an `httptest` server using `web.NewServerWithOptions(..., web.WithPreviewRuntime(gst.NewPreviewRuntime()))`
+  - serves a real GStreamer preview runtime through the normal web handlers
+  - calls `/api/previews/ensure`
+  - reads `/api/previews/{id}/mjpeg` until it sees a frame boundary
+  - starts a fake recording through `/api/recordings/start`
+  - polls `/api/previews` until preview count becomes `0` (suspended)
+  - waits for preview count to become `1` again (restored)
+  - reads MJPEG again after restore
+  - releases the preview
+- Re-ran test suite:
+  - `go test ./... -count=1`
+- Ran the end-to-end harness for:
+  - display preview
+  - region preview
+  - camera preview
+  - window preview (extra validation beyond task scope)
+- Checked task:
+  - 1.6 end-to-end preview validation
+
+### Why
+
+Phase 1 was not really complete until the preview runtime proved itself through the actual HTTP contract the browser uses. Direct runtime smoke tests were necessary, but not sufficient.
+
+This step proves the current web layer can keep its shape while the preview runtime underneath changes. That is one of the central migration goals.
+
+### What worked
+
+- `go test ./... -count=1` stayed green after adding the server option
+- Display preview worked end-to-end through HTTP:
+  - ensure endpoint succeeded
+  - MJPEG endpoint returned `--frame`
+  - preview suspended during recording start
+  - preview restored after recording finished
+  - MJPEG still worked after restore
+- Region preview worked through the same HTTP path
+- Camera preview worked through the same HTTP path
+- Window preview also worked through the same HTTP path after the geometry fallback from Step 13
+- The preview handoff logic in `internal/web/server.go` did not need semantic changes; the GStreamer runtime fit under the existing `PreviewManager`
+
+### What didn't work
+
+- Nothing new failed in this step.
+- The only noteworthy caveat was that camera MJPEG reads after restore could take longer than display/region because frame delivery timing is hardware-dependent. The request still succeeded and returned a frame boundary.
+
+### What I learned
+
+- The existing HTTP preview contract is decoupled enough from FFmpeg that a runtime swap is feasible without redesigning the browser API
+- The preview suspend/restore lifecycle belongs at the manager/server layer, not inside FFmpeg/GStreamer-specific code
+- Adding an explicit server option is much cleaner than manually replacing `server.previews` in every external harness
+- The web path now has practical proof for:
+  - ensure
+  - MJPEG streaming
+  - suspend
+  - restore
+  - release
+
+### What was tricky to build
+
+- The main challenge was getting true end-to-end coverage without changing production defaults prematurely.
+- If I had simply switched `NewServer(...)` to use the GStreamer runtime by default, that would have mixed validation work with rollout policy. The symptom would have been a harder-to-review change where every server construction path silently changed behavior at once.
+- The solution was to add a narrow constructor seam:
+  1. preserve `NewServer(...)` behavior
+  2. add `NewServerWithOptions(...)`
+  3. inject `WithPreviewRuntime(gst.NewPreviewRuntime())` only in the validation harness
+
+### What warrants a second pair of eyes
+
+- Whether `WithPreviewRuntime(...)` should remain a test/integration-only hook for now or become part of the normal rollout strategy when we switch defaults
+- Whether we want a small CLI or env toggle for serving with GStreamer preview in manual developer testing
+- Whether the preview ID stability assumption across suspend/restore is something we want to preserve explicitly, or whether the browser should always treat restored previews as potentially new identities
+
+### What should be done in the future
+
+- Decide whether to switch the web server’s preview runtime default from FFmpeg to GStreamer now that Phase 1 is fully validated
+- Start Phase 2: native GStreamer recording runtime
+- Reuse the same server-option pattern if a staged rollout is needed for recording runtime injection later
+
+### Code review instructions
+
+- Start with the server constructor seam:
+  - `internal/web/server.go`
+- Then review the end-to-end harness:
+  - `ttmp/.../scripts/11-web-gst-preview-e2e/main.go`
+  - `ttmp/.../scripts/11-web-gst-preview-e2e.sh`
+- Validate with:
+  - `go test ./... -count=1`
+  - `bash ttmp/.../scripts/11-web-gst-preview-e2e.sh`
+  - `REGION=0,0,640,480 bash ttmp/.../scripts/11-web-gst-preview-e2e.sh`
+  - `SOURCE_TYPE=camera DEVICE=/dev/video0 bash ttmp/.../scripts/11-web-gst-preview-e2e.sh`
+  - optional: `SOURCE_TYPE=window WINDOW_ID=0x03c00005 bash ttmp/.../scripts/11-web-gst-preview-e2e.sh`
+
+### Technical details
+
+- Server API added in this step:
+
+```go
+type ServerOption func(*serverOptions)
+
+func WithPreviewRuntime(runtime media.PreviewRuntime) ServerOption
+func NewServerWithOptions(parentCtx context.Context, application ApplicationService, cfg Config, opts ...ServerOption) *Server
+```
+
+- End-to-end flow validated in this step:
+
+```text
+HTTP POST /api/previews/ensure
+  -> PreviewManager.Ensure
+  -> GStreamer PreviewRuntime.StartPreview
+  -> appsink frames stored in manager
+
+HTTP GET /api/previews/{id}/mjpeg
+  -> reads manager.LatestFrame()
+  -> multipart/x-mixed-replace stream
+
+HTTP POST /api/recordings/start
+  -> server suspends previews
+  -> fake recording runs
+  -> server restores suspended previews on finish
+```
+
+- Source types validated through the HTTP path:
+  - display ✓
+  - region ✓
+  - camera ✓
+  - window ✓ (extra)

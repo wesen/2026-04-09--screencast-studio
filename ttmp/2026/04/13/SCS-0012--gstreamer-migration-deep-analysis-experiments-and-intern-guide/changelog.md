@@ -50,3 +50,13 @@ Investigated unreliable window preview capture and fixed the native GStreamer pr
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview.go — Window preview now resolves geometry and captures via region-style ximagesrc settings
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/10-window-preview-investigation.sh — Reproducible evidence for XID-vs-geometry window capture behavior
 
+
+## 2026-04-13
+
+Completed Phase 1 end-to-end validation for native GStreamer preview: added a server-level preview runtime injection hook and a reproducible HTTP harness that validates ensure, MJPEG streaming, preview suspend during recording, and preview restore after recording across display, region, camera, and window sources (commit 7db020ad31048d9b2f4f47adc9f04c8b6742ef6b).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go — Added NewServerWithOptions and WithPreviewRuntime for staged preview-runtime validation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/11-web-gst-preview-e2e/main.go — HTTP end-to-end harness for GStreamer preview ensure/MJPEG/suspend/restore
+
