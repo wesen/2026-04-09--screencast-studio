@@ -33,17 +33,26 @@ func (RecordingRuntime) StartRecording(ctx context.Context, plan *dsl.CompiledPl
 	if len(plan.VideoJobs) == 0 && len(plan.AudioJobs) == 0 {
 		return nil, errors.New("compiled plan has no executable jobs")
 	}
-	if len(plan.AudioJobs) > 0 {
-		return nil, errors.New("gstreamer audio recording is not implemented yet")
-	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	runCtx, cancel := context.WithCancel(ctx)
-	workers := make([]*recordingWorker, 0, len(plan.VideoJobs))
+	workers := make([]*recordingWorker, 0, len(plan.VideoJobs)+len(plan.AudioJobs))
 	for _, job := range plan.VideoJobs {
-		worker, err := startRecordingWorker(runCtx, job)
+		worker, err := startVideoRecordingWorker(runCtx, job)
+		if err != nil {
+			cancel()
+			for _, started := range workers {
+				_ = started.stop(250 * time.Millisecond)
+				started.cleanup()
+			}
+			return nil, err
+		}
+		workers = append(workers, worker)
+	}
+	for _, job := range plan.AudioJobs {
+		worker, err := startAudioRecordingWorker(runCtx, job)
 		if err != nil {
 			cancel()
 			for _, started := range workers {
@@ -186,7 +195,7 @@ type recordingWorker struct {
 	resultCh   chan error
 }
 
-func startRecordingWorker(ctx context.Context, job dsl.VideoJob) (*recordingWorker, error) {
+func startVideoRecordingWorker(ctx context.Context, job dsl.VideoJob) (*recordingWorker, error) {
 	resolvedSource, err := resolveWindowSource(ctx, job.Source)
 	if err != nil {
 		return nil, err
@@ -270,6 +279,54 @@ func (w *recordingWorker) cleanup() {
 	}
 }
 
+func startAudioRecordingWorker(ctx context.Context, job dsl.AudioMixJob) (*recordingWorker, error) {
+	if err := os.MkdirAll(filepath.Dir(job.OutputPath), 0o755); err != nil {
+		return nil, fmt.Errorf("create output directory: %w", err)
+	}
+	pipeline, err := buildAudioRecordingPipeline(job)
+	if err != nil {
+		return nil, err
+	}
+	bus := pipeline.GetPipelineBus()
+	resultCh := make(chan error, 1)
+	watch, err := startBusWatch(bus, func(msg *gst.Message) bool {
+		switch msg.Type() {
+		case gst.MessageError:
+			gstErr := msg.ParseError()
+			err := fmt.Errorf("audio recording pipeline error: %w", gstErr)
+			select {
+			case resultCh <- err:
+			default:
+			}
+			return false
+		case gst.MessageEOS:
+			select {
+			case resultCh <- nil:
+			default:
+			}
+			return false
+		default:
+			return true
+		}
+	})
+	if err != nil {
+		pipeline.BlockSetState(gst.StateNull)
+		return nil, err
+	}
+	if err := pipeline.SetState(gst.StatePlaying); err != nil {
+		watch.Stop()
+		pipeline.BlockSetState(gst.StateNull)
+		return nil, fmt.Errorf("start audio recording pipeline: %w", err)
+	}
+	log.Info().
+		Str("event", "recording.gst.start").
+		Str("process_label", job.Name).
+		Str("output_path", job.OutputPath).
+		Int("source_count", len(job.Sources)).
+		Msg("started gstreamer audio recording pipeline")
+	return &recordingWorker{label: job.Name, outputPath: job.OutputPath, pipeline: pipeline, watch: watch, resultCh: resultCh}, nil
+}
+
 func buildVideoRecordingPipeline(source dsl.EffectiveVideoSource, outputPath string) (*gst.Pipeline, error) {
 	pipeline, err := gst.NewPipeline("")
 	if err != nil {
@@ -338,6 +395,129 @@ func buildVideoRecordingPipeline(source dsl.EffectiveVideoSource, outputPath str
 	return pipeline, nil
 }
 
+func buildAudioRecordingPipeline(job dsl.AudioMixJob) (*gst.Pipeline, error) {
+	if len(job.Sources) == 0 {
+		return nil, errors.New("audio mix job has no sources")
+	}
+	pipeline, err := gst.NewPipeline("")
+	if err != nil {
+		return nil, fmt.Errorf("create pipeline: %w", err)
+	}
+
+	mixer, err := gst.NewElement("audiomixer")
+	if err != nil {
+		return nil, fmt.Errorf("create audiomixer: %w", err)
+	}
+	pipeline.Add(mixer)
+
+	for i, src := range job.Sources {
+		branch, volume, err := buildAudioSourceBranch(src, job.Output)
+		if err != nil {
+			return nil, err
+		}
+		pipeline.AddMany(branch...)
+		if err := linkElements(branch...); err != nil {
+			pipeline.BlockSetState(gst.StateNull)
+			return nil, err
+		}
+		srcPad := volume.GetStaticPad("src")
+		if srcPad == nil {
+			return nil, fmt.Errorf("audio branch %d missing src pad", i)
+		}
+		sinkPad := mixer.GetRequestPad("sink_%u")
+		if sinkPad == nil {
+			return nil, fmt.Errorf("audio mixer request pad %d failed", i)
+		}
+		if ret := srcPad.Link(sinkPad); ret != gst.PadLinkOK {
+			return nil, fmt.Errorf("link audio branch %d to mixer: %s", i, ret.String())
+		}
+	}
+
+	postMixer, err := buildAudioOutputChain(job.Output, job.OutputPath)
+	if err != nil {
+		return nil, err
+	}
+	pipeline.AddMany(postMixer...)
+	chain := append([]*gst.Element{mixer}, postMixer...)
+	if err := linkElements(chain...); err != nil {
+		pipeline.BlockSetState(gst.StateNull)
+		return nil, err
+	}
+	return pipeline, nil
+}
+
+func buildAudioSourceBranch(src dsl.EffectiveAudioSource, out dsl.AudioOutputSettings) ([]*gst.Element, *gst.Element, error) {
+	pulsesrc, err := gst.NewElement("pulsesrc")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create pulsesrc: %w", err)
+	}
+	pulsesrc.Set("device", src.Device)
+	caps, err := newCapsFilter(audioRawCaps(out))
+	if err != nil {
+		return nil, nil, err
+	}
+	audioconvert, err := gst.NewElement("audioconvert")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create audioconvert: %w", err)
+	}
+	audioresample, err := gst.NewElement("audioresample")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create audioresample: %w", err)
+	}
+	volume, err := gst.NewElement("volume")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create volume: %w", err)
+	}
+	gain := src.Settings.Gain
+	if gain <= 0 {
+		gain = 1.0
+	}
+	volume.Set("volume", gain)
+	return []*gst.Element{pulsesrc, caps, audioconvert, audioresample, volume}, volume, nil
+}
+
+func buildAudioOutputChain(out dsl.AudioOutputSettings, outputPath string) ([]*gst.Element, error) {
+	audioconvert, err := gst.NewElement("audioconvert")
+	if err != nil {
+		return nil, fmt.Errorf("create audioconvert: %w", err)
+	}
+	audioresample, err := gst.NewElement("audioresample")
+	if err != nil {
+		return nil, fmt.Errorf("create audioresample: %w", err)
+	}
+	caps, err := newCapsFilter(audioEncoderCaps(out))
+	if err != nil {
+		return nil, err
+	}
+	filesink, err := gst.NewElement("filesink")
+	if err != nil {
+		return nil, fmt.Errorf("create filesink: %w", err)
+	}
+	filesink.Set("location", outputPath)
+
+	switch strings.ToLower(strings.TrimSpace(out.Codec)) {
+	case "", "pcm_s16le", "wav":
+		wavenc, err := gst.NewElement("wavenc")
+		if err != nil {
+			return nil, fmt.Errorf("create wavenc: %w", err)
+		}
+		return []*gst.Element{audioconvert, audioresample, caps, wavenc, filesink}, nil
+	case "opus":
+		opusenc, err := gst.NewElement("opusenc")
+		if err != nil {
+			return nil, fmt.Errorf("create opusenc: %w", err)
+		}
+		opusenc.Set("bitrate", 160000)
+		oggmux, err := gst.NewElement("oggmux")
+		if err != nil {
+			return nil, fmt.Errorf("create oggmux: %w", err)
+		}
+		return []*gst.Element{audioconvert, audioresample, caps, opusenc, oggmux, filesink}, nil
+	default:
+		return nil, fmt.Errorf("unsupported gstreamer audio codec %q", out.Codec)
+	}
+}
+
 func newVideoMuxer(container string) (*gst.Element, error) {
 	switch strings.ToLower(strings.TrimSpace(container)) {
 	case "", "mp4":
@@ -365,6 +545,35 @@ func qualityToBitrate(quality int) int {
 		quality = 100
 	}
 	return 1000 + (quality-1)*80
+}
+
+func audioRawCaps(out dsl.AudioOutputSettings) string {
+	rate := out.SampleRateHz
+	if rate <= 0 {
+		rate = 48000
+	}
+	channels := out.Channels
+	if channels <= 0 {
+		channels = 2
+	}
+	return fmt.Sprintf("audio/x-raw,format=S16LE,rate=%d,channels=%d", rate, channels)
+}
+
+func audioEncoderCaps(out dsl.AudioOutputSettings) string {
+	rate := out.SampleRateHz
+	if rate <= 0 {
+		rate = 48000
+	}
+	channels := out.Channels
+	if channels <= 0 {
+		channels = 2
+	}
+	switch strings.ToLower(strings.TrimSpace(out.Codec)) {
+	case "opus":
+		return fmt.Sprintf("audio/x-raw,format=S16LE,rate=48000,channels=%d", channels)
+	default:
+		return fmt.Sprintf("audio/x-raw,format=S16LE,rate=%d,channels=%d", rate, channels)
+	}
 }
 
 func emitRecordingEvent(sink func(media.RecordingEvent), event media.RecordingEvent) {
