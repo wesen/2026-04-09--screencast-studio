@@ -60,7 +60,9 @@ RelatedFiles:
     - Path: pkg/media/gst/shared_video.go
       Note: Step 23 shared video source registry and preview branch lifecycle foundation for Phase 4
     - Path: pkg/media/gst/shared_video_recording_bridge.go
-      Note: Step 24 isolated shared-source recording bridge prototype for Phase 4.1e
+      Note: |-
+        Step 24 isolated shared-source recording bridge prototype for Phase 4.1e
+        Step 25 raw branch normalization and push instrumentation proving the remaining bridge bug is recorder-side finalization only
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
@@ -97,6 +99,7 @@ LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -2704,4 +2707,133 @@ preview after recorder stop reached 31 frames
 ```text
 GStreamer-CRITICAL **: gst_segment_to_running_time: assertion 'segment->format == format' failed
 output size: 852 bytes
+```
+
+---
+
+## Step 25: Phase 4.1f Narrowing — Normalized Raw Branch and Verified Buffer Pushes
+
+I continued the shared bridge work by narrowing the recorder-side failure rather than pretending the bridge was “mysteriously broken.” The previous run had already shown that preview continuity worked; the missing information was whether the recorder was receiving the correct raw frame shape and whether buffers were actually being pushed into the recorder pipeline. I changed the raw consumer branch to normalize its output format explicitly and added bridge push logging.
+
+That turned out to be a useful narrowing step. The bridge is now clearly receiving the right shape of data (`640x480`, `I420`, `10fps`) and pushing dozens of timestamped buffers into the appsrc recorder pipeline before stop. The remaining problem is therefore not source sharing, not preview continuity, and not raw frame delivery. The remaining problem is specifically the `appsrc` recorder’s segment/EOS behavior when finalizing the file.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 24)
+
+**Assistant interpretation:** Keep pushing forward on the current Phase 4 task until the blocker is narrower or solved.
+
+**Inferred user intent:** Continue making real progress, even if the next step is a narrowing/debugging step rather than a final success.
+
+### What I did
+- Refined `pkg/media/gst/shared_video_recording_bridge.go`:
+  - raw consumer options now include width / height / format
+  - raw branch now actively normalizes via:
+    - `videoconvert`
+    - `videoscale`
+    - `videorate`
+    - `capsfilter`
+  - normalized raw caps now force:
+    - `format=I420`
+    - `framerate=10/1`
+    - `pixel-aspect-ratio=1/1`
+    - `width=640`
+    - `height=480`
+  - bridge recorder now logs every first / tenth buffer push
+  - bridge recorder stop now logs the pushed buffer count
+- Re-ran:
+
+```bash
+go test ./... -count=1
+./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke.sh
+```
+
+### Why
+- I needed to distinguish between two very different failure classes:
+  1. the recorder pipeline is never really receiving usable frames,
+  2. the recorder pipeline is receiving usable frames but finalization is still wrong.
+- That distinction matters because only the second case justifies staying on the bridge architecture path.
+
+### What worked
+- The normalized raw branch linked and ran successfully.
+- The bridge recorder now reports correct caps:
+
+```text
+caps="video/x-raw, width=(int)640, height=(int)480, framerate=(fraction)10/1, pixel-aspect-ratio=(fraction)1/1, format=(string)I420"
+```
+
+- The bridge recorder also confirmed real buffer flow:
+
+```text
+buffer_count=1
+buffer_count=10
+buffer_count=20
+buffer_count=30
+```
+
+- The stop log showed a total of 34 pushed buffers before EOS.
+- Preview continuity still worked during and after recorder stop.
+
+### What didn't work
+- The output file is still not valid:
+
+```text
+output size: 850 bytes
+duration=N/A
+```
+
+- The stop path still emits the same critical failure signature:
+
+```text
+gst_segment_to_running_time: assertion 'segment->format == format' failed
+```
+
+### What I learned
+- The bridge is definitely moving real video frames through the shared-source path now.
+- Therefore, the Phase 4 bridge problem is no longer about raw capture shape, framerate normalization, or whether buffers are being pushed at all.
+- The remaining issue is specifically the appsrc recorder pipeline’s segment/time semantics at or near EOS/finalization.
+
+### What was tricky to build
+- The tricky part was that a link-time failure (`link tee to raw queue: no common format`) initially looked like a tee/source problem, but it was really a normalization-branch design problem: I had asked the raw branch to demand a new width/height without including the elements required to transform into it.
+- Adding `videoscale` was therefore not just a cosmetic change; it was what allowed the raw consumer to become a proper normalization branch instead of a caps-only demand branch.
+
+### What warrants a second pair of eyes
+- Whether the `appsrc` recorder should emit a different segment format or explicit segment event handling than the current base-src/property configuration
+- Whether a different stop order (bridge recorder stop before raw detach, or vice versa) could affect the finalization path despite the current evidence that buffers are already in-flight
+- Whether a different recorder pipeline shape (e.g. parser insertion or different muxer choice) is needed once appsrc is the source
+
+### What should be done in the future
+- Continue Phase 4.1f with focused investigation of the appsrc segment/EOS path
+- Do not yet integrate the bridge into the stable recording runtime
+- Preserve the current bridge refinements because they are strong evidence that the remaining bug is isolated to recorder finalization rather than source sharing
+
+### Code review instructions
+- Review:
+  - `pkg/media/gst/shared_video_recording_bridge.go`
+- Re-run:
+
+```bash
+go test ./... -count=1
+./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke.sh
+```
+
+- Confirm these facts from the output:
+  - raw caps are normalized to `640x480 I420 10fps`
+  - buffer pushes reach at least ~30 frames
+  - preview continuity still works
+  - file finalization still fails with the segment-format assertion
+
+### Technical details
+- Key successful output from the refined harness:
+
+```text
+caps="video/x-raw, width=(int)640, height=(int)480, framerate=(fraction)10/1, pixel-aspect-ratio=(fraction)1/1, format=(string)I420"
+buffer_count=30
+```
+
+- Key remaining failure output:
+
+```text
+gst_segment_to_running_time: assertion 'segment->format == format' failed
+output size: 850 bytes
 ```

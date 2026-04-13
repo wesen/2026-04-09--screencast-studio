@@ -155,3 +155,12 @@ Implemented an isolated shared-source recording bridge prototype on top of the n
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go — Experimental shared-source recording bridge implementation kept isolated from the stable runtime
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go — Extended shared source lifecycle to support raw recording consumers as well as preview consumers
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke/main.go — Focused validation harness for preview continuity plus isolated bridge recorder stop behavior
+
+
+## 2026-04-13
+
+Refined the isolated shared bridge recorder to normalize the raw branch explicitly (`videoconvert -> videoscale -> videorate -> capsfilter`) before frames hit the appsink bridge. This eliminated the earlier ambiguous raw caps and proved that the bridge recorder now receives normalized `640x480 I420 10fps` frames and pushes ~34 timestamped buffers before stop. The remaining failure is unchanged and now sharply isolated: appsrc recorder finalization still emits `gst_segment_to_running_time` assertions and only produces a tiny output file.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go — Raw branch normalization and buffer-push instrumentation that narrowed the remaining bridge bug
