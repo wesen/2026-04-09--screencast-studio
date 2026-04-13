@@ -14,6 +14,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
 )
 
 type Config struct {
@@ -45,7 +47,23 @@ type recordingPreviewHandoff struct {
 	plan      previewResumePlan
 }
 
+type serverOptions struct {
+	previewRuntime media.PreviewRuntime
+}
+
+type ServerOption func(*serverOptions)
+
+func WithPreviewRuntime(runtime media.PreviewRuntime) ServerOption {
+	return func(opts *serverOptions) {
+		opts.previewRuntime = runtime
+	}
+}
+
 func NewServer(parentCtx context.Context, application ApplicationService, cfg Config) *Server {
+	return NewServerWithOptions(parentCtx, application, cfg)
+}
+
+func NewServerWithOptions(parentCtx context.Context, application ApplicationService, cfg Config, opts ...ServerOption) *Server {
 	if cfg.Addr == "" {
 		cfg.Addr = ":8080"
 	}
@@ -59,6 +77,13 @@ func NewServer(parentCtx context.Context, application ApplicationService, cfg Co
 		parentCtx = context.Background()
 	}
 
+	resolvedOpts := serverOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&resolvedOpts)
+		}
+	}
+
 	events := NewEventHub()
 	server := &Server{
 		app:       application,
@@ -69,7 +94,7 @@ func NewServer(parentCtx context.Context, application ApplicationService, cfg Co
 		telemetry: NewTelemetryManager(events.Publish),
 	}
 	server.recordings = NewRecordingManager(parentCtx, application, events.Publish, server.handleRecordingFinished)
-	server.previews = NewPreviewManager(parentCtx, application, events.Publish, cfg.PreviewLimit, nil)
+	server.previews = NewPreviewManager(parentCtx, application, events.Publish, cfg.PreviewLimit, resolvedOpts.previewRuntime)
 	server.registerRoutes()
 	return server
 }
