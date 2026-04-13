@@ -28,9 +28,25 @@
 - [x] Phase 3.5: Add level element to the audio pipeline for live VU meter. Set level interval=50ms, post-messages=true. Parse bus MessageElement messages to extract dB values and publish them via WebSocket as a new event type (audio_level).
 - [ ] Phase 3.6: Test screenshots during recording, test live gain adjustment during recording, test VU meter data flowing to browser.
 - [ ] Phase 4.1: Introduce a capture graph registry (e.g., CaptureRegistry keyed by source signature). When a preview or recording needs a source, check if a live capture pipeline already exists for that source. If yes, add a new branch to its tee. If no, create a new capture pipeline with a tee.
+- [x] Phase 4.1a: Add `pkg/media/gst` shared video source primitives (capture registry, shared source lifecycle, tee-backed preview branch attach/detach) without changing recording behavior yet.
+- [x] Phase 4.1b: Migrate `pkg/media/gst/preview.go` to acquire shared video sources from the registry instead of creating standalone source pipelines per preview session.
+- [x] Phase 4.1c: Add a focused shared-preview validation harness/script proving preview branch attach/detach and last-consumer shutdown behavior for the shared source implementation.
+- [x] Phase 4.1d: Re-run existing preview runtime + web preview validation against the shared-source preview runtime and record any regressions.
+- [ ] Phase 4.1e: Design and implement a bridge-style recording consumer for shared video sources (`appsink -> appsrc` or better if discovered), keeping it isolated from the stable recording runtime until validated.
+- [ ] Phase 4.1f: Add a focused shared-source recording harness proving all of the following at once: preview continuity during recording, valid finalized MP4 output, and continued preview after recording stop.
+- [ ] Phase 4.1g: Integrate shared-source video capture into `pkg/media/gst/recording.go` for video jobs while leaving audio jobs on the current stable implementation.
+- [ ] Phase 4.1h: Validate the real default app/server constructors end-to-end with shared capture via the Phase 4 web harness (preview stays active, screenshot works, audio controls still work, output finalizes correctly).
 - [ ] Phase 4.2: Remove the PreviewManager.SuspendAll / RestoreSuspended workaround. Preview and recording now share the same capture source via tee, so suspension is no longer needed.
+- [ ] Phase 4.2a: Remove server-level preview handoff bookkeeping from `internal/web/server.go` once shared capture passes real-defaults validation.
+- [ ] Phase 4.2b: Update web/server tests to assert preview continuity during recording instead of suspend/restore behavior.
+- [ ] Phase 4.2c: Close Phase 3.6 by validating screenshots during recording, live gain adjustment during recording, and VU meter flow in the no-suspend shared-capture path.
 - [ ] Phase 4.3: Delete pkg/recording/ffmpeg.go, pkg/media/ffmpeg/, internal/web/preview_runner.go. Remove FFmpeg from system dependencies. The entire FFmpeg code path should be gone.
+- [ ] Phase 4.3a: Remove FFmpeg default-runtime fallbacks and dead adapter references after GStreamer-only validation is complete.
+- [ ] Phase 4.3b: Delete FFmpeg-specific packages/files and update imports/build graph.
+- [ ] Phase 4.3c: Update docs/README/setup guidance to remove FFmpeg dependency assumptions and emphasize GStreamer requirements.
 - [ ] Phase 4.4: Clean up internal/web/server.go to remove preview handoff logic (the code that suspends previews before recording and restores after). Verify all tests pass without FFmpeg installed.
+- [ ] Phase 4.4a: Run full repo tests and all shared-capture validation harnesses with the FFmpeg path removed.
+- [ ] Phase 4.4b: Decide whether any ticket documentation/examples still need a legacy FFmpeg appendix or whether the repo can become GStreamer-only with no caveats.
 - [ ] Phase 5.1: Add transcription tee branch to the audio recording pipeline. After audiomixer, add a tee: branch 1 goes to wavenc/filesink (recording), branch 2 goes to capsfilter(16kHz/mono) -> appsink (transcription feed).
 - [ ] Phase 5.2: Implement Go-side audio chunking. In the transcription appsink callback, accumulate PCM buffers. Every 3 seconds of audio (16000*2*3 = 96000 bytes for 16kHz 16-bit mono), flush the buffer and pass to the transcription backend.
 - [ ] Phase 5.3: Integrate with a transcription backend. Start with the simplest option: invoke local whisper CLI as a subprocess, pass the audio chunk as a temp WAV file, read the text output. Publish transcription segments via WebSocket.

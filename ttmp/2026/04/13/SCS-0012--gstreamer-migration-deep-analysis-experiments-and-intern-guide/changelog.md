@@ -133,3 +133,14 @@ Added a new long-form intern-facing Phase 4 architecture guide focused on shared
 ### Related Files
 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/02-phase-4-shared-capture-architecture-and-intern-implementation-guide.md — New detailed intern guide for the remaining shared capture architecture problem
+
+
+## 2026-04-13
+
+Completed the first production Phase 4 shared-capture slice: added a shared GStreamer video source registry and migrated preview sessions to attach tee-backed preview branches instead of creating standalone source pipelines. Added a focused shared-preview smoke harness proving attach/detach, continued preview after one consumer stops, last-consumer shutdown, and clean source recreation. Re-ran the existing preview runtime and web preview end-to-end harnesses; both still passed under the new shared-preview implementation (commit 5fea3b6485af7cc9701bdcaee6475fb32ef7b3a8).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go — New shared video source registry and tee-backed preview consumer primitives
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview.go — Preview runtime now acquires shared sources from the registry instead of building standalone source pipelines
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/19-go-gst-shared-preview-runtime-smoke/main.go — Focused validation harness for shared-preview branch lifetime behavior

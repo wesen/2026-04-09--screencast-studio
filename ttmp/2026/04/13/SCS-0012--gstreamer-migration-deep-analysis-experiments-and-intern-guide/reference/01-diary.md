@@ -50,12 +50,15 @@ RelatedFiles:
       Note: |-
         Step 11 native GStreamer preview runtime (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
         Step 13 geometry fallback fix for window preview
+        Step 23 preview runtime migrated to acquire shared video sources
     - Path: pkg/media/gst/recording.go
       Note: |-
         Step 15 native GStreamer video recording runtime
         Step 16 added native GStreamer audio mixing/runtime support
         Step 18 recording lifecycle/state/event/max-duration refinements
         Step 19 live audio controls
+    - Path: pkg/media/gst/shared_video.go
+      Note: Step 23 shared video source registry and preview branch lifecycle foundation for Phase 4
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
@@ -82,12 +85,15 @@ RelatedFiles:
       Note: Step 21 shared tee EOS experiment proving MP4 finalization vs preview continuity tradeoff
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/18-go-gst-shared-source-appsink-appsrc-bridge/main.go
       Note: Step 21 shared source bridge experiment narrowing the remaining issue to appsrc segment/timestamp handling
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/19-go-gst-shared-preview-runtime-smoke/main.go
+      Note: Step 23 focused harness proving shared preview attach/detach and source recreation behavior
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -2388,3 +2394,152 @@ which showed:
 ```text
 /ai/2026/04/13/SCS-0012/SCS-0012 Phase 4 Shared Capture Intern Guide.pdf
 ```
+
+---
+
+## Step 23: Phase 4.1 Preview Foundation — Shared Video Source Registry and Shared Preview Runtime
+
+I broke the coarse Phase 4 ticket into concrete sub-tasks first, then implemented the first production slice: a shared video source registry in `pkg/media/gst` and a preview runtime that acquires sources from that registry instead of building a standalone source pipeline for every preview session. This is the first real production code for the shared-capture architecture, but it deliberately stops short of touching recording behavior.
+
+The important result is that preview now has the correct architectural foundation for Phase 4. Two preview sessions for the same source can share one underlying source pipeline, one preview consumer can detach while another keeps receiving frames, the last consumer shuts the shared source down, and a later preview can recreate it cleanly. I validated that behavior with a new focused smoke harness and then re-ran the existing preview runtime and web preview end-to-end harnesses to make sure I did not regress the stable preview path.
+
+### Prompt Context
+
+**User prompt (verbatim):** "alright, let's add tasks to the ticket, and then work on them one by one, committing at appropriate intervals, keeping a detailed diary"
+
+**Assistant interpretation:** Refine the remaining migration work into concrete ticket tasks and start executing them in focused slices with proper validation and commit hygiene.
+
+**Inferred user intent:** Turn the remaining Phase 4 work into a disciplined engineering sequence rather than a loose exploratory effort.
+
+**Commit (code):** 5fea3b6485af7cc9701bdcaee6475fb32ef7b3a8 — "Add shared GStreamer preview source registry"
+
+### What I did
+- Expanded the Phase 4 portion of `tasks.md` into concrete sub-steps:
+  - 4.1a shared source primitives
+  - 4.1b preview migration
+  - 4.1c focused shared-preview harness
+  - 4.1d preview regression validation
+  - plus later recording-bridge / integration tasks
+- Added new file:
+  - `pkg/media/gst/shared_video.go`
+- Implemented in that file:
+  - `captureRegistry`
+  - package-level `defaultCaptureRegistry`
+  - `sharedVideoSource`
+  - tee-backed shared source pipeline creation
+  - shared preview consumer branch attach/detach
+  - reference counting and last-consumer shutdown
+  - terminal bus error/EOS propagation to active preview consumers
+- Rewrote `pkg/media/gst/preview.go` so preview sessions now:
+  - acquire a shared video source from the registry
+  - attach a preview branch instead of creating a whole source pipeline
+  - detach on context cancellation / stop
+  - keep the same external `PreviewSession` contract (`Wait`, `Stop`, `LatestFrame`, `TakeScreenshot`)
+- Added focused validation harness:
+  - `ttmp/.../scripts/19-go-gst-shared-preview-runtime-smoke/main.go`
+  - `ttmp/.../scripts/19-go-gst-shared-preview-runtime-smoke.sh`
+- Ran repo tests:
+
+```bash
+go test ./... -count=1
+```
+
+- Ran new shared-preview harness:
+
+```bash
+./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/19-go-gst-shared-preview-runtime-smoke.sh
+```
+
+- Re-ran existing preview validation harnesses:
+
+```bash
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/11-web-gst-preview-e2e.sh
+```
+
+### Why
+- Phase 4 needs a real shared-capture foundation. The safest way to begin was to migrate preview first, because preview branches are simpler than recording branches and do not involve MP4 finalization.
+- This slice provides the core building block that later recording-sharing work will need, while keeping the current stable recording runtime untouched.
+
+### What worked
+- The new shared-preview runtime behavior worked as intended.
+- The focused shared-preview smoke harness proved all three target behaviors:
+  - two preview sessions for the same source shared one underlying source pipeline,
+  - preview 2 kept receiving frames after preview 1 stopped,
+  - stopping the last preview shut the shared source down, and a later preview recreated it successfully.
+- Existing preview smoke and web preview E2E harnesses still passed after the migration.
+- `go test ./... -count=1` stayed green.
+
+### What didn't work
+- The only minor failure during validation was not a runtime bug; it was a local file-mode issue when trying to execute an existing script directly:
+
+```text
+/bin/bash: line 1: ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke.sh: Permission denied
+```
+
+- I reran it via `bash .../09-go-gst-preview-runtime-smoke.sh`, which worked. No code change was needed.
+
+### What I learned
+- The shared-capture foundation is feasible in production code without destabilizing preview behavior.
+- Preview is indeed the right first consumer to migrate because branch attach/detach is straightforward and gives immediate validation of registry lifetime semantics.
+- The web layer did not need to know about the shared source registry at all, which is a strong sign that the runtime seam is paying off.
+
+### What was tricky to build
+- The tricky part was sequencing source startup and branch attachment correctly.
+- A shared source pipeline with a tee should not be started “empty” without any consumer branch, because a source with no downstream consumer is the wrong shape for normal playback and could produce confusing behavior.
+- The implementation therefore had to:
+  - build the shared source pipeline first,
+  - attach the first preview branch,
+  - only then start the pipeline,
+  - and for later consumers, add the branch dynamically and `SyncStateWithParent()`.
+- Another subtle part was stop behavior: detaching a preview branch should not kill the whole shared source if another consumer still exists, but the last consumer should still trigger a full shared-source shutdown and registry removal.
+
+### What warrants a second pair of eyes
+- The exact shared-source signature fields (`display`, `device`, `rect`, `cursor`, `mirror`, `size`) should be reviewed before recording consumers start depending on them too heavily.
+- The cleanup order inside `shared_video.go` (unlink tee pad, release request pad, NULL branch elements, remove from pipeline) is correct in current testing but deserves review before recording branches are added.
+- Whether the shared source should emit more detailed metrics/logs once recordings begin attaching.
+
+### What should be done in the future
+- Implement Phase 4.1e next: a recording-bridge consumer for shared video sources.
+- Add a focused shared-source recording harness proving preview continuity plus valid MP4 finalization.
+- Only after that integrate shared sources into `pkg/media/gst/recording.go` for video jobs.
+
+### Code review instructions
+- Start with:
+  - `pkg/media/gst/shared_video.go`
+  - `pkg/media/gst/preview.go`
+- Then review the focused harness:
+  - `ttmp/.../scripts/19-go-gst-shared-preview-runtime-smoke/main.go`
+- Validate with:
+
+```bash
+go test ./... -count=1
+./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/19-go-gst-shared-preview-runtime-smoke.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/11-web-gst-preview-e2e.sh
+```
+
+### Technical details
+- New production file:
+
+```text
+/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go
+```
+
+- New validation harness:
+
+```text
+/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/19-go-gst-shared-preview-runtime-smoke/main.go
+```
+
+- The focused shared-preview harness produced the key validation sequence:
+
+```text
+preview 1 stopped
+preview 2 continued
+preview 2 stopped
+shared source shutdown
+preview 3 recreated successfully
+```
+
+- That is the exact lifetime behavior we needed before moving on to recording-sharing work.
