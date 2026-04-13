@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/wesen/2026-04-09--screencast-studio/pkg/discovery"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
 )
@@ -43,7 +44,13 @@ func (PreviewRuntime) StartPreview(ctx context.Context, source dsl.EffectiveVide
 		opts.OnLog = func(string, string) {}
 	}
 
-	pipeline, sink, err := buildPreviewPipeline(source)
+	resolvedSource, err := resolveWindowSource(previewCtx, source)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+
+	pipeline, sink, err := buildPreviewPipeline(resolvedSource)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -116,9 +123,9 @@ func (PreviewRuntime) StartPreview(ctx context.Context, source dsl.EffectiveVide
 
 	log.Info().
 		Str("event", "preview.gst.start").
-		Str("source_id", source.ID).
-		Str("source_name", source.Name).
-		Str("source_type", source.Type).
+		Str("source_id", resolvedSource.ID).
+		Str("source_name", resolvedSource.Name).
+		Str("source_type", resolvedSource.Type).
 		Msg("started gstreamer preview pipeline")
 
 	go session.wait(previewCtx, watch, resultCh)
@@ -314,24 +321,15 @@ func buildSourceElements(source dsl.EffectiveVideoSource) ([]*gst.Element, error
 		ximagesrc.Set("use-damage", false)
 
 		switch source.Type {
-		case "region":
+		case "region", "window":
 			if source.Target.Rect == nil {
-				return nil, errors.New("region source missing target.rect")
+				return nil, fmt.Errorf("%s source missing target.rect", source.Type)
 			}
 			rect := source.Target.Rect
 			ximagesrc.Set("startx", rect.X)
 			ximagesrc.Set("starty", rect.Y)
 			ximagesrc.Set("endx", rect.X+rect.W-1)
 			ximagesrc.Set("endy", rect.Y+rect.H-1)
-		case "window":
-			if strings.TrimSpace(source.Target.WindowID) == "" {
-				return nil, errors.New("window source missing target.window_id")
-			}
-			xid, err := strconv.ParseUint(strings.TrimSpace(source.Target.WindowID), 0, 64)
-			if err != nil {
-				return nil, fmt.Errorf("parse window id %q: %w", source.Target.WindowID, err)
-			}
-			ximagesrc.Set("xid", xid)
 		}
 		return []*gst.Element{ximagesrc}, nil
 	case "camera":
@@ -385,6 +383,34 @@ func sendEOS(pipeline *gst.Pipeline) {
 		return
 	}
 	pipeline.SendEvent(gst.NewEOSEvent())
+}
+
+func resolveWindowSource(ctx context.Context, source dsl.EffectiveVideoSource) (dsl.EffectiveVideoSource, error) {
+	if source.Type != "window" {
+		return source, nil
+	}
+	if source.Target.Rect != nil && source.Target.Rect.W > 0 && source.Target.Rect.H > 0 {
+		return source, nil
+	}
+	if strings.TrimSpace(source.Target.WindowID) == "" {
+		return source, errors.New("window source missing target.window_id")
+	}
+	x, y, width, height, err := discovery.WindowGeometry(ctx, source.Target.WindowID)
+	if err != nil {
+		return source, fmt.Errorf("resolve window geometry for %s: %w", source.Target.WindowID, err)
+	}
+	resolved := source
+	resolved.Target.Rect = &dsl.Rect{X: x, Y: y, W: width, H: height}
+	log.Info().
+		Str("event", "preview.gst.window_geometry.resolved").
+		Str("source_id", source.ID).
+		Str("window_id", source.Target.WindowID).
+		Int("x", x).
+		Int("y", y).
+		Int("width", width).
+		Int("height", height).
+		Msg("resolved window preview geometry for region-style capture")
+	return resolved, nil
 }
 
 func boolValue(v *bool, def bool) bool {

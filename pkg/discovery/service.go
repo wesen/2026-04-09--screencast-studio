@@ -133,6 +133,10 @@ func ListWindows(ctx context.Context) ([]Window, error) {
 	return windows, nil
 }
 
+func WindowGeometry(ctx context.Context, id string) (int, int, int, int, error) {
+	return windowGeometry(ctx, id)
+}
+
 func windowTitle(ctx context.Context, id string) (string, error) {
 	for _, args := range [][]string{
 		{"-id", id, "_NET_WM_NAME"},
