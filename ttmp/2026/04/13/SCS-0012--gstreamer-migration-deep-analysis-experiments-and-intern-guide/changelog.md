@@ -124,3 +124,12 @@ Added focused Phase 4 media-runtime experiments to answer the shared-capture que
 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/17-go-gst-shared-video-tee-experiment/main.go — Reproducible shared-tee branch-stop experiment across multiple EOS targets
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/18-go-gst-shared-source-appsink-appsrc-bridge/main.go — Reproducible shared-source bridge experiment isolating appsrc segment/timestamp issues
+
+
+## 2026-04-13
+
+Added a new long-form intern-facing Phase 4 architecture guide focused on shared source capture, preview/recording lifecycle semantics, and the experiment evidence from scripts 16–18. Uploaded the guide to reMarkable at `/ai/2026/04/13/SCS-0012` as `SCS-0012 Phase 4 Shared Capture Intern Guide`.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/02-phase-4-shared-capture-architecture-and-intern-implementation-guide.md — New detailed intern guide for the remaining shared capture architecture problem

@@ -2272,3 +2272,119 @@ size=850
 ```
 
 - So the source/preview side can stay alive under a bridge architecture, but the recorder side still needs a correct `appsrc` segment/time pattern.
+
+---
+
+## Step 22: Wrote and Uploaded the Phase 4 Shared Capture Intern Guide
+
+I wrote a new long-form design document for a new intern focused specifically on the remaining Phase 4 architecture problem: shared source capture for preview and recording. The existing full migration guide already explained the broader FFmpeg-to-GStreamer migration, but at this point the most valuable follow-up document was a more focused and explicit guide about the current system shape, the exact failure mode, the experiment evidence, and the recommended implementation direction.
+
+I stored the new document in the ticket under `design-doc/02-...` and uploaded it to reMarkable as its own PDF so it can be read independently. The guide is intentionally very explicit: it includes system overview prose, file maps, API references, diagrams, pseudocode, design alternatives, debugging signatures, and a step-by-step implementation plan that a new intern can actually execute against.
+
+### Prompt Context
+
+**User prompt (verbatim):** "reate a detailed analysis / design / implementation guide that is very detailed for a new intern, explaining all the parts of the system needed to understand what it is, with prose paragraphs and bullet point sand pseudocode and diagrams and api references and file
+  references.
+  It should be very clear and detailed. Store in the ticket and the nupload to remarkable."
+
+**Assistant interpretation:** Create a new comprehensive intern-facing design document focused on the Phase 4 shared capture problem, store it in the ticket, and upload it to reMarkable.
+
+**Inferred user intent:** Produce a handoff-quality architecture guide that a new engineer can use to get fully oriented and continue the migration safely.
+
+### What I did
+- Created a new ticket document:
+  - `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/02-phase-4-shared-capture-architecture-and-intern-implementation-guide.md`
+- Wrote a detailed guide covering:
+  - what Screencast Studio is
+  - the system layers and control flow
+  - the file map and what to read first
+  - the media runtime seam
+  - the current stable GStreamer runtime behavior
+  - the exact Phase 4 problem statement
+  - why the naive removal of suspend/restore failed
+  - experiment evidence from scripts 16, 17, and 18
+  - design goals and invariants
+  - alternatives considered
+  - the recommended architecture direction
+  - proposed internal APIs and pseudocode
+  - debugging guidance and validation plan
+- Related the key code files to the new doc using `docmgr doc relate`
+- Verified `remarquee status`
+- Ran dry-run upload:
+
+```bash
+remarquee upload md --dry-run /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/02-phase-4-shared-capture-architecture-and-intern-implementation-guide.md --name "SCS-0012 Phase 4 Shared Capture Intern Guide" --remote-dir "/ai/2026/04/13/SCS-0012"
+```
+
+- Performed the real upload:
+
+```bash
+remarquee upload md /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/02-phase-4-shared-capture-architecture-and-intern-implementation-guide.md --name "SCS-0012 Phase 4 Shared Capture Intern Guide" --remote-dir "/ai/2026/04/13/SCS-0012"
+```
+
+- Verified remote listing:
+
+```bash
+remarquee cloud ls /ai/2026/04/13/SCS-0012 --long --non-interactive
+```
+
+which showed:
+
+```text
+[f]    SCS-0012 GStreamer Migration Analysis and Intern Guide
+[f]    SCS-0012 Phase 4 Shared Capture Intern Guide
+```
+
+### Why
+- The original migration guide is broad and useful, but the current bottleneck is much narrower and more architectural.
+- The new guide exists so a new intern can understand not only the product and the migration, but the exact Phase 4 trap: shared source ownership and stop/finalization semantics.
+
+### What worked
+- The new document was created successfully in the ticket.
+- `docmgr doc relate` updated its file relationships.
+- `remarquee` dry-run and real upload both worked.
+- The reMarkable ticket folder now contains both the broad migration guide and the focused Phase 4 guide.
+
+### What didn't work
+- N/A for this step.
+
+### What I learned
+- The most useful follow-up documentation at this stage is not another broad migration summary, but a sharply scoped architecture guide around the shared capture problem.
+- The reMarkable upload flow is stable and quick when using the `remarquee upload md` path directly against a single markdown file.
+
+### What was tricky to build
+- The tricky part was balancing two goals at once:
+  - the document had to be detailed enough that a new intern could orient themselves from scratch,
+  - but it also had to be honest about what is still unresolved rather than pretending the architecture is already settled.
+- The guide therefore had to distinguish carefully between:
+  - what is already implemented and stable,
+  - what experiments proved,
+  - and what the currently recommended direction is.
+
+### What warrants a second pair of eyes
+- Whether the recommended bridge-first direction in the guide should remain the preferred architecture after more appsrc investigation
+- Whether the guide should later be split into a shorter “onboarding read first” version plus a deeper implementation appendix
+
+### What should be done in the future
+- Update this guide as the shared capture implementation progresses
+- If the bridge path is solved, add a final implementation section with concrete production file/class names and validation results
+- If the architecture changes direction, preserve the experiment evidence sections and rewrite only the recommendation sections
+
+### Code review instructions
+- Read the new guide first:
+  - `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/02-phase-4-shared-capture-architecture-and-intern-implementation-guide.md`
+- Confirm the PDF is on reMarkable with:
+  - `remarquee cloud ls /ai/2026/04/13/SCS-0012 --long --non-interactive`
+
+### Technical details
+- New document path:
+
+```text
+/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/02-phase-4-shared-capture-architecture-and-intern-implementation-guide.md
+```
+
+- reMarkable remote path:
+
+```text
+/ai/2026/04/13/SCS-0012/SCS-0012 Phase 4 Shared Capture Intern Guide.pdf
+```
