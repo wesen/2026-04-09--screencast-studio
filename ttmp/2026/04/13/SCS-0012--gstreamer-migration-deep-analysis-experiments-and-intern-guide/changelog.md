@@ -27,3 +27,15 @@ Implemented Phase 0 runtime seam for the GStreamer migration: added pkg/media in
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/ffmpeg/recording.go — Wrapped pkg/recording.Run as a RecordingRuntime session
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/types.go — Introduced preview/recording runtime interfaces and media-layer event/result types
 
+
+## 2026-04-13
+
+Implemented the first in-repo native GStreamer preview runtime with go-gst: appsink JPEG delivery, GLib bus watch handling, source mapping for display/region/window/camera, and a reproducible smoke test script. Validated display, region, and camera preview; window preview currently fails with X11 BadMatch/MIT-SHM (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/bus.go — GLib main-loop-backed bus watch helper for preview sessions
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/pipeline.go — Shared capsfilter and link helpers for pipeline assembly
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview.go — Native GStreamer preview runtime implementation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke/main.go — Reproducible runtime smoke test for display/region/camera/window preview paths
+

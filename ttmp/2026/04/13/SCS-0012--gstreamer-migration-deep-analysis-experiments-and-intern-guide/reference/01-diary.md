@@ -30,16 +30,25 @@ RelatedFiles:
       Note: |-
         FFmpeg recording adapter introduced in Step 10
         FFmpeg recording runtime adapter (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
+    - Path: pkg/media/gst/bus.go
+      Note: Step 11 GLib bus watch helper (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
+    - Path: pkg/media/gst/pipeline.go
+      Note: Step 11 pipeline assembly helpers (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
+    - Path: pkg/media/gst/preview.go
+      Note: Step 11 native GStreamer preview runtime (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
         Phase 0 runtime seam interfaces (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke/main.go
+      Note: Step 11 reproducible preview runtime smoke test (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 # Diary
@@ -639,3 +648,186 @@ This phase deliberately preserves behavior while shifting ownership boundaries: 
   - 0.3 FFmpeg adapter package introduction
   - 0.4 application + preview manager wiring
   - 0.5 full test pass
+
+---
+
+## Step 11: Native GStreamer Preview Runtime in `pkg/media/gst`
+
+This step implemented the first real in-repo GStreamer runtime instead of just prototype scripts. The scope was preview only: build the pipeline programmatically, receive JPEG frames via `appsink`, handle bus messages with a GLib main loop, and validate the runtime against real display, region, and camera sources.
+
+I intentionally kept FFmpeg as the default preview runtime in the web layer for now. That lets us land and review the native GStreamer runtime in isolation before switching production preview traffic over to it.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 10)
+
+**Assistant interpretation:** Continue the ticket implementation task-by-task, make another focused commit, and record exactly what worked and what failed.
+
+**Inferred user intent:** Turn the analyzed migration plan into small, validated implementation increments instead of a risky one-shot rewrite.
+
+**Commit (code):** 806c14e630a108ac3dd9670af0eb205c4c1072c9 — "Add native GStreamer preview runtime"
+
+### What I did
+
+- Added Go GStreamer dependencies to the repo module:
+  - `github.com/go-gst/go-gst v1.4.0`
+  - `github.com/go-gst/go-glib v1.4.0`
+- Implemented `pkg/media/gst/preview.go`:
+  - `PreviewRuntime.StartPreview(...)`
+  - `previewSession.Wait()`
+  - `previewSession.Stop(...)`
+  - `LatestFrame()` / `TakeScreenshot(...)`
+  - one-time `gst.Init(nil)` initialization
+  - source mapping for:
+    - `display`
+    - `region`
+    - `window`
+    - `camera`
+  - preview pipeline construction:
+    - source → `videoconvert`
+    - optional `videoflip` for mirrored camera preview
+    - `videoscale`
+    - `capsfilter(video/x-raw,width=640)`
+    - `videorate`
+    - `capsfilter(video/x-raw,framerate=5/1)`
+    - `jpegenc`
+    - `appsink`
+- Implemented `pkg/media/gst/bus.go`:
+  - GLib main-loop-backed bus watch helper
+  - watch cleanup / loop shutdown helper
+- Implemented `pkg/media/gst/pipeline.go`:
+  - capsfilter helper
+  - element-link helper
+- Added reproducible validation script in the ticket:
+  - `scripts/09-go-gst-preview-runtime-smoke/main.go`
+  - `scripts/09-go-gst-preview-runtime-smoke.sh`
+- Ran dependency hygiene and tests:
+  - `go mod tidy`
+  - `go test ./... -count=1`
+- Ran live smoke tests against the real runtime:
+  - display preview ✓
+  - region preview ✓
+  - camera preview ✓
+  - window preview ✗ (X11 BadMatch / MIT-SHM issue)
+- Checked ticket tasks:
+  - 1.1 preview runtime implementation
+  - 1.2 appsink callback wiring
+  - 1.3 bus handling
+  - 1.4 preview stop semantics
+
+### Why
+
+The architecture seam from Step 10 is only useful if we can drop a real GStreamer implementation behind it. Preview is the safest first vertical slice because it has a small, well-understood contract: take a video source and deliver JPEG frames into Go.
+
+This step proves the migration path is not theoretical anymore. The runtime now exists inside the main codebase and not just in ticket experiments.
+
+### What worked
+
+- `pkg/media/gst/preview.go` compiled and integrated cleanly into the repo
+- `go test ./... -count=1` passed after adding CGO-backed GStreamer dependencies
+- The smoke test worked for real display capture:
+  - command: `bash ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke.sh`
+  - result: 15 JPEG frames in ~3 seconds
+- Region preview worked:
+  - command: `REGION=0,0,640,480 bash ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke.sh`
+  - result: 15 JPEG frames in ~3 seconds
+- Camera preview worked:
+  - command: `SOURCE_TYPE=camera DEVICE=/dev/video0 bash ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke.sh`
+  - result: 13 JPEG frames in ~3 seconds
+- Context-driven shutdown worked: the preview session exits cleanly when the timeout cancels the context
+- Appsink delivery worked exactly as intended: raw JPEG bytes arrive in Go without stdout parsing
+
+### What didn't work
+
+- **Window preview failed** in the current environment.
+- Exact validation command:
+  - `SOURCE_TYPE=window WINDOW_ID=0x05c0000e bash ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke.sh`
+- Exact failure:
+
+```text
+X Error of failed request:  BadMatch (invalid parameter attributes)
+  Major opcode of failed request:  130 (MIT-SHM)
+  Minor opcode of failed request:  4 (X_ShmGetImage)
+  Serial number of failed request:  59
+  Current serial number in output stream:  59
+exit status 1
+```
+
+- I also reproduced the same problem with raw `gst-launch-1.0`, so this is not just a Go wrapper bug.
+- Because of that, I did **not** check task 1.5 or 1.6 yet.
+
+### What I learned
+
+- The in-process GStreamer preview pipeline is straightforward once the go-gst API quirks are understood
+- `appsink` is a clean replacement for the old FFmpeg `pipe:1` MJPEG parsing path
+- A tiny GLib bus-watch helper is enough for the preview use case; we do not need a giant framework around bus handling
+- The display / region / camera paths are now validated in the real repo, not just in one-off experiments
+- Window capture on X11 is the first serious preview-runtime blocker that needs deeper investigation
+
+### What was tricky to build
+
+- The most delicate part was orchestrating three lifecycles at once:
+  1. the Go context
+  2. the GStreamer pipeline state
+  3. the GLib main loop used for bus watches
+- The symptom to avoid was a preview session that would keep running after context cancellation or leave the main loop/watch hanging. I handled that by making the session goroutine own shutdown sequencing:
+  - on cancellation, send EOS
+  - briefly wait for bus EOS/error
+  - stop the bus watch
+  - set pipeline state to NULL
+  - close the session `done` channel
+- The other sharp edge was not over-wiring the web layer too early. I chose to keep FFmpeg as the default runtime until the GStreamer preview path has broader validation.
+
+### What warrants a second pair of eyes
+
+- The X11 window-capture failure with `ximagesrc xid=...` — especially whether we should:
+  - keep pursuing `xid`,
+  - capture windows by resolved geometry instead,
+  - or treat window capture as an X11-specific compatibility path that may need a fallback
+- The `videoflip` mirror property path for cameras should be reviewed once browser-visible preview switching is wired up
+- The GLib main-loop approach should be reviewed if we later run many simultaneous preview sessions
+
+### What should be done in the future
+
+- Investigate/fix the window preview path before checking task 1.5 and 1.6
+- Add a web/server-level injection point or config switch so the browser preview can be exercised end-to-end with the GStreamer runtime
+- Once preview is sufficiently validated, decide whether to make GStreamer the default preview runtime while recording remains FFmpeg-backed
+
+### Code review instructions
+
+- Start with:
+  - `pkg/media/gst/preview.go`
+- Then review the supporting helpers:
+  - `pkg/media/gst/bus.go`
+  - `pkg/media/gst/pipeline.go`
+- Then review the reproducible smoke-test entrypoint:
+  - `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke/main.go`
+  - `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke.sh`
+- Validate with:
+  - `go test ./... -count=1`
+  - `bash .../09-go-gst-preview-runtime-smoke.sh`
+  - `REGION=0,0,640,480 bash .../09-go-gst-preview-runtime-smoke.sh`
+  - `SOURCE_TYPE=camera DEVICE=/dev/video0 bash .../09-go-gst-preview-runtime-smoke.sh`
+
+### Technical details
+
+- New repo dependencies added to the main module:
+  - `github.com/go-gst/go-gst v1.4.0`
+  - `github.com/go-gst/go-glib v1.4.0`
+- Preview runtime design in this step:
+
+```text
+StartPreview(ctx, source, opts)
+  -> gst.Init(nil) once
+  -> build pipeline for source type
+  -> appsink callback copies JPEG bytes to Go
+  -> bus watch publishes EOS/error into result channel
+  -> session goroutine waits for EOS/error or ctx cancellation
+  -> pipeline set to NULL on exit
+```
+
+- Validated source types in this step:
+  - display ✓
+  - region ✓
+  - camera ✓
+  - window ✗ (BadMatch / MIT-SHM failure)
