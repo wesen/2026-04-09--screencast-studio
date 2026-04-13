@@ -6,10 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-gst/go-gst/gst"
-	"github.com/go-gst/go-gst/gst/app"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -18,7 +16,9 @@ import (
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
 )
 
-type PreviewRuntime struct{}
+type PreviewRuntime struct {
+	registry *captureRegistry
+}
 
 var (
 	gstInitOnce sync.Once
@@ -26,17 +26,19 @@ var (
 )
 
 func NewPreviewRuntime() *PreviewRuntime {
-	return &PreviewRuntime{}
+	return &PreviewRuntime{registry: defaultCaptureRegistry}
 }
 
-func (PreviewRuntime) StartPreview(ctx context.Context, source dsl.EffectiveVideoSource, opts media.PreviewOptions) (media.PreviewSession, error) {
+func (r *PreviewRuntime) StartPreview(ctx context.Context, source dsl.EffectiveVideoSource, opts media.PreviewOptions) (media.PreviewSession, error) {
 	if err := initGStreamer(); err != nil {
 		return nil, err
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	previewCtx, cancel := context.WithCancel(ctx)
+	if r == nil || r.registry == nil {
+		r = &PreviewRuntime{registry: defaultCaptureRegistry}
+	}
 	if opts.OnFrame == nil {
 		opts.OnFrame = func([]byte) {}
 	}
@@ -44,114 +46,54 @@ func (PreviewRuntime) StartPreview(ctx context.Context, source dsl.EffectiveVide
 		opts.OnLog = func(string, string) {}
 	}
 
-	resolvedSource, err := resolveWindowSource(previewCtx, source)
+	previewCtx, cancel := context.WithCancel(ctx)
+	shared, err := r.registry.acquireVideoSource(previewCtx, source)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
-
-	pipeline, sink, err := buildPreviewPipeline(resolvedSource)
+	consumer, err := shared.attachPreviewConsumer(opts)
 	if err != nil {
+		shared.releaseReference()
 		cancel()
 		return nil, err
 	}
 
 	session := &previewSession{
 		cancel:   cancel,
-		pipeline: pipeline,
-		done:     make(chan struct{}),
+		source:   shared,
+		consumer: consumer,
 	}
-
-	sink.SetCallbacks(&app.SinkCallbacks{
-		NewSampleFunc: func(s *app.Sink) gst.FlowReturn {
-			sample := s.PullSample()
-			if sample == nil {
-				return gst.FlowEOS
-			}
-			buffer := sample.GetBuffer()
-			if buffer == nil {
-				return gst.FlowError
-			}
-			mapInfo := buffer.Map(gst.MapRead)
-			if mapInfo == nil {
-				return gst.FlowError
-			}
-			defer buffer.Unmap()
-
-			frame := mapInfo.Bytes()
-			session.setLatestFrame(frame)
-			opts.OnFrame(frame)
-			return gst.FlowOK
-		},
-	})
-
-	bus := pipeline.GetPipelineBus()
-	resultCh := make(chan error, 1)
-	watch, err := startBusWatch(bus, func(msg *gst.Message) bool {
-		switch msg.Type() {
-		case gst.MessageError:
-			gstErr := msg.ParseError()
-			err := fmt.Errorf("preview pipeline error: %w", gstErr)
-			opts.OnLog("stderr", err.Error())
-			select {
-			case resultCh <- err:
-			default:
-			}
-			return false
-		case gst.MessageEOS:
-			select {
-			case resultCh <- nil:
-			default:
-			}
-			return false
-		default:
-			return true
+	go func() {
+		select {
+		case <-previewCtx.Done():
+			shared.detachPreviewConsumer(consumer.id, nil)
+		case <-consumer.done:
 		}
-	})
-	if err != nil {
-		cancel()
-		pipeline.BlockSetState(gst.StateNull)
-		return nil, err
-	}
-
-	if err := pipeline.SetState(gst.StatePlaying); err != nil {
-		watch.Stop()
-		cancel()
-		pipeline.BlockSetState(gst.StateNull)
-		return nil, fmt.Errorf("start preview pipeline: %w", err)
-	}
+	}()
 
 	log.Info().
 		Str("event", "preview.gst.start").
-		Str("source_id", resolvedSource.ID).
-		Str("source_name", resolvedSource.Name).
-		Str("source_type", resolvedSource.Type).
-		Msg("started gstreamer preview pipeline")
-
-	go session.wait(previewCtx, watch, resultCh)
+		Str("source_id", shared.source.ID).
+		Str("source_name", shared.source.Name).
+		Str("source_type", shared.source.Type).
+		Str("shared_signature", shared.signature).
+		Msg("started gstreamer preview session on shared source")
 	return session, nil
 }
 
 type previewSession struct {
 	cancel   context.CancelFunc
-	pipeline *gst.Pipeline
-	done     chan struct{}
-
-	mu          sync.RWMutex
-	latestFrame []byte
-	waitErr     error
+	source   *sharedVideoSource
+	consumer *sharedPreviewConsumer
 }
 
 func (s *previewSession) Wait() error {
-	if s == nil {
+	if s == nil || s.consumer == nil {
 		return nil
 	}
-	if s.done != nil {
-		<-s.done
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.waitErr
+	<-s.consumer.done
+	return s.consumer.WaitErr()
 }
 
 func (s *previewSession) Stop(ctx context.Context) error {
@@ -164,147 +106,28 @@ func (s *previewSession) Stop(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if s.done == nil {
+	if s.consumer == nil {
 		return nil
 	}
 	select {
-	case <-s.done:
-		return s.Wait()
+	case <-s.consumer.done:
+		return s.consumer.WaitErr()
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
 func (s *previewSession) LatestFrame() ([]byte, error) {
-	if s == nil {
+	if s == nil || s.consumer == nil {
 		return nil, errors.New("preview session is nil")
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if len(s.latestFrame) == 0 {
-		return nil, errors.New("preview frame not available yet")
-	}
-	return append([]byte(nil), s.latestFrame...), nil
+	return s.consumer.LatestFrame()
 }
 
 func (s *previewSession) TakeScreenshot(ctx context.Context, opts media.ScreenshotOptions) ([]byte, error) {
 	_ = ctx
 	_ = opts
 	return s.LatestFrame()
-}
-
-func (s *previewSession) wait(ctx context.Context, watch *busWatch, resultCh <-chan error) {
-	defer close(s.done)
-	defer watch.Stop()
-	defer s.pipeline.BlockSetState(gst.StateNull)
-
-	select {
-	case err := <-resultCh:
-		s.setWaitResult(err)
-	case <-ctx.Done():
-		sendEOS(s.pipeline)
-		select {
-		case err := <-resultCh:
-			if ctx.Err() != nil && err == nil {
-				s.setWaitResult(nil)
-			} else {
-				s.setWaitResult(err)
-			}
-		case <-time.After(750 * time.Millisecond):
-			s.setWaitResult(nil)
-		}
-	}
-}
-
-func (s *previewSession) setLatestFrame(frame []byte) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.latestFrame = append([]byte(nil), frame...)
-}
-
-func (s *previewSession) setWaitResult(err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.waitErr = err
-}
-
-func buildPreviewPipeline(source dsl.EffectiveVideoSource) (*gst.Pipeline, *app.Sink, error) {
-	pipeline, err := gst.NewPipeline("")
-	if err != nil {
-		return nil, nil, fmt.Errorf("create pipeline: %w", err)
-	}
-
-	elements, err := buildPreviewElements(source)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sink, err := app.NewAppSink()
-	if err != nil {
-		return nil, nil, fmt.Errorf("create appsink: %w", err)
-	}
-	sink.SetCaps(gst.NewCapsFromString("image/jpeg"))
-	sink.SetProperty("max-buffers", 2)
-	sink.SetProperty("drop", true)
-
-	toAdd := append([]*gst.Element(nil), elements...)
-	toAdd = append(toAdd, sink.Element)
-	pipeline.AddMany(toAdd...)
-	if err := linkElements(append(elements, sink.Element)...); err != nil {
-		pipeline.BlockSetState(gst.StateNull)
-		return nil, nil, err
-	}
-	return pipeline, sink, nil
-}
-
-func buildPreviewElements(source dsl.EffectiveVideoSource) ([]*gst.Element, error) {
-	elements := []*gst.Element{}
-
-	sourceElements, err := buildSourceElements(source)
-	if err != nil {
-		return nil, err
-	}
-	elements = append(elements, sourceElements...)
-
-	videoconvert, err := gst.NewElement("videoconvert")
-	if err != nil {
-		return nil, fmt.Errorf("create videoconvert: %w", err)
-	}
-	elements = append(elements, videoconvert)
-
-	if source.Type == "camera" && boolValue(source.Capture.Mirror, false) {
-		videoflip, err := gst.NewElement("videoflip")
-		if err != nil {
-			return nil, fmt.Errorf("create videoflip: %w", err)
-		}
-		videoflip.Set("method", "horizontal-flip")
-		elements = append(elements, videoflip)
-	}
-
-	videoscale, err := gst.NewElement("videoscale")
-	if err != nil {
-		return nil, fmt.Errorf("create videoscale: %w", err)
-	}
-	capsScale, err := newCapsFilter("video/x-raw,width=640")
-	if err != nil {
-		return nil, err
-	}
-	videorate, err := gst.NewElement("videorate")
-	if err != nil {
-		return nil, fmt.Errorf("create videorate: %w", err)
-	}
-	capsRate, err := newCapsFilter("video/x-raw,framerate=5/1")
-	if err != nil {
-		return nil, err
-	}
-	jpegenc, err := gst.NewElement("jpegenc")
-	if err != nil {
-		return nil, fmt.Errorf("create jpegenc: %w", err)
-	}
-	jpegenc.Set("quality", 50)
-
-	elements = append(elements, videoscale, capsScale, videorate, capsRate, jpegenc)
-	return elements, nil
 }
 
 func buildSourceElements(source dsl.EffectiveVideoSource) ([]*gst.Element, error) {
