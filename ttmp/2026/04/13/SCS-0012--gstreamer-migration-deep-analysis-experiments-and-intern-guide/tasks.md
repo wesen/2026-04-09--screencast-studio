@@ -33,13 +33,13 @@
 - [x] Phase 4.1c: Add a focused shared-preview validation harness/script proving preview branch attach/detach and last-consumer shutdown behavior for the shared source implementation.
 - [x] Phase 4.1d: Re-run existing preview runtime + web preview validation against the shared-source preview runtime and record any regressions.
 - [x] Phase 4.1e: Design and implement a bridge-style recording consumer for shared video sources (`appsink -> appsrc` or better if discovered), keeping it isolated from the stable recording runtime until validated.
-- [ ] Phase 4.1f: Add a focused shared-source recording harness proving all of the following at once: preview continuity during recording, valid finalized MP4 output, and continued preview after recording stop.
-- [ ] Phase 4.1g: Integrate shared-source video capture into `pkg/media/gst/recording.go` for video jobs while leaving audio jobs on the current stable implementation.
-- [ ] Phase 4.1h: Validate the real default app/server constructors end-to-end with shared capture via the Phase 4 web harness (preview stays active, screenshot works, audio controls still work, output finalizes correctly).
+- [x] Phase 4.1f: Add a focused shared-source recording harness proving all of the following at once: preview continuity during recording, valid finalized MP4 output, and continued preview after recording stop.
+- [x] Phase 4.1g: Integrate shared-source video capture into `pkg/media/gst/recording.go` for video jobs while leaving audio jobs on the current stable implementation.
+- [x] Phase 4.1h: Validate the real default app/server constructors end-to-end with shared capture via the Phase 4 web harness (preview stays active, screenshot works, audio controls still work, output finalizes correctly).
 - [ ] Phase 4.2: Remove the PreviewManager.SuspendAll / RestoreSuspended workaround. Preview and recording now share the same capture source via tee, so suspension is no longer needed.
 - [ ] Phase 4.2a: Remove server-level preview handoff bookkeeping from `internal/web/server.go` once shared capture passes real-defaults validation.
-- [ ] Phase 4.2b: Update web/server tests to assert preview continuity during recording instead of suspend/restore behavior.
-- [ ] Phase 4.2c: Close Phase 3.6 by validating screenshots during recording, live gain adjustment during recording, and VU meter flow in the no-suspend shared-capture path.
+- [x] Phase 4.2b: Update web/server tests to assert preview continuity during recording instead of suspend/restore behavior.
+- [x] Phase 4.2c: Close Phase 3.6 by validating screenshots during recording, live gain adjustment during recording, and VU meter flow in the no-suspend shared-capture path.
 - [ ] Phase 4.3: Delete pkg/recording/ffmpeg.go, pkg/media/ffmpeg/, internal/web/preview_runner.go. Remove FFmpeg from system dependencies. The entire FFmpeg code path should be gone.
 - [ ] Phase 4.3a: Remove FFmpeg default-runtime fallbacks and dead adapter references after GStreamer-only validation is complete.
 - [ ] Phase 4.3b: Delete FFmpeg-specific packages/files and update imports/build graph.

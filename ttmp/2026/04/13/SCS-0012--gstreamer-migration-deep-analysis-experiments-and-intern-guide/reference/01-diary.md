@@ -15,7 +15,9 @@ Intent: long-term
 Owners: []
 RelatedFiles:
     - Path: internal/web/handlers_api.go
-      Note: Step 19 live audio effects HTTP endpoint
+      Note: |-
+        Step 19 live audio effects HTTP endpoint
+        Step 26 removed preview suspension from recording start for the no-suspend shared-capture path
     - Path: internal/web/handlers_preview.go
       Note: Step 19 screenshot endpoint and preview screenshot retrieval
     - Path: internal/web/preview_manager.go
@@ -25,6 +27,8 @@ RelatedFiles:
         Step 20 default preview runtime now points to GStreamer
     - Path: internal/web/server.go
       Note: Step 14 server option seam for preview runtime injection
+    - Path: internal/web/server_test.go
+      Note: Step 26 updated tests from suspend/restore assertions to preview continuity assertions
     - Path: internal/web/session_manager.go
       Note: Step 19 websocket audio meter publishing from recording events
     - Path: pkg/app/application.go
@@ -57,12 +61,14 @@ RelatedFiles:
         Step 16 added native GStreamer audio mixing/runtime support
         Step 18 recording lifecycle/state/event/max-duration refinements
         Step 19 live audio controls
+        Step 26 integrated shared bridge recording into the real video worker path
     - Path: pkg/media/gst/shared_video.go
       Note: Step 23 shared video source registry and preview branch lifecycle foundation for Phase 4
     - Path: pkg/media/gst/shared_video_recording_bridge.go
       Note: |-
         Step 24 isolated shared-source recording bridge prototype for Phase 4.1e
         Step 25 raw branch normalization and push instrumentation proving the remaining bridge bug is recorder-side finalization only
+        Step 26 appsrc MP4 fix via h264parse unlocked valid shared bridge recording
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
@@ -93,12 +99,15 @@ RelatedFiles:
       Note: Step 23 focused harness proving shared preview attach/detach and source recreation behavior
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke/main.go
       Note: Step 24 bridge harness proving preview continuity while recorder-side appsrc issues remain
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/21-go-gst-appsrc-mp4-recorder-smoke/main.go
+      Note: Step 26 synthetic appsrc MP4 reproduction that proved h264parse was required for this recorder path
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -2836,4 +2845,245 @@ buffer_count=30
 ```text
 gst_segment_to_running_time: assertion 'segment->format == format' failed
 output size: 850 bytes
+```
+
+---
+
+## Step 26: Phase 4.1f–4.1h Breakthrough — `h264parse` Fixed the AppSrc MP4 Path, Shared Recording Is Now Real
+
+This was the real Phase 4 breakthrough step. I stopped treating the shared bridge failure as if it were necessarily a shared-capture architecture problem and instead isolated the recorder path itself. That turned out to be the right move.
+
+The key finding was that the bridge recorder failure was reproducible even in a brand-new synthetic `appsrc` test with no shared preview source at all. A minimal `appsrc -> videoconvert -> x264enc -> mp4mux -> filesink` program produced the same invalid ~850-byte MP4 and the same `gst_segment_to_running_time` assertions. That proved the remaining bug was not in preview sharing, not in appsink-to-appsrc bridging as an architecture, and not in the shared registry. The bug was in the exact MP4 recorder shape used with `appsrc`.
+
+I then created a new focused experiment, added `h264parse` between `x264enc` and `mp4mux`, and the synthetic recorder immediately started producing valid MP4 output. After that I applied the same fix to the production shared bridge recorder. Once `h264parse` was present, the isolated shared bridge harness finally satisfied all of the original Phase 4.1f success criteria at the same time:
+
+- preview continues during recording,
+- preview continues after recorder stop,
+- and the MP4 finalizes correctly.
+
+From there I integrated the shared bridge path into `pkg/media/gst/recording.go` for video jobs, leaving audio jobs on the current stable runtime path. Then I validated the real default web/app seam and switched recording start away from the old preview-suspend behavior. The final default-runtime harness now shows the honest target behavior: preview stays active, screenshots continue to work, audio effects remain live, audio meter events still flow, and the output files finalize correctly.
+
+### Prompt Context
+
+**User prompt (verbatim):** continue
+
+**Assistant interpretation:** Keep progressing Phase 4 immediately instead of stopping after the narrowed bridge diagnosis.
+
+**Inferred user intent:** Finish the actual shared-capture blocker and push the result through the real app/server path if the evidence supports it.
+
+### What I did
+
+#### 1. Added a new minimal reproduction experiment
+Created:
+- `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/21-go-gst-appsrc-mp4-recorder-smoke.sh`
+- `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/21-go-gst-appsrc-mp4-recorder-smoke/main.go`
+
+This synthetic test uses:
+
+```text
+appsrc -> videoconvert -> x264enc -> mp4mux -> filesink
+```
+
+with generated RGBA frames and explicit timestamps.
+
+#### 2. Proved the recorder bug was not shared-capture-specific
+The synthetic `appsrc` recorder reproduced the same failure signatures as the shared bridge path:
+
+```text
+gst_segment_to_running_time: assertion 'segment->format == format' failed
+output size: 850 bytes
+duration=N/A
+```
+
+That was the critical isolation result.
+
+#### 3. Tested the smallest likely fix: `h264parse`
+I inserted `h264parse` between `x264enc` and `mp4mux` in the synthetic recorder.
+
+Result: the same synthetic appsrc recorder started producing a valid MP4.
+
+Observed output:
+
+```text
+output size: 18090 bytes
+duration=3.000000
+size=18090
+```
+
+#### 4. Applied the same fix to the production shared bridge recorder
+Updated:
+- `pkg/media/gst/shared_video_recording_bridge.go`
+
+Recorder chain now effectively uses:
+
+```text
+appsrc -> videoconvert -> x264enc -> h264parse -> mp4mux -> filesink
+```
+
+#### 5. Re-ran the isolated shared bridge harness
+Re-ran:
+
+```bash
+./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke.sh
+```
+
+Result:
+- preview stayed alive during recording,
+- preview stayed alive after recorder stop,
+- valid MP4 output finalized.
+
+Observed output:
+
+```text
+output size: 155034 bytes
+duration=3.400000
+size=155034
+```
+
+This completed the real intent of Phase 4.1f.
+
+#### 6. Integrated shared-source video capture into the recording runtime
+Updated:
+- `pkg/media/gst/recording.go`
+
+Changes:
+- video workers now use `StartExperimentalSharedVideoRecorder(...)`
+- audio workers remain on the stable pipeline path
+- worker supervision structure remains intact
+- process-log events from the bridge path still flow into the session event model
+
+This completed Phase 4.1g.
+
+#### 7. Switched the web recording start path away from preview suspension
+Updated:
+- `internal/web/handlers_api.go`
+- `internal/web/server_test.go`
+
+Behavior change:
+- recording start no longer suspends previews before starting recording
+- server tests now assert preview continuity instead of suspend/restore behavior
+
+I did **not** yet fully remove the now-dead handoff bookkeeping from `internal/web/server.go`; that remains cleanup work under later Phase 4 subtasks.
+
+#### 8. Validated the real default web/app seam
+Re-ran:
+
+```bash
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e.sh
+```
+
+I also adjusted the harness to:
+- allow a larger max duration window,
+- and wait for an initial preview screenshot before starting recording,
+so the test was measuring the shared-capture behavior rather than a preview cold-start race.
+
+Final result:
+- preview remains active during recording,
+- preview remains active after recording,
+- screenshots work,
+- audio meter events flow,
+- live audio effects endpoint works during recording,
+- video and audio outputs finalize correctly.
+
+Observed final outputs:
+
+```text
+default-runtime video (30836 bytes):
+duration=8.200000
+size=30836
+
+default-runtime audio (1532204 bytes):
+duration=7.980000
+size=1532204
+```
+
+This completed Phase 4.1h and honestly closed the old “Phase 3.6 under true shared capture” gap as well.
+
+### Why
+- The bridge blocker had to be separated into:
+  1. shared-source architecture problems,
+  2. appsrc recorder-shape problems.
+- Without that separation, I would have been tempted either to blame the registry/tee architecture incorrectly or to continue random property tweaks.
+- The synthetic appsrc recorder experiment was the shortest path to a real answer.
+
+### What worked
+- The synthetic `21-...` experiment gave a clean minimal reproduction.
+- `h264parse` was the decisive fix for the appsrc MP4 path.
+- The production shared bridge recorder finalized valid MP4 after the parser was inserted.
+- Shared-source video recording is now integrated into the real recording runtime.
+- The default server/app path now works without preview suspension.
+
+### What didn't work
+- Pre-parser appsrc recording path:
+
+```text
+output size: 850 bytes
+duration=N/A
+gst_segment_to_running_time: assertion 'segment->format == format' failed
+```
+
+- The first pass of the default-runtime harness still raced the 4-second max duration when trying to validate audio effects, so I widened the harness timing.
+- The first no-suspend screenshot validation was also somewhat cold-start-sensitive, so I changed the harness to prove initial preview frame availability before starting recording.
+
+### What I learned
+- The nasty ~850-byte invalid MP4 output was not a mysterious shared-capture failure. It was an appsrc-to-mp4 pipeline-shape problem.
+- `h264parse` is effectively required for this appsrc-driven H.264-to-MP4 path on this machine / stack, even though the older direct-source recording path got away without it.
+- Once the recorder shape was corrected, the shared-capture architecture worked the way the Phase 4 design expected.
+
+### What was tricky to build
+- The hardest part conceptually was recognizing that “shared capture still fails” was too broad a diagnosis. The architecture and the recorder finalization path had to be separated experimentally.
+- The web default-runtime harness initially had its own validation races (short max duration, preview frame timing), so I had to improve the harness before using it as final evidence.
+
+### What warrants a second pair of eyes
+- Whether `h264parse` should also be inserted into the older non-shared direct video recording pipeline for consistency, even though it already worked before
+- Whether the now-unused preview handoff code in `internal/web/server.go` should be removed immediately or in a small follow-up cleanup commit
+- Whether there are any remaining edge cases around multi-video-job sessions sharing the same source signature concurrently
+
+### What should be done in the future
+- Remove the now-unused preview handoff bookkeeping from `internal/web/server.go`
+- Decide whether to fully delete or merely deprecate `PreviewManager.SuspendAll / RestoreSuspended`
+- Proceed to FFmpeg removal only after shared-capture cleanup and any final edge-case validation are complete
+
+### Code review instructions
+Review these files first:
+- `pkg/media/gst/shared_video_recording_bridge.go`
+- `pkg/media/gst/recording.go`
+- `internal/web/handlers_api.go`
+- `internal/web/server_test.go`
+- `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/21-go-gst-appsrc-mp4-recorder-smoke/main.go`
+- `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e/main.go`
+
+Re-run:
+
+```bash
+go test ./... -count=1
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/21-go-gst-appsrc-mp4-recorder-smoke.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e.sh
+```
+
+Check for these success facts:
+- script 21 writes a valid MP4 after adding `h264parse`
+- script 20 keeps preview alive and writes a valid MP4
+- default-runtime web harness keeps preview active during recording
+- screenshot / live audio effects / audio meter all work in the no-suspend shared-capture path
+
+### Technical details
+Key successful outputs:
+
+```text
+script 21:
+output size: 18090 bytes
+duration=3.000000
+
+script 20:
+output size: 155034 bytes
+duration=3.400000
+
+script 16:
+default-runtime video (30836 bytes):
+duration=8.200000
+
+default-runtime audio (1532204 bytes):
+duration=7.980000
 ```

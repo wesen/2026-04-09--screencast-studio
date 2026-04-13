@@ -164,3 +164,19 @@ Refined the isolated shared bridge recorder to normalize the raw branch explicit
 ### Related Files
 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go — Raw branch normalization and buffer-push instrumentation that narrowed the remaining bridge bug
+
+
+## 2026-04-13
+
+Closed the hard Phase 4 bridge blocker by isolating the recorder path with a new synthetic `appsrc` MP4 harness (`scripts/21-go-gst-appsrc-mp4-recorder-smoke`). That experiment reproduced the exact same ~850-byte invalid MP4 and `gst_segment_to_running_time` failure as the shared bridge recorder, proving the remaining issue was recorder-shape-specific rather than shared-capture-specific. Adding `h264parse` between `x264enc` and `mp4mux` fixed the synthetic recorder immediately, and the same fix then made the production shared bridge recorder finalize valid MP4 output while preview remained alive.
+
+Integrated the shared-source bridge into `pkg/media/gst/recording.go` for video jobs, leaving audio on the stable path. Then switched `internal/web/handlers_api.go` to stop suspending previews before recording and updated `internal/web/server_test.go` to assert preview continuity instead of suspend/restore behavior. Finally, the real default web/app harness (`scripts/16-web-gst-default-runtime-e2e`) validated the honest target behavior: preview stays active during recording, screenshots keep working, live audio effects and audio meter flow remain available, and both video/audio outputs finalize correctly.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go — Added `h264parse` to the appsrc H.264 MP4 recorder path; shared bridge now finalizes valid MP4 output
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go — Video recording workers now use the shared-source bridge path while audio stays on the stable implementation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go — Recording start no longer suspends previews before starting shared-capture recording
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — Web tests now assert preview continuity and no restart across recording start/stop and start failures
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/21-go-gst-appsrc-mp4-recorder-smoke/main.go — Minimal appsrc MP4 reproduction that proved `h264parse` was the missing recorder fix
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e/main.go — Real-default no-suspend shared-capture harness refined to validate the honest target behavior
