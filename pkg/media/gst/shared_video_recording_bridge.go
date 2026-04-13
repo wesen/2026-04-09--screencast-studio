@@ -79,8 +79,12 @@ func StartExperimentalSharedVideoRecorder(ctx context.Context, source dsl.Effect
 		done:   make(chan struct{}),
 	}
 
+	width, height := sharedRecordingTargetSize(shared.source)
 	raw, err := shared.attachRawConsumer(sharedRawConsumerOptions{
-		FPS: opts.FPS,
+		FPS:    opts.FPS,
+		Width:  width,
+		Height: height,
+		Format: "I420",
 		OnLog: func(stream, message string) {
 			opts.OnLog(stream, message)
 		},
@@ -223,6 +227,9 @@ type sharedRawConsumer struct {
 
 type sharedRawConsumerOptions struct {
 	FPS      int
+	Width    int
+	Height   int
+	Format   string
 	OnSample func(*gst.Sample) gst.FlowReturn
 	OnLog    func(string, string)
 }
@@ -239,6 +246,9 @@ func (s *sharedVideoSource) attachRawConsumer(opts sharedRawConsumerOptions) (*s
 	}
 	if opts.OnLog == nil {
 		opts.OnLog = func(string, string) {}
+	}
+	if strings.TrimSpace(opts.Format) == "" {
+		opts.Format = "I420"
 	}
 
 	consumer, err := buildSharedRawConsumer(s, opts)
@@ -378,15 +388,27 @@ func buildSharedRawConsumer(source *sharedVideoSource, opts sharedRawConsumerOpt
 		return nil, fmt.Errorf("create raw queue: %w", err)
 	}
 	queue.Set("max-size-buffers", 4)
+	videoconvert, err := gst.NewElementWithName("videoconvert", consumerID+"-videoconvert")
+	if err != nil {
+		return nil, fmt.Errorf("create raw videoconvert: %w", err)
+	}
+	videoscale, err := gst.NewElementWithName("videoscale", consumerID+"-videoscale")
+	if err != nil {
+		return nil, fmt.Errorf("create raw videoscale: %w", err)
+	}
 	videorate, err := gst.NewElementWithName("videorate", consumerID+"-videorate")
 	if err != nil {
 		return nil, fmt.Errorf("create raw videorate: %w", err)
 	}
-	capsRate, err := newCapsFilter(fmt.Sprintf("video/x-raw,framerate=%d/1", opts.FPS))
+	capsSpec := fmt.Sprintf("video/x-raw,format=%s,framerate=%d/1,pixel-aspect-ratio=1/1", opts.Format, opts.FPS)
+	if opts.Width > 0 && opts.Height > 0 {
+		capsSpec = fmt.Sprintf("%s,width=%d,height=%d", capsSpec, opts.Width, opts.Height)
+	}
+	capsRate, err := newCapsFilter(capsSpec)
 	if err != nil {
 		return nil, err
 	}
-	capsRate.SetProperty("name", consumerID+"-rate-caps")
+	capsRate.SetProperty("name", consumerID+"-normalized-caps")
 	sink, err := app.NewAppSink()
 	if err != nil {
 		return nil, fmt.Errorf("create raw appsink: %w", err)
@@ -399,7 +421,7 @@ func buildSharedRawConsumer(source *sharedVideoSource, opts sharedRawConsumerOpt
 		id:       consumerID,
 		source:   source,
 		queue:    queue,
-		elements: []*gst.Element{queue, videorate, capsRate, sink.Element},
+		elements: []*gst.Element{queue, videoconvert, videoscale, videorate, capsRate, sink.Element},
 		sink:     sink,
 		onLog:    opts.OnLog,
 		done:     make(chan struct{}),
@@ -448,6 +470,7 @@ type bridgeVideoRecorder struct {
 	resultCh      chan error
 	frameDuration time.Duration
 	frameCount    uint64
+	pushCount     atomic.Uint64
 	mu            sync.Mutex
 	closed        bool
 }
@@ -469,6 +492,7 @@ func newBridgeVideoRecorder(caps *gst.Caps, opts ExperimentalSharedVideoRecorder
 	appsrc.SetStreamType(app.AppStreamTypeStream)
 	appsrc.Set("block", true)
 	appsrc.Set("emit-signals", false)
+	appsrc.Set("format", int(gst.FormatTime))
 	appsrc.SetFormat(gst.FormatTime)
 	appsrc.SetAutomaticEOS(false)
 
@@ -574,6 +598,15 @@ func (r *bridgeVideoRecorder) pushSample(sample *gst.Sample) (gst.FlowReturn, er
 	if ret != gst.FlowOK {
 		return ret, fmt.Errorf("bridge recorder push buffer returned %s", ret)
 	}
+	count := r.pushCount.Add(1)
+	if count == 1 || count%10 == 0 {
+		log.Info().
+			Str("event", "capture.gst.shared.bridge_recorder.push").
+			Uint64("buffer_count", count).
+			Dur("pts", time.Duration(copyBuffer.PresentationTimestamp())).
+			Dur("duration", time.Duration(copyBuffer.Duration())).
+			Msg("pushed buffer into experimental shared bridge recorder")
+	}
 	return ret, nil
 }
 
@@ -589,6 +622,10 @@ func (r *bridgeVideoRecorder) stop(timeout time.Duration) error {
 	r.closed = true
 	r.mu.Unlock()
 
+	log.Info().
+		Str("event", "capture.gst.shared.bridge_recorder.stop").
+		Uint64("buffer_count", r.pushCount.Load()).
+		Msg("stopping experimental shared bridge recorder")
 	ret := r.appsrc.EndStream()
 	if ret != gst.FlowOK && ret != gst.FlowEOS {
 		return fmt.Errorf("bridge recorder end stream returned %s", ret)
@@ -611,4 +648,16 @@ func (r *bridgeVideoRecorder) stop(timeout time.Duration) error {
 		}
 		return errors.New("timed out waiting for shared bridge recorder EOS")
 	}
+}
+
+func sharedRecordingTargetSize(source dsl.EffectiveVideoSource) (int, int) {
+	if source.Target.Rect != nil && source.Target.Rect.W > 0 && source.Target.Rect.H > 0 {
+		return source.Target.Rect.W, source.Target.Rect.H
+	}
+	if strings.TrimSpace(source.Capture.Size) != "" {
+		if width, height, err := parseSize(source.Capture.Size); err == nil {
+			return width, height
+		}
+	}
+	return 0, 0
 }
