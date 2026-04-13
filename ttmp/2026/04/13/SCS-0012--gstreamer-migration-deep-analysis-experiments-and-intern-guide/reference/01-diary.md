@@ -3087,3 +3087,63 @@ duration=8.200000
 default-runtime audio (1532204 bytes):
 duration=7.980000
 ```
+
+---
+
+## Step 27: Wrote and Uploaded the Full Intern-Facing System Explanation and Migration Postmortem
+
+The user asked for a very detailed new intern-facing report that explains not just the current architecture, but the full postmortem of the migration struggles. I wrote a new long-form design/postmortem document and stored it in the ticket rather than trying to stretch the earlier architecture docs further.
+
+### New document
+
+- `ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/03-screencast-studio-system-explanation-and-gstreamer-migration-postmortem-for-interns.md`
+
+### What the report covers
+
+The new report was written for a new intern and includes:
+
+- what Screencast Studio is,
+- how the DSL / compiler / application / web / preview / recording / media layers fit together,
+- the runtime seam and why it mattered,
+- the legacy FFmpeg mental model,
+- the shared-capture problem,
+- the tee experiment failures,
+- the appsink/appsrc bridge direction,
+- the decisive minimal `appsrc` recorder experiment,
+- why `h264parse` turned out to be the real fix for the appsrc MP4 recorder path,
+- the architecture after the breakthrough,
+- HTTP/WebSocket/API references,
+- file references,
+- diagrams,
+- pseudocode,
+- debugging playbooks,
+- and explicit lessons learned.
+
+### Supporting ticket updates
+
+I also:
+
+- added the new report to the ticket `index.md` key links,
+- validated the new doc frontmatter with `docmgr validate frontmatter`,
+- updated its related-file metadata with `docmgr doc relate`.
+
+### ReMarkable upload
+
+I uploaded the new report to the existing ticket folder on reMarkable:
+
+- remote folder: `/ai/2026/04/13/SCS-0012`
+- uploaded name: `SCS-0012 System Explanation and GStreamer Migration Postmortem for Interns`
+
+### Commands used
+
+```bash
+docmgr validate frontmatter --doc /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/03-screencast-studio-system-explanation-and-gstreamer-migration-postmortem-for-interns.md --suggest-fixes
+
+remarquee upload md --dry-run /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/03-screencast-studio-system-explanation-and-gstreamer-migration-postmortem-for-interns.md --name 'SCS-0012 System Explanation and GStreamer Migration Postmortem for Interns' --remote-dir '/ai/2026/04/13/SCS-0012' --non-interactive
+
+remarquee upload md /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/03-screencast-studio-system-explanation-and-gstreamer-migration-postmortem-for-interns.md --name 'SCS-0012 System Explanation and GStreamer Migration Postmortem for Interns' --remote-dir '/ai/2026/04/13/SCS-0012' --non-interactive
+```
+
+### Why this matters
+
+This new report is different from the earlier docs. The older documents explain the migration plan and the Phase 4 architecture problem. This new report is the "how to understand the whole system and why the team struggled the way it did" document. It is explicitly intended to shorten the onboarding time for the next person who needs to touch preview, recording, shared capture, or FFmpeg removal.

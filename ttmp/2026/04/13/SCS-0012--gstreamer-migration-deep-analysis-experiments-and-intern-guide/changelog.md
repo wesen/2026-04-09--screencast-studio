@@ -180,3 +180,15 @@ Integrated the shared-source bridge into `pkg/media/gst/recording.go` for video 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — Web tests now assert preview continuity and no restart across recording start/stop and start failures
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/21-go-gst-appsrc-mp4-recorder-smoke/main.go — Minimal appsrc MP4 reproduction that proved `h264parse` was the missing recorder fix
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e/main.go — Real-default no-suspend shared-capture harness refined to validate the honest target behavior
+
+
+## 2026-04-13
+
+Added a new long-form intern-facing system/design/postmortem report at `design-doc/03-screencast-studio-system-explanation-and-gstreamer-migration-postmortem-for-interns.md`. This document explains the full architecture of Screencast Studio, the stable DSL/compiler/runtime seam, the preview and recording managers, the shared-capture problem, the failed tee and bridge experiments, the decisive `appsrc` minimal reproduction, the `h264parse` fix, and the current no-suspend shared-capture design after the breakthrough. It also includes diagrams, pseudocode, API references, file references, and a debugging playbook for future interns.
+
+Uploaded the new report to reMarkable at `/ai/2026/04/13/SCS-0012` as `SCS-0012 System Explanation and GStreamer Migration Postmortem for Interns`.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/design-doc/03-screencast-studio-system-explanation-and-gstreamer-migration-postmortem-for-interns.md — New detailed intern-facing postmortem and system explanation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/index.md — Ticket index updated to link to the new postmortem document
