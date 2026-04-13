@@ -60,3 +60,13 @@ Completed Phase 1 end-to-end validation for native GStreamer preview: added a se
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go — Added NewServerWithOptions and WithPreviewRuntime for staged preview-runtime validation
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/11-web-gst-preview-e2e/main.go — HTTP end-to-end harness for GStreamer preview ensure/MJPEG/suspend/restore
 
+
+## 2026-04-13
+
+Implemented the first native GStreamer recording runtime slice for video jobs: programmatic video pipeline construction, per-job worker supervision, EOS-driven stop/finalization, and a reproducible smoke harness that validated real MP4 output for display, region, and camera sources. Had to tune x264/stop behavior so EOS finalization completed cleanly (commit bc6e63e584291432ce857b7137053ed8576213fb).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go — Native GStreamer video recording runtime with x264/mp4mux/qtmux pipelines and EOS stop handling
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/12-go-gst-recording-runtime-smoke/main.go — Reproducible validation harness for display/region/camera recording output
+

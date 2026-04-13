@@ -42,6 +42,8 @@ RelatedFiles:
       Note: |-
         Step 11 native GStreamer preview runtime (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
         Step 13 geometry fallback fix for window preview
+    - Path: pkg/media/gst/recording.go
+      Note: Step 15 native GStreamer video recording runtime
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
@@ -52,12 +54,15 @@ RelatedFiles:
       Note: Step 13 investigation script for unreliable XID window capture
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/11-web-gst-preview-e2e/main.go
       Note: Step 14 end-to-end HTTP validation harness for GStreamer preview
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/12-go-gst-recording-runtime-smoke/main.go
+      Note: Step 15 smoke harness for validating real MP4 output
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -1235,3 +1240,157 @@ HTTP POST /api/recordings/start
   - region ✓
   - camera ✓
   - window ✓ (extra)
+
+---
+
+## Step 15: Native GStreamer Video Recording Runtime (Phase 2.1)
+
+This step started the recording side of the migration by implementing the first native GStreamer recording runtime slice: **video jobs only**. I kept audio explicitly out of scope for this step so the code and validation could focus on one problem at a time: build a real pipeline, write a real MP4, stop cleanly with EOS, and surface results through the `media.RecordingRuntime` seam already created in Phase 0.
+
+The key success criterion for this step was not just “pipeline starts.” It was “pipeline starts, records, stops on context cancellation, finalizes a valid MP4, and returns a coherent recording result.”
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 14)
+
+**Assistant interpretation:** Keep progressing through the ticket tasks after preview completion and move into the next recording-runtime task in the same disciplined way.
+
+**Inferred user intent:** Finish the migration incrementally, with each runtime slice validated before moving deeper.
+
+**Commit (code):** bc6e63e584291432ce857b7137053ed8576213fb — "Add native GStreamer video recording runtime"
+
+### What I did
+
+- Implemented `pkg/media/gst/recording.go`:
+  - `RecordingRuntime.StartRecording(...)`
+  - `recordingSession.Wait()` / `Stop(...)`
+  - per-job recording workers with:
+    - GStreamer pipeline creation
+    - bus watch for `MessageError` / `MessageEOS`
+    - EOS-driven stop handling on context cancellation
+  - session-level event emission through `media.RecordingEvent`
+- Implemented video pipeline construction for `dsl.VideoJob`:
+  - source elements from the same source-mapping logic used by preview
+  - window sources resolved to geometry first
+  - `videoconvert`
+  - optional `videoflip` for mirrored camera recording
+  - `videorate`
+  - caps filter for target FPS
+  - `x264enc`
+  - `mp4mux` / `qtmux`
+  - `filesink`
+- Added a focused smoke-test harness:
+  - `ttmp/.../scripts/12-go-gst-recording-runtime-smoke/main.go`
+  - `ttmp/.../scripts/12-go-gst-recording-runtime-smoke.sh`
+- Validated the runtime with real recordings for:
+  - display
+  - region
+  - camera
+- Used `file` and `ffprobe` to verify the produced MP4 files
+- Re-ran the repo test suite:
+  - `go test ./... -count=1`
+- Checked task:
+  - 2.1 video recording runtime implementation
+
+### Why
+
+Recording is a riskier migration surface than preview because the output must be finalized correctly. A runtime that “mostly records” but leaves corrupt or empty files is not useful.
+
+By isolating this step to video jobs only, I could validate the muxing and EOS path without mixing in audio-mixer complexity yet.
+
+### What worked
+
+- The runtime now records valid MP4 files directly via GStreamer inside the main repo
+- Display recording smoke test succeeded:
+  - output file: valid MP4
+  - `ffprobe` duration: `3.000000`
+  - non-zero file size
+- Region recording smoke test succeeded:
+  - output file: valid MP4
+  - `ffprobe` duration: `3.000000`
+- Camera recording smoke test succeeded:
+  - output file: valid MP4
+  - `ffprobe` duration: `2.900000`
+- Window-geometry reuse worked naturally for recording because the same source-resolution logic is shared in the GStreamer package
+- `go test ./... -count=1` passed after landing the runtime and harness
+
+### What didn't work
+
+- The **first** display-recording attempt failed during shutdown.
+- Exact symptom from the first run:
+
+```text
+event: type=state_changed state=failed reason="Recording Source failed: timed out waiting for recording EOS"
+wait recording: Recording Source failed: timed out waiting for recording EOS
+```
+
+- The pipeline started fine, but the initial encoder/stop configuration did not finalize quickly enough when the context timed out.
+- I fixed this by:
+  - increasing the EOS wait budget from 3s to 10s
+  - setting lower-latency x264 options:
+    - `tune=zerolatency`
+    - `speed-preset=veryfast`
+    - `bframes=0`
+
+After those changes, the recording finalized cleanly and produced valid MP4 files.
+
+### What I learned
+
+- The recording-runtime correctness hinges on **EOS finalization behavior**, not just pipeline startup
+- Preview-style cancellation timing is too optimistic for muxed recording outputs; recording needs a larger shutdown budget
+- x264 latency settings materially affect whether the pipeline drains/finalizes quickly enough for a clean stop
+- A real smoke harness with `ffprobe` is essential here; file existence alone would have been too weak a validation signal
+
+### What was tricky to build
+
+- The sharpest edge was shutdown ownership.
+- In the first draft, there was a concurrency risk where the session-level cancellation path and the worker-level stop path could both try to consume the same worker result channel. That would have made failures intermittent and very hard to reason about.
+- I fixed that by making the worker’s `wait(ctx)` own the EOS-on-cancel behavior. The session loop observes worker results and context cancellation, but it no longer races the worker by trying to stop pipelines separately.
+- The second tricky part was encoder latency: the pipeline could start, run, and still fail the step if it didn’t flush quickly enough on EOS.
+
+### What warrants a second pair of eyes
+
+- Whether the current session result semantics should distinguish user-requested stop from generic `context deadline exceeded` more explicitly
+- Whether the current bitrate heuristic from `quality` is the right long-term mapping for x264 in this app
+- Whether we want additional container support beyond `mp4` / `mov` before wiring this runtime into higher-level app code
+
+### What should be done in the future
+
+- Implement Phase 2.2: native GStreamer audio recording/mixing runtime
+- Then implement Phase 2.3 / 2.4 so the recording stop/event model matches the existing web session manager expectations more closely
+- Add end-to-end app/web validation for recording after audio is present
+
+### Code review instructions
+
+- Start with:
+  - `pkg/media/gst/recording.go`
+- Then review the smoke harness:
+  - `ttmp/.../scripts/12-go-gst-recording-runtime-smoke/main.go`
+  - `ttmp/.../scripts/12-go-gst-recording-runtime-smoke.sh`
+- Validate with:
+  - `go test ./... -count=1`
+  - `OUT_PATH=/tmp/scs-gst-recording-display.mp4 bash ttmp/.../scripts/12-go-gst-recording-runtime-smoke.sh`
+  - `OUT_PATH=/tmp/scs-gst-recording-region.mp4 REGION=0,0,640,480 bash ttmp/.../scripts/12-go-gst-recording-runtime-smoke.sh`
+  - `OUT_PATH=/tmp/scs-gst-recording-camera.mp4 SOURCE_TYPE=camera DEVICE=/dev/video0 bash ttmp/.../scripts/12-go-gst-recording-runtime-smoke.sh`
+
+### Technical details
+
+- Video pipeline shape in this step:
+
+```text
+[source]
+  -> videoconvert
+  -> optional videoflip (camera mirror)
+  -> videorate
+  -> capsfilter(video/x-raw,framerate=N/1)
+  -> x264enc(bitrate, bframes=0, tune=zerolatency, speed-preset=veryfast)
+  -> mp4mux / qtmux
+  -> filesink
+```
+
+- Current limitation in this step:
+  - `plan.AudioJobs` are rejected with `gstreamer audio recording is not implemented yet`
+- Validated outputs from this step:
+  - display MP4 ✓
+  - region MP4 ✓
+  - camera MP4 ✓
