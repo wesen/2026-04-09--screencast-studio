@@ -43,7 +43,9 @@ RelatedFiles:
         Step 11 native GStreamer preview runtime (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
         Step 13 geometry fallback fix for window preview
     - Path: pkg/media/gst/recording.go
-      Note: Step 15 native GStreamer video recording runtime
+      Note: |-
+        Step 15 native GStreamer video recording runtime
+        Step 16 added native GStreamer audio mixing/runtime support
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
@@ -56,12 +58,15 @@ RelatedFiles:
       Note: Step 14 end-to-end HTTP validation harness for GStreamer preview
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/12-go-gst-recording-runtime-smoke/main.go
       Note: Step 15 smoke harness for validating real MP4 output
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/13-go-gst-audio-recording-runtime-smoke/main.go
+      Note: Step 16 smoke harness for WAV/Opus/mixed audio validation
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -1394,3 +1399,149 @@ After those changes, the recording finalized cleanly and produced valid MP4 file
   - display MP4 ✓
   - region MP4 ✓
   - camera MP4 ✓
+
+---
+
+## Step 16: Native GStreamer Audio Recording and Mixing Runtime (Phase 2.2)
+
+This step completed the second big recording-runtime slice by adding native GStreamer support for `AudioJobs`. The goal was to match the current app’s audio model closely enough to be useful: one or more PulseAudio/PipeWire sources, per-source gain, mixing through `audiomixer`, and file output in at least the formats already validated during earlier experiments.
+
+I kept the validation practical rather than theoretical. The output had to be real, non-empty, and recognizable by `file`/`ffprobe`, and the multi-input graph had to work with real request-pad linking instead of a hard-coded single-source shortcut.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 15)
+
+**Assistant interpretation:** Continue with the next planned recording-runtime task and validate it the same way as the earlier runtime slices.
+
+**Inferred user intent:** Keep progressing through the migration checklist, one tested subsystem at a time.
+
+**Commit (code):** ec7136d5168f7e911ef209e369110157225e5e52 — "Add GStreamer audio mixing runtime"
+
+### What I did
+
+- Extended `pkg/media/gst/recording.go` to support `plan.AudioJobs`
+- Added native audio pipeline construction with:
+  - one `pulsesrc` per source
+  - capsfilter for shared raw-audio format
+  - `audioconvert`
+  - `audioresample`
+  - per-source `volume`
+  - `audiomixer`
+  - post-mix `audioconvert` / `audioresample`
+  - encoder/mux branch:
+    - `wavenc -> filesink` for WAV/PCM
+    - `opusenc -> oggmux -> filesink` for Opus/Ogg
+- Used request pads on `audiomixer` (`sink_%u`) and linked source-branch `volume` src pads directly into the mixer
+- Added audio caps helpers so raw/mixed audio formats are normalized before encoding
+- Added a dedicated runtime smoke harness:
+  - `ttmp/.../scripts/13-go-gst-audio-recording-runtime-smoke/main.go`
+  - `ttmp/.../scripts/13-go-gst-audio-recording-runtime-smoke.sh`
+- Validated three concrete cases:
+  1. single-source WAV
+  2. single-source Opus/Ogg
+  3. two-branch mixed WAV (using the same `default` Pulse source twice with different gains to validate the graph shape)
+- Re-ran the full Go test suite:
+  - `go test ./... -count=1`
+- Checked task:
+  - 2.2 audio recording/mixing runtime
+
+### Why
+
+The video runtime from Step 15 was only half the recording story. The current app’s recording plans can also contain audio mix jobs, and the migration isn’t credible until both sides exist natively under the new runtime seam.
+
+This step aimed for the minimal useful implementation: real mix graph, real outputs, real encoder branches, and real runtime supervision.
+
+### What worked
+
+- Single-source WAV recording worked:
+  - output recognized as `RIFF ... WAVE audio, Microsoft PCM, 16 bit, stereo 48000 Hz`
+  - `ffprobe` duration: `2.970000`
+- Single-source Opus/Ogg recording worked:
+  - output recognized as `Ogg data, Opus audio`
+  - `ffprobe` duration: `3.016500`
+- Two-branch mixed WAV recording worked:
+  - same `default` source wired twice with gains `1.0` and `0.5`
+  - output recognized as valid WAV
+  - confirms the `audiomixer` request-pad graph is functioning, not just the single-source happy path
+- The runtime session model from Step 15 handled audio workers cleanly without needing a separate orchestration model
+- `go test ./... -count=1` still passed after the audio extension landed
+
+### What didn't work
+
+- Nothing failed at runtime once the graph was wired up.
+- The main caveat is validation realism for the mixed case: I mixed the same Pulse `default` device twice rather than two genuinely different microphones/sources, because this machine setup makes that the fastest way to verify the mixer graph without inventing extra infrastructure.
+
+### What I learned
+
+- The go-gst request-pad APIs are workable enough for `audiomixer`:
+  - `GetRequestPad("sink_%u")`
+  - `GetStaticPad("src")`
+  - `Pad.Link(...)`
+- The runtime seam from Phase 0 is holding up well: the same worker/session model now supervises both video and audio pipelines
+- Opus needs a 48kHz raw-audio encoder input cap, so it was worth making encoder caps explicit instead of assuming the pre-mix raw caps could be reused blindly
+- Multi-input audio validation does not require a special fake source to prove the pipeline shape; duplicating the same live device is enough to verify the graph mechanics
+
+### What was tricky to build
+
+- The trickiest part was deciding where to normalize audio caps.
+- There are two distinct needs:
+  1. make individual source branches mixer-compatible
+  2. make post-mix audio encoder-compatible
+- If I reused a single caps choice everywhere, Opus would have been awkward because its encoder wants 48kHz S16LE input regardless of the general output defaults. The solution was to split the concerns into two helpers:
+  - `audioRawCaps(...)` for branch/mixer compatibility
+  - `audioEncoderCaps(...)` for codec-specific post-mix expectations
+- The other subtle part was avoiding overclaiming the mixed-source test. The graph is validated, but the “two different live sources” scenario still deserves real-world testing later.
+
+### What warrants a second pair of eyes
+
+- Whether the current codec support matrix for the GStreamer audio runtime should stay intentionally smaller than FFmpeg for now (`wav` / `opus`) or be expanded immediately
+- Whether `audiomixer` + per-source `volume` is enough for parity right now, or whether we should bring in optional normalization/latency tuning sooner
+- Whether the session result reason should be more semantic than `context deadline exceeded` when a bounded smoke test intentionally stops the runtime via timeout
+
+### What should be done in the future
+
+- Implement Phase 2.3: recording stop semantics cleanup / graceful EOS handling review across both video and audio workers
+- Implement Phase 2.4: align runtime-emitted recording states/events even more closely with the existing web session manager expectations
+- Add an end-to-end recording validation harness that exercises mixed video+audio plans through the app/web layer
+
+### Code review instructions
+
+- Start with:
+  - `pkg/media/gst/recording.go`
+- Then review the audio-specific harness:
+  - `ttmp/.../scripts/13-go-gst-audio-recording-runtime-smoke/main.go`
+  - `ttmp/.../scripts/13-go-gst-audio-recording-runtime-smoke.sh`
+- Validate with:
+  - `go test ./... -count=1`
+  - `OUT_PATH=/tmp/scs-gst-audio-runtime.wav bash ttmp/.../scripts/13-go-gst-audio-recording-runtime-smoke.sh`
+  - `CODEC=opus OUT_PATH=/tmp/scs-gst-audio-runtime.ogg bash ttmp/.../scripts/13-go-gst-audio-recording-runtime-smoke.sh`
+  - `OUT_PATH=/tmp/scs-gst-audio-runtime-mix.wav DEVICES=default,default GAINS=1.0,0.5 bash ttmp/.../scripts/13-go-gst-audio-recording-runtime-smoke.sh`
+
+### Technical details
+
+- Audio graph in this step:
+
+```text
+for each source:
+  pulsesrc(device=...)
+    -> capsfilter(audio/x-raw,format=S16LE,rate=...,channels=...)
+    -> audioconvert
+    -> audioresample
+    -> volume(volume=gain)
+    -> audiomixer request pad
+
+mixer output:
+  audioconvert
+    -> audioresample
+    -> capsfilter(codec-specific caps)
+    -> (wavenc -> filesink) OR (opusenc -> oggmux -> filesink)
+```
+
+- Validated outputs:
+  - WAV ✓
+  - Opus/Ogg ✓
+  - Multi-branch mix graph ✓
+- Current supported GStreamer audio codecs in this runtime slice:
+  - `wav` / `pcm_s16le`
+  - `opus`

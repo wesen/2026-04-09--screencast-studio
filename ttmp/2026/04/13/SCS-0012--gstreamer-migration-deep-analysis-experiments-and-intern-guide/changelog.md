@@ -70,3 +70,13 @@ Implemented the first native GStreamer recording runtime slice for video jobs: p
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go — Native GStreamer video recording runtime with x264/mp4mux/qtmux pipelines and EOS stop handling
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/12-go-gst-recording-runtime-smoke/main.go — Reproducible validation harness for display/region/camera recording output
 
+
+## 2026-04-13
+
+Extended the native GStreamer recording runtime to support audio jobs: one pulsesrc branch per source, per-source gain, audiomixer request-pad linking, WAV and Opus/Ogg output branches, and a dedicated smoke harness that validated single-source WAV, single-source Opus, and a two-branch mixed WAV output (commit ec7136d5168f7e911ef209e369110157225e5e52).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go — Added native GStreamer audio branch/mixer/output support to the recording runtime
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/13-go-gst-audio-recording-runtime-smoke/main.go — Smoke harness for WAV
+
