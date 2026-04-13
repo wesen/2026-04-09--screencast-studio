@@ -91,3 +91,26 @@ Finished Phase 2 of the GStreamer migration: refined recording lifecycle semanti
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/12-go-gst-recording-runtime-smoke/main.go — Extended smoke harness for internal max-duration recording validation
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/14-web-gst-recording-e2e/main.go — Browser/API-level recording validation for stop
 
+
+## 2026-04-13
+
+Implemented Phase 3 feature plumbing for the GStreamer runtime: preview screenshots via latest-frame retrieval, a new screenshot HTTP endpoint, live audio effect controls via runtime-settable volume/audiodynamic elements, and websocket audio-meter publication from the recording graph. Added a Phase 3 web-level harness that validates JPEG screenshots, live effect updates during recording, and end-to-end audio-meter event flow. Note: exact level RMS decoding is still blocked by a go-gst binding limitation exposing the field as an unsafe pointer on this machine, so the meter path currently uses an availability fallback while keeping the graph/message plumbing real (commit a2f89f78bcd9bd502976727ed8088a3e0d22f1e6).
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_api.go — Added POST /api/audio/effects for live gain/compressor updates
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go — Added screenshot endpoint for live preview sessions
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go — Added live audio-control hooks
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/15-web-gst-phase3-e2e/main.go — Phase 3 web-level validation harness for screenshot
+
+
+## 2026-04-13
+
+Switched the application and preview-manager defaults to the native GStreamer runtimes while preserving the older preview suspend/restore workaround for stability. A real-defaults end-to-end harness showed that removing suspend/restore without a true shared capture graph is still unsafe: preview can remain visually active and screenshots can work during recording, but the combined video+audio recording path can still fail finalization with a recording EOS timeout. This establishes the true Phase 4 requirement: a tee-based shared capture graph, not just deletion of the server-side handoff code.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/app/application.go — Default recording runtime now points at the GStreamer runtime
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go — Default preview runtime now points at the GStreamer runtime
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e/main.go — Real-defaults harness documenting why shared capture is still required before Phase 4 can be closed
+

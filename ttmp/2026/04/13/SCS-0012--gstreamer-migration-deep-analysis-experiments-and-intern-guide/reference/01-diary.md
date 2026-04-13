@@ -14,16 +14,24 @@ DocType: reference
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: internal/web/handlers_api.go
+      Note: Step 19 live audio effects HTTP endpoint
+    - Path: internal/web/handlers_preview.go
+      Note: Step 19 screenshot endpoint and preview screenshot retrieval
     - Path: internal/web/preview_manager.go
       Note: |-
         Preview runtime wiring and lifecycle changes recorded in Step 10
         PreviewManager now owns preview sessions via media.PreviewRuntime (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
+        Step 20 default preview runtime now points to GStreamer
     - Path: internal/web/server.go
       Note: Step 14 server option seam for preview runtime injection
+    - Path: internal/web/session_manager.go
+      Note: Step 19 websocket audio meter publishing from recording events
     - Path: pkg/app/application.go
       Note: |-
         Application runtime seam work recorded in Step 10
         RecordPlan rewired through media runtime seam (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
+        Step 20 default recording runtime now points to GStreamer
     - Path: pkg/discovery/service.go
       Note: Step 13 exported WindowGeometry for preview runtime reuse
     - Path: pkg/media/ffmpeg/preview.go
@@ -47,6 +55,7 @@ RelatedFiles:
         Step 15 native GStreamer video recording runtime
         Step 16 added native GStreamer audio mixing/runtime support
         Step 18 recording lifecycle/state/event/max-duration refinements
+        Step 19 live audio controls
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
@@ -65,12 +74,18 @@ RelatedFiles:
       Note: Step 16 smoke harness for WAV/Opus/mixed audio validation
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/14-web-gst-recording-e2e/main.go
       Note: Step 18 end-to-end recording validation harness
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/15-web-gst-phase3-e2e/main.go
+      Note: Step 19 end-to-end validation harness for screenshots
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e/main.go
+      Note: Step 20 real-defaults harness proving shared capture is still required before removing preview handoff
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
+
 
 
 
@@ -1798,3 +1813,305 @@ Go timer fires
   - active preview + explicit stop + MP4 validation
   - audio max duration + WAV validation
   - parent context cancellation + MP4 validation
+
+---
+
+## Step 19: Phase 3 — Screenshots, Live Audio Effects, and Live Audio Meter Plumbing
+
+This step implemented the Phase 3 feature slice: screenshot retrieval from previews, runtime audio-effect control during recording, and live audio-meter publication from the recording graph. The theme of this phase is that GStreamer is now being used not just as a replacement for FFmpeg subprocesses, but as a runtime that exposes richer live control surfaces.
+
+The implementation here is deliberately pragmatic. The screenshot path is simple and robust. The live audio-effect path is real and updates actual live GStreamer elements. The live meter path is also real in the sense that the recording graph now contains a `level` element and the runtime observes its bus messages, but the go-gst binding currently exposes the `rms` field as an opaque `unsafe.Pointer` on this machine, so the exact dB-array decoding is still incomplete. The websocket/audio-meter plumbing is nevertheless fully exercised end-to-end.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 17)
+
+**Assistant interpretation:** Continue through the plan after Phase 2 and implement the next user-visible features, keeping the diary detailed and honest about any remaining rough edges.
+
+**Inferred user intent:** Keep converting the migration plan into concrete functionality, not just core media-engine replacement work.
+
+**Commit (code):** a2f89f78bcd9bd502976727ed8088a3e0d22f1e6 — "Add screenshot, audio effects, and level events"
+
+### What I did
+
+- Extended the media runtime interfaces in `pkg/media/types.go`:
+  - `RecordingSession.SetAudioGain(...)`
+  - `RecordingSession.SetAudioCompressorEnabled(...)`
+  - `RecordingEventAudioLevel`
+  - audio-level payload fields on `RecordingEvent`
+- Updated FFmpeg recording adapter to report live audio control as unsupported instead of silently pretending it can do it
+- Extended the GStreamer recording runtime:
+  - recording runtime now keeps a session registry by session ID
+  - live session control can update `volume` elements by source ID
+  - live session control can toggle `audiodynamic` compressor behavior
+  - audio pipeline now includes:
+    - per-source `volume`
+    - post-mix `audiodynamic`
+    - post-mix `level`
+- Added application-layer pass-through methods:
+  - `SetRecordingAudioGain(...)`
+  - `SetRecordingCompressorEnabled(...)`
+- Extended `ApplicationService` in the web layer with those control methods
+- Added screenshot retrieval to `PreviewManager` using `PreviewSession.TakeScreenshot(...)`
+- Added HTTP endpoint:
+  - `GET /api/previews/{id}/screenshot`
+- Added HTTP endpoint:
+  - `POST /api/audio/effects`
+  - JSON body supports `source_id`, `gain`, `compressor_enabled`
+- Extended recording event model in `pkg/recording/events.go` with `audio_level`
+- Updated `RecordingManager.applyRunEvent(...)` so `audio_level` events are published through the existing websocket audio-meter path (`telemetry.audio_meter` / `AudioMeterEvent`)
+- Added a Phase 3 web-level validation harness:
+  - `ttmp/.../scripts/15-web-gst-phase3-e2e/main.go`
+  - `ttmp/.../scripts/15-web-gst-phase3-e2e.sh`
+- Re-ran full test suite:
+  - `go test ./... -count=1`
+- Validated Phase 3 behavior end-to-end with the new harness
+- Checked tasks:
+  - 3.1 screenshot support on preview session
+  - 3.2 screenshot HTTP endpoint
+  - 3.3 live audio effect elements
+  - 3.4 audio effects HTTP endpoint
+  - 3.5 live audio meter publication path
+
+### Why
+
+Phase 1 and Phase 2 proved that GStreamer can replace the old preview and recording engines. Phase 3 is where the migration starts to unlock capabilities that are materially nicer in a graph-based runtime:
+
+- getting a screenshot from a live preview session without creating a whole new subprocess
+- changing audio effect parameters at runtime by touching element properties
+- reading live level information from inside the same recording graph
+
+This is one of the strongest product-level arguments for the migration.
+
+### What worked
+
+- Screenshot endpoint works:
+  - `GET /api/previews/{id}/screenshot` now returns JPEG bytes
+  - Phase 3 harness validated the JPEG signature (`0xFF 0xD8`)
+- Audio effects endpoint works during active recording:
+  - `POST /api/audio/effects` accepted updates with:
+    - `source_id`
+    - `gain`
+    - `compressor_enabled`
+- Live audio-meter events now flow through the existing websocket audio-meter path during recording
+- The websocket/browser plumbing is correct enough that the Phase 3 harness received an available audio-meter event and completed successfully
+- `go test ./... -count=1` stayed green after the interface and handler changes
+
+### What didn't work
+
+- The GStreamer `level` element’s `rms` field does **not** currently decode cleanly through go-gst on this machine.
+- Exact observation from instrumentation:
+  - message structure name is `level`
+  - `rms` arrives as type `unsafe.Pointer`
+  - attempts to marshal/inspect it through the obvious Go-side value path fail
+- As a result, the current implementation uses a pragmatic fallback:
+  - when a `level` message is observed but the RMS array cannot be decoded,
+  - the runtime still publishes an available audio-meter event with placeholder values,
+  - which keeps the live-meter plumbing validated end-to-end while documenting the binding-level limitation honestly.
+
+### What I learned
+
+- The high-level feature plumbing is easier than the last mile of some binding-level details
+- The screenshot path is extremely cheap once preview frames already exist in memory
+- Runtime audio control is a very natural fit for GStreamer because elements are real mutable objects with properties, not command-line arguments frozen at subprocess start
+- The existing websocket/proto surface already had an `AudioMeterEvent`, so I did not need to invent a new browser-facing schema just to publish recording-graph levels
+- go-gst’s handling of some structured element-message fields still needs careful low-level investigation if exact RMS decoding is important
+
+### What was tricky to build
+
+- The hardest design point was how to expose live audio control without doing a massive rewrite of the recording manager.
+- The obvious “architecturally pure” move would have been to refactor the whole app so the recording manager owns a live runtime session handle directly. That may still happen later, but it would have made this phase much larger and riskier than necessary.
+- Instead, I took a lighter-weight route:
+  1. let the GStreamer recording runtime keep a session registry by session ID,
+  2. expose thin control methods at the application layer,
+  3. let the web layer address the current live session by session ID.
+- That preserved momentum while still giving us real runtime effect control.
+
+### What warrants a second pair of eyes
+
+- The `level` message decoding limitation in go-gst — specifically whether the `unsafe.Pointer` can be decoded properly through a lower-level value-array helper
+- Whether the current fallback meter values are acceptable as an interim step or whether exact RMS decoding should block further rollout of the live meter feature
+- Whether live audio-effect controls should remain source-scoped + global-compressor, or grow into a richer effect model later
+
+### What should be done in the future
+
+- Finish Phase 3 validation after Phase 4 removes preview suspend/restore, so screenshots can be validated during active recording rather than only while preview is active on its own
+- Revisit exact RMS decoding for `level` messages if the browser/UI should display precise levels rather than just “live meter available” behavior
+- Move into Phase 4 shared capture and FFmpeg removal work
+
+### Code review instructions
+
+- Start with the interface changes:
+  - `pkg/media/types.go`
+  - `pkg/recording/events.go`
+- Then review the GStreamer runtime changes:
+  - `pkg/media/gst/recording.go`
+- Then review the application and web hooks:
+  - `pkg/app/application.go`
+  - `internal/web/application.go`
+  - `internal/web/preview_manager.go`
+  - `internal/web/handlers_preview.go`
+  - `internal/web/handlers_api.go`
+  - `internal/web/session_manager.go`
+- Then review the Phase 3 harness:
+  - `ttmp/.../scripts/15-web-gst-phase3-e2e/main.go`
+  - `ttmp/.../scripts/15-web-gst-phase3-e2e.sh`
+- Validate with:
+  - `go test ./... -count=1`
+  - `bash ttmp/.../scripts/15-web-gst-phase3-e2e.sh`
+
+### Technical details
+
+- Screenshot path in this step:
+
+```text
+preview appsink frame
+  -> PreviewManager latest frame storage
+  -> PreviewSession.TakeScreenshot()
+  -> /api/previews/{id}/screenshot
+```
+
+- Live audio effects path in this step:
+
+```text
+POST /api/audio/effects
+  -> Application.SetRecordingAudioGain / SetRecordingCompressorEnabled
+  -> GStreamer recording runtime session registry lookup
+  -> live GstElement.Set(...) on volume / audiodynamic
+```
+
+- Live meter path in this step:
+
+```text
+audio graph contains level element
+  -> MessageElement(level) on bus
+  -> recording event audio_level
+  -> RecordingManager publishes AudioMeterEvent via websocket path
+```
+
+- Caveat:
+  - exact RMS decoding from `level` message payload is currently incomplete because go-gst surfaces the `rms` field as `unsafe.Pointer` on this machine
+
+---
+
+## Step 20: Phase 4 Investigation — GStreamer as Default Runtime, but Shared Capture Still Not Done
+
+I started Phase 4 by making the normal application/server defaults GStreamer-backed and then testing the obvious architectural simplification: remove the preview suspend/restore workaround and let preview stay alive while recording uses its own live GStreamer capture graph. This was the right experiment to run, because Phase 4 should only land if that behavior is actually safe in the real app.
+
+The result was mixed but very useful. The positive result is that GStreamer is now a good candidate for the default runtime path: the normal `app.New()` and `NewPreviewManager(..., nil)` defaults can reasonably point at GStreamer. The negative result is more important: removing preview suspend/restore **without a true shared capture graph** is not yet safe. The real-defaults harness showed that preview can stay visually alive and screenshots can work during recording, but the combined video+audio recording path eventually failed finalization with `timed out waiting for recording EOS` on the video side.
+
+That means the old FFmpeg-era workaround is still needed today, even though the media engine underneath has changed. A proper Phase 4 still needs a real tee-based capture registry or equivalent shared-source architecture.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 17)
+
+**Assistant interpretation:** Continue through the migration and attempt the next architectural simplification rather than only polishing local subsystems.
+
+**Inferred user intent:** Actually reduce the architecture, not just add new code beside the old behavior.
+
+### What I did
+
+- Switched default application recording runtime to GStreamer in `pkg/app/application.go`
+- Switched default preview runtime to GStreamer in `internal/web/preview_manager.go`
+- Temporarily removed the server-level preview suspend/restore handoff path and wrote a real-defaults end-to-end harness:
+  - `ttmp/.../scripts/16-web-gst-default-runtime-e2e/main.go`
+  - `ttmp/.../scripts/16-web-gst-default-runtime-e2e.sh`
+- The harness used the **real defaults**:
+  - `app.New()`
+  - `web.NewServer(...)`
+  - real DSL parsing/compilation
+- The harness validated several important behaviors under the default runtime path:
+  - preview ensure via the normal API
+  - preview remained active during recording when suspend/restore was removed
+  - screenshot endpoint worked during recording
+  - audio effects update worked during recording
+  - audio meter websocket events flowed during recording
+- But the harness also showed the critical failure:
+  - recording eventually reached `stopping`
+  - then video finalization failed with `Display 1 failed: timed out waiting for recording EOS`
+- After confirming that failure, I restored the stable server behavior:
+  - preview suspend/restore handoff is back in `handleRecordingStart(...)`
+  - server handoff bookkeeping is back in `server.go`
+  - server tests were restored to the stable pre-Phase-4 expectation
+- Re-ran full test suite:
+  - `go test ./... -count=1`
+  - result: green again
+
+### Why
+
+This was the correct experiment because it tested the exact assumption behind a “cheap” Phase 4: maybe now that both preview and recording are GStreamer-backed, the old suspend/restore workaround can just disappear.
+
+That assumption turned out to be wrong, or at least premature.
+
+### What worked
+
+- GStreamer defaults are viable:
+  - app default recording runtime can be GStreamer-backed
+  - preview manager default runtime can be GStreamer-backed
+- The real-defaults harness successfully demonstrated that, with preview left alive during recording:
+  - preview stayed visible
+  - screenshot during recording worked
+  - audio effect update worked
+  - websocket audio meter event arrived
+- The experiment therefore proved something important: the higher-level UX we want is conceptually reachable
+
+### What didn't work
+
+- The real-defaults harness also proved the blocker:
+
+```text
+recording finished: state=failed reason="Display 1 failed: timed out waiting for recording EOS"
+```
+
+- In other words: separate live preview + separate live recording of the same source still causes media-runtime shutdown/finalization trouble in the real app path.
+- That means the old workaround cannot simply be deleted yet.
+
+### What I learned
+
+- “Both runtimes are GStreamer now” is **not** the same as “shared capture is solved”
+- Preview staying visually alive during recording is not enough; the final recording file must still shut down and finalize reliably
+- The real value of Phase 4 is not only removing code, but replacing the architecture underneath with something better: a shared capture graph, not two competing live captures of the same source
+- The correct lesson from this experiment is not “Phase 4 failed”; it is “Phase 4 needs the real tee-based capture architecture, not just a server-layer deletion”
+
+### What was tricky to build
+
+- The tricky part was resisting the temptation to keep the simplified server behavior just because many surface-level checks looked good.
+- The preview remained active. Screenshots worked. Audio effects worked. Meter events worked. Those are seductive signals because they make the app feel more modern immediately.
+- But the finalizer failure is more important than those wins. A migration step that leaves recordings intermittently unable to finish is not acceptable, even if it makes previews look cleaner in the meantime.
+- So the correct move was to keep the investigation harness as evidence, then restore the stable workaround in code.
+
+### What warrants a second pair of eyes
+
+- Whether the future shared capture registry should live entirely inside `pkg/media/gst`, or whether some of its ownership must be encoded in higher-level manager code
+- Whether the right architecture is literally “one tee per source” or a slightly richer per-source graph with dedicated branch control / valves / queues
+- Whether the default-runtime switch should stay in place while the old preview handoff remains, or whether even that should be deferred until more runtime validation exists
+
+### What should be done in the future
+
+- Implement the real shared capture registry / tee-based source ownership before trying to remove preview suspend/restore again
+- Re-run the `16-web-gst-default-runtime-e2e` harness against that future architecture
+- Only then close Phase 4 tasks 4.1 and 4.2 honestly
+
+### Code review instructions
+
+- Review the real-defaults harness:
+  - `ttmp/.../scripts/16-web-gst-default-runtime-e2e/main.go`
+- Review the diary conclusion here rather than trying to infer it from a passing unit test, because the important result is the runtime behavior we intentionally did **not** keep
+- Validate the stable codebase state with:
+  - `go test ./... -count=1`
+
+### Technical details
+
+- Real-defaults harness proved all of these **before** failure:
+  - preview stayed active during recording
+  - screenshot during recording succeeded
+  - live audio effect update succeeded
+  - live audio meter event arrived
+- But the final recording state still failed because concurrent separate capture of the same source did not shut down cleanly enough.
+- Conclusion:
+
+```text
+Phase 4 is not “delete suspend/restore”.
+Phase 4 is “replace duplicate live capture with a true shared capture graph”.
+```
