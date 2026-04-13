@@ -78,12 +78,17 @@ RelatedFiles:
       Note: Step 19 end-to-end validation harness for screenshots
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e/main.go
       Note: Step 20 real-defaults harness proving shared capture is still required before removing preview handoff
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/17-go-gst-shared-video-tee-experiment/main.go
+      Note: Step 21 shared tee EOS experiment proving MP4 finalization vs preview continuity tradeoff
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/18-go-gst-shared-source-appsink-appsrc-bridge/main.go
+      Note: Step 21 shared source bridge experiment narrowing the remaining issue to appsrc segment/timestamp handling
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -2115,3 +2120,155 @@ recording finished: state=failed reason="Display 1 failed: timed out waiting for
 Phase 4 is not “delete suspend/restore”.
 Phase 4 is “replace duplicate live capture with a true shared capture graph”.
 ```
+
+---
+
+## Step 21: Phase 4 Experiments — Shared Tee Stop Modes and appsink→appsrc Bridge Investigation
+
+I paused production-code changes and built two focused runtime experiments because Phase 4 now clearly depends on one hard question: how do we keep preview alive while stopping/finalizing recording cleanly? The last failed default-runtime attempt proved that duplicate live capture is unsafe, but it did not yet prove which replacement architecture would actually work.
+
+These experiments narrowed that down considerably. A pure shared tee can keep preview alive, but branch-local EOS/finalization for MP4 is tricky: the EOS points that finalize the file tend to poison the whole shared pipeline, while the branch-local EOS points that keep preview alive fail to finalize MP4. A separate encoder pipeline fed from a shared-source appsink/appsrc bridge is more promising conceptually, but my first bridge attempt still has unresolved `appsrc` segment/timestamp issues.
+
+### Prompt Context
+
+**User prompt (verbatim):** "continue"
+
+**Assistant interpretation:** Keep progressing on the next real migration task instead of stopping at the prior checkpoint.
+
+**Inferred user intent:** Continue the ticket in a disciplined way, preserving evidence and not claiming success prematurely.
+
+### What I did
+- Added a reproducible shared-tee experiment:
+  - `ttmp/.../scripts/17-go-gst-shared-video-tee-experiment/main.go`
+  - `ttmp/.../scripts/17-go-gst-shared-video-tee-experiment.sh`
+- This experiment creates one live source pipeline with:
+  - preview branch: `queue -> videorate -> jpegenc -> appsink`
+  - recording branch: `queue -> x264enc -> mp4mux -> filesink`
+- Tested multiple stop/EOS targets for the recording branch:
+  - `queue-sink-pad`
+  - `queue-src-pad`
+  - `videorate`
+  - `encoder`
+  - `mux`
+  - `filesink`
+- Added a second reproducible bridge experiment:
+  - `ttmp/.../scripts/18-go-gst-shared-source-appsink-appsrc-bridge/main.go`
+  - `ttmp/.../scripts/18-go-gst-shared-source-appsink-appsrc-bridge.sh`
+- This experiment creates:
+  - source pipeline: `videotestsrc -> videoconvert -> capsfilter(I420,640x480,10fps) -> tee`
+  - preview branch from tee: `queue -> videorate -> jpegenc -> appsink`
+  - raw-record branch from tee: `queue -> appsink`
+  - separate recording pipeline: `appsrc -> videoconvert -> x264enc -> mp4mux -> filesink`
+- Iterated on the bridge with several fixes:
+  - fixed raw caps normalization to I420/640x480/10fps
+  - seeded appsrc caps explicitly
+  - tried `PushSample(sample.Copy())`
+  - then tried building fresh buffers with deterministic timestamps/durations
+  - switched from generic property setting to base-src methods (`SetFormat`, `SetLive`, `SetDoTimestamp`)
+  - stopped forwarding source samples after `EndStream()` to avoid poisoning the source pipeline on recorder shutdown
+
+### Why
+- Phase 4 cannot be completed honestly by deleting suspend/restore code and hoping GStreamer “just shares now.”
+- The right next move was a pair of very small experiments that isolate the media-runtime truth:
+  - can a tee branch finalize MP4 without ending preview?
+  - if not, can a shared source feed a separate recording pipeline safely?
+
+### What worked
+- Script 17 produced useful, repeatable evidence.
+- Findings from script 17:
+  - Sending EOS to `queue-sink-pad`, `videorate`, or `encoder` finalized MP4 **but** also produced `BUS eos from shared-video-tee`, effectively ending the shared pipeline / preview.
+  - Sending EOS to `mux` or `filesink` kept preview alive longer, but the MP4 was invalid (`moov atom not found`).
+  - Removing the recording branch without EOS kept preview alive, but the MP4 remained invalid / empty.
+- Script 18 also produced useful evidence.
+- Findings from script 18:
+  - A shared-source + separate encoder-pipeline shape is conceptually viable for preview continuity.
+  - After I stopped returning EOS from the source-side callback, preview continued after recorder shutdown (`preview frames after recorder stop: 29` in the last run).
+  - The remaining bridge problem is now much narrower and clearly localized to `appsrc` / segment handling rather than shared capture lifetime in general.
+
+### What didn't work
+- Pure tee branch finalization is not solved yet for MP4.
+- Exact failed/important outputs from script 17 included:
+
+```text
+BUS eos from shared-video-tee
+```
+
+and for the non-poisoning-but-invalid cases:
+
+```text
+moov atom not found
+... Invalid data found when processing input
+```
+
+- The first bridge attempts failed immediately with:
+
+```text
+record bus error from record-appsrc: Internal data stream error.
+record bus debug: ../libs/gst/base/gstbasesrc.c(3177): gst_base_src_loop (): /GstPipeline:record-bridge/GstAppSrc:record-appsrc:
+streaming stopped, reason error (-5)
+```
+
+- After simplifying the encoder pipeline, the hard failure moved, but the bridge still emitted repeated segment/timestamp assertions and only produced a tiny invalid MP4:
+
+```text
+GStreamer-CRITICAL **: gst_segment_to_running_time: assertion 'segment->format == format' failed
+output size: 850 bytes
+duration=N/A
+size=850
+```
+
+### What I learned
+- A simple `tee` is not enough. The difficult part is not only sharing the live source, but stopping/finalizing one consumer while another stays alive.
+- For MP4 specifically, the EOS points that finalize the muxer appear too “upstream” in a plain tee branch and can end the whole pipeline.
+- A shared-source appsink/appsrc bridge is still the most promising Phase 4 direction, because it decouples file finalization from the shared source pipeline. The source-preview lifetime problem appears tractable there.
+- The unresolved bridge bug is now much more precise: `appsrc` segment/time negotiation in this go-gst setup still needs one more correct pattern.
+
+### What was tricky to build
+- The subtle part is that several bad solutions look superficially successful.
+- Example: sending EOS to the recording branch queue produces a valid MP4, which feels like success — until the bus shows EOS for the whole shared pipeline and preview stops too.
+- The opposite failure is equally deceptive: sending EOS only to `mux` / `filesink` lets preview continue, which feels architecturally correct — but the output file is invalid because finalization never really happened.
+- The bridge experiment had a different trap: once the raw branch and recorder pipeline both existed, it was easy to think caps were the whole problem. In reality, the error narrowed from full stream failure to a smaller segment-format/timing issue only after several iterations.
+
+### What warrants a second pair of eyes
+- The exact recommended GStreamer pattern for live `appsink -> appsrc` bridging into an H.264/MP4 recording pipeline
+- Whether the eventual production implementation should:
+  - use `appsrc` at all,
+  - use a different container during capture and remux after stop,
+  - or use a more advanced per-branch finalize strategy inside one shared pipeline
+- Whether a branch-local valve/probe/blocking-pad design could still make a pure shared tee workable for MP4
+
+### What should be done in the future
+- Keep the current production runtime stable (preview suspend/restore still required)
+- Use scripts 17 and 18 as the baseline evidence for the next Phase 4 iteration
+- Solve the `appsrc` segment/timestamp issue before wiring any shared-source registry into production recording code
+- Only remove server-level preview handoff after one of these architectures is validated end-to-end with real MP4 output and live preview continuity
+
+### Code review instructions
+- Start with these new experiments:
+  - `ttmp/.../scripts/17-go-gst-shared-video-tee-experiment/main.go`
+  - `ttmp/.../scripts/18-go-gst-shared-source-appsink-appsrc-bridge/main.go`
+- Re-run them with:
+  - `./ttmp/.../scripts/17-go-gst-shared-video-tee-experiment.sh`
+  - `./ttmp/.../scripts/18-go-gst-shared-source-appsink-appsrc-bridge.sh`
+- Look specifically at:
+  - which stop modes poison the shared tee bus
+  - whether preview frame counts continue after recorder stop
+  - whether `ffprobe` reports a valid MP4
+
+### Technical details
+- Script 17 stop-mode summary:
+  - `queue-sink-pad` → valid MP4, poisoned shared pipeline
+  - `videorate` / `encoder` → same general result
+  - `mux` / `filesink` → preview survives longer, MP4 invalid
+  - branch removal without proper EOS → preview survives, MP4 invalid
+- Script 18 last observed promising-but-incomplete state:
+
+```text
+preview frames before stop: 14
+preview frames after recorder stop: 29
+output size: 850 bytes
+duration=N/A
+size=850
+```
+
+- So the source/preview side can stay alive under a bridge architecture, but the recorder side still needs a correct `appsrc` segment/time pattern.

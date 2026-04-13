@@ -114,3 +114,13 @@ Switched the application and preview-manager defaults to the native GStreamer ru
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go — Default preview runtime now points at the GStreamer runtime
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e/main.go — Real-defaults harness documenting why shared capture is still required before Phase 4 can be closed
 
+
+
+## 2026-04-13
+
+Added focused Phase 4 media-runtime experiments to answer the shared-capture question honestly. A shared-tee experiment showed that the obvious EOS points which finalize MP4 also poison the whole shared pipeline, while the branch-local EOS points that keep preview alive fail to finalize MP4. A second shared-source appsink→appsrc bridge experiment showed that preview continuity is achievable without duplicate capture, but the recording side still has unresolved appsrc segment/timestamp handling before the architecture is production-ready.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/17-go-gst-shared-video-tee-experiment/main.go — Reproducible shared-tee branch-stop experiment across multiple EOS targets
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/18-go-gst-shared-source-appsink-appsrc-bridge/main.go — Reproducible shared-source bridge experiment isolating appsrc segment/timestamp issues
