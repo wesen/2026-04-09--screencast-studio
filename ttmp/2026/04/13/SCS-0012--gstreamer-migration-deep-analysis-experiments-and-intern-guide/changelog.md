@@ -203,3 +203,17 @@ Removed the remaining server-level preview handoff bookkeeping now that the no-s
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go — Removed obsolete preview handoff storage/restore code after shared-capture validation
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/session_manager.go — Simplified recording manager constructor by deleting the legacy after-finish preview-restore hook
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/manager_shutdown_test.go — Updated remaining constructor callsites after the recording-manager cleanup
+
+
+## 2026-04-13
+
+Deleted the remaining preview suspend/restore implementation and removed the FFmpeg runtime code path from the active repo. `internal/web/preview_manager.go` no longer contains `SuspendAll(...)` or `RestoreSuspended(...)`, and the dedicated suspend/restore test was removed. The old FFmpeg runtime/adapters and process-supervisor files were deleted (`pkg/media/ffmpeg/*`, `pkg/recording/ffmpeg.go`, `pkg/recording/run.go`, and related tests), leaving `pkg/recording/events.go` as the slim event/state package still used by the app/web layers.
+
+Updated `README.md` to describe the project as GStreamer-based rather than FFmpeg-based and removed the last active-code FFmpeg string from `internal/web/server_test.go`. Re-ran the repo tests and the key shared-capture web harnesses to confirm that the GStreamer-only path still provides screenshots, live audio controls, audio meter flow, preview continuity, and valid finalized media output.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go — Removed dead preview suspend/restore APIs
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/manager_shutdown_test.go — Removed the dedicated suspend/restore test after deleting that behavior
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/recording/events.go — Slimmed the recording package down to event/state types still used by app/web
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/README.md — Updated active repo documentation from FFmpeg-centric wording to GStreamer-centric wording

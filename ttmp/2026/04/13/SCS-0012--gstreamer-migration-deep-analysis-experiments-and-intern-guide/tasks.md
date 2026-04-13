@@ -36,14 +36,14 @@
 - [x] Phase 4.1f: Add a focused shared-source recording harness proving all of the following at once: preview continuity during recording, valid finalized MP4 output, and continued preview after recording stop.
 - [x] Phase 4.1g: Integrate shared-source video capture into `pkg/media/gst/recording.go` for video jobs while leaving audio jobs on the current stable implementation.
 - [x] Phase 4.1h: Validate the real default app/server constructors end-to-end with shared capture via the Phase 4 web harness (preview stays active, screenshot works, audio controls still work, output finalizes correctly).
-- [ ] Phase 4.2: Remove the PreviewManager.SuspendAll / RestoreSuspended workaround. Preview and recording now share the same capture source via tee, so suspension is no longer needed.
+- [x] Phase 4.2: Remove the PreviewManager.SuspendAll / RestoreSuspended workaround. Preview and recording now share the same capture source via tee, so suspension is no longer needed.
 - [x] Phase 4.2a: Remove server-level preview handoff bookkeeping from `internal/web/server.go` once shared capture passes real-defaults validation.
 - [x] Phase 4.2b: Update web/server tests to assert preview continuity during recording instead of suspend/restore behavior.
 - [x] Phase 4.2c: Close Phase 3.6 by validating screenshots during recording, live gain adjustment during recording, and VU meter flow in the no-suspend shared-capture path.
-- [ ] Phase 4.3: Delete pkg/recording/ffmpeg.go, pkg/media/ffmpeg/, internal/web/preview_runner.go. Remove FFmpeg from system dependencies. The entire FFmpeg code path should be gone.
-- [ ] Phase 4.3a: Remove FFmpeg default-runtime fallbacks and dead adapter references after GStreamer-only validation is complete.
-- [ ] Phase 4.3b: Delete FFmpeg-specific packages/files and update imports/build graph.
-- [ ] Phase 4.3c: Update docs/README/setup guidance to remove FFmpeg dependency assumptions and emphasize GStreamer requirements.
+- [x] Phase 4.3: Delete the FFmpeg runtime path and remove FFmpeg from active system dependencies. The entire FFmpeg code path should be gone. (`internal/web/preview_runner.go` was retained because it is no longer FFmpeg-specific.)
+- [x] Phase 4.3a: Remove FFmpeg default-runtime fallbacks and dead adapter references after GStreamer-only validation is complete.
+- [x] Phase 4.3b: Delete FFmpeg-specific packages/files and update imports/build graph.
+- [x] Phase 4.3c: Update docs/README/setup guidance to remove FFmpeg dependency assumptions and emphasize GStreamer requirements.
 - [ ] Phase 4.4: Clean up internal/web/server.go to remove preview handoff logic (the code that suspends previews before recording and restores after). Verify all tests pass without FFmpeg installed.
 - [ ] Phase 4.4a: Run full repo tests and all shared-capture validation harnesses with the FFmpeg path removed.
 - [ ] Phase 4.4b: Decide whether any ticket documentation/examples still need a legacy FFmpeg appendix or whether the repo can become GStreamer-only with no caveats.

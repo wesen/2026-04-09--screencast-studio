@@ -14,6 +14,8 @@ DocType: reference
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: README.md
+      Note: Step 29 updated active repo docs from FFmpeg-centric to GStreamer-centric wording after FFmpeg deletion
     - Path: internal/web/handlers_api.go
       Note: |-
         Step 19 live audio effects HTTP endpoint
@@ -27,6 +29,7 @@ RelatedFiles:
         Preview runtime wiring and lifecycle changes recorded in Step 10
         PreviewManager now owns preview sessions via media.PreviewRuntime (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
         Step 20 default preview runtime now points to GStreamer
+        Step 29 deleted the dead preview suspend/restore APIs after shared capture became the only supported lifecycle
     - Path: internal/web/server.go
       Note: |-
         Step 14 server option seam for preview runtime injection
@@ -79,6 +82,8 @@ RelatedFiles:
       Note: |-
         New media runtime interfaces introduced in Step 10
         Phase 0 runtime seam interfaces (commit e36d29966f9fc2dd49721c1608192a2123b64c0c)
+    - Path: pkg/recording/events.go
+      Note: Step 29 slimmed the recording package down to the event/state contract still used by the app and web layers
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/09-go-gst-preview-runtime-smoke/main.go
       Note: Step 11 reproducible preview runtime smoke test (commit 806c14e630a108ac3dd9670af0eb205c4c1072c9)
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/10-window-preview-investigation.sh
@@ -113,6 +118,7 @@ LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -3222,3 +3228,97 @@ This cleanup is the point where the server layer finally stopped pretending that
 ### What remains after this
 
 The next cleanup question is whether `PreviewManager.SuspendAll / RestoreSuspended` should be removed entirely or merely left available as an internal utility for now. That is now a much smaller follow-up decision than it was before this step.
+
+---
+
+## Step 29: Deleted the Remaining Suspend/Restore Code and Removed the FFmpeg Runtime Path
+
+The user explicitly asked to delete the remaining suspend/restore machinery and remove FFmpeg from the active runtime path. At this point that was the right call: shared capture had already been validated through the real web/app seam, the server-level preview handoff code was already gone, and the old FFmpeg implementation was no longer imported anywhere live.
+
+This step therefore converted the repo from “GStreamer is the real runtime, but some old code still exists” into “the active runtime graph is GStreamer-only, and the old FFmpeg execution path is physically gone.”
+
+### What I changed
+
+#### Removed preview suspend/restore code
+Updated:
+- `internal/web/preview_manager.go`
+- `internal/web/manager_shutdown_test.go`
+
+Deleted from `PreviewManager`:
+- `previewResumePlan`
+- `SuspendAll(...)`
+- `RestoreSuspended(...)`
+
+Deleted the dedicated suspend/restore test:
+- `TestPreviewManagerSuspendAndRestore`
+
+That completed the real code deletion for Phase 4.2 rather than leaving dead methods around after the server had already stopped using them.
+
+#### Removed FFmpeg runtime packages/files
+Deleted:
+- `pkg/media/ffmpeg/preview.go`
+- `pkg/media/ffmpeg/recording.go`
+- `pkg/recording/ffmpeg.go`
+- `pkg/recording/ffmpeg_test.go`
+- `pkg/recording/run.go`
+- `pkg/recording/session.go`
+- `pkg/recording/session_test.go`
+
+I kept `pkg/recording/events.go`, but simplified the package’s role: it now only carries the recording event/state types still used by the app/web layers. I moved the `SessionState` constants there so the app and session manager could keep using the event contract without depending on the old FFmpeg process supervisor internals.
+
+#### Updated active repo docs
+Updated:
+- `README.md`
+- `internal/web/server_test.go`
+
+README changes:
+- architecture diagram now says `GStreamer` instead of `ffmpeg`
+- tech stack now says native GStreamer media pipeline
+- prerequisites/requirements now list GStreamer dev/runtime packages instead of FFmpeg
+- project structure now describes `pkg/media/` as the active runtime area
+- bottom-line tagline now says “Built with Go, React, and GStreamer.”
+
+Also changed the last active-code test string that still said “fake ffmpeg log line” so the live code tree no longer mentions FFmpeg outside historical ticket docs.
+
+### Why
+
+The key reasoning was:
+- `PreviewManager.SuspendAll / RestoreSuspended` no longer had any real callsites after the server cleanup.
+- `pkg/media/ffmpeg` was no longer imported anywhere live.
+- `pkg/recording/run.go` and the FFmpeg arg builders only existed to support the removed FFmpeg runtime package.
+- Keeping any of this code around would make the repo look like it still supported a second execution path when in reality it no longer should.
+
+### Validation
+
+Re-ran:
+
+```bash
+go test ./... -count=1
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/15-web-gst-phase3-e2e.sh
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e.sh
+```
+
+Results:
+- repo tests green
+- Phase 3 web behavior still works on the GStreamer-only path
+- default-runtime no-suspend shared-capture path still works after FFmpeg deletion
+- preview remains active after recording
+- video/audio outputs still finalize correctly
+
+Observed final default-runtime output included:
+
+```text
+preview still active after recording: preview count=1
+default-runtime video ... duration=8.200000
+default-runtime audio ... duration=8.010000
+```
+
+### Important honesty note
+
+I marked the FFmpeg code-path removal work complete, but I did **not** mark the “verify everything passes without FFmpeg installed on the machine” task complete, because I did not actually uninstall FFmpeg from this environment before validating. The codebase is now GStreamer-only in its active runtime graph, but the stronger environment-proof task still requires a real no-FFmpeg environment check.
+
+### What remains after this step
+
+At this point the meaningful remaining cleanup is smaller and more specific:
+- verify the full repo/harnesses in an environment where FFmpeg is absent (`4.4a`)
+- decide whether any active docs should still keep a legacy FFmpeg appendix or if the project should present itself as GStreamer-only with no caveats (`4.4b`)

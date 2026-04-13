@@ -145,9 +145,9 @@ audio_sources:
 │  │   Web API    │   Recorder   │        │
 │  └──────────────┴──────────────┘        │
 │         │              │                │
-│  ┌──────▼──────┐ ┌─────▼─────┐         │
-│  │  Discovery  │ │  ffmpeg   │         │
-│  └─────────────┘ └───────────┘         │
+│  ┌──────▼──────┐ ┌───────────────┐      │
+│  │  Discovery  │ │   GStreamer   │      │
+│  └─────────────┘ └───────────────┘      │
 └─────────────────────────────────────────┘
 ```
 
@@ -156,7 +156,7 @@ audio_sources:
 - **Backend**: Go 1.25+ with Cobra CLI framework
 - **Frontend**: React 18 + TypeScript + Vite + Redux Toolkit
 - **Streaming**: WebSocket for live state updates
-- **Video Pipeline**: FFmpeg for capture and encoding
+- **Media Pipeline**: Native GStreamer for preview, capture, encoding, and audio mixing
 - **Communication**: Protocol Buffers over WebSocket
 - **Styling**: Retro terminal-inspired design
 
@@ -169,7 +169,8 @@ audio_sources:
 │   ├── cli/                    # CLI commands
 │   ├── discovery/              # Source discovery (X11, V4L2, PulseAudio)
 │   ├── dsl/                    # YAML configuration DSL
-│   └── recording/              # FFmpeg recording engine
+│   ├── media/                  # GStreamer media runtimes and shared capture graph
+│   └── recording/              # Recording event/state types
 ├── ui/                         # React web interface
 │   ├── src/
 │   └── storybook-static/       # Component documentation
@@ -183,7 +184,7 @@ audio_sources:
 
 - Go 1.25+
 - Node.js 20+ with pnpm
-- FFmpeg
+- GStreamer 1.24+ development headers and runtime plugins
 - Linux with X11
 
 ### Build UI
@@ -238,7 +239,11 @@ Use tokens in destination templates:
 ## Requirements
 
 - Linux with X11 display server
-- FFmpeg 5.0+
+- GStreamer 1.24+
+- `libgstreamer1.0-dev`
+- `libgstreamer-plugins-base1.0-dev`
+- `libgstreamer-plugins-good1.0-dev`
+- `libgstreamer-plugins-bad1.0-dev`
 - For camera capture: Video4Linux2 (V4L2) devices
 - For audio: PulseAudio or PipeWire
 
@@ -256,4 +261,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-Built with Go, React, and FFmpeg.
+Built with Go, React, and GStreamer.
