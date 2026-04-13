@@ -14,7 +14,7 @@ import (
 	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
-	ffmpegmedia "github.com/wesen/2026-04-09--screencast-studio/pkg/media/ffmpeg"
+	gstreamermedia "github.com/wesen/2026-04-09--screencast-studio/pkg/media/gst"
 )
 
 var (
@@ -79,7 +79,7 @@ func NewPreviewManager(parentCtx context.Context, application ApplicationService
 		limit = 4
 	}
 	if runtime == nil {
-		runtime = ffmpegmedia.NewPreviewRuntime()
+		runtime = gstreamermedia.NewPreviewRuntime()
 	}
 	if parentCtx == nil {
 		parentCtx = context.Background()

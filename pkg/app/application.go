@@ -10,7 +10,7 @@ import (
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/discovery"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
-	ffmpegmedia "github.com/wesen/2026-04-09--screencast-studio/pkg/media/ffmpeg"
+	gstreamermedia "github.com/wesen/2026-04-09--screencast-studio/pkg/media/gst"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/recording"
 )
 
@@ -33,7 +33,7 @@ func WithRecordingRuntime(runtime media.RecordingRuntime) Option {
 
 func New(opts ...Option) *Application {
 	a := &Application{
-		recordingRuntime: ffmpegmedia.NewRecordingRuntime(),
+		recordingRuntime: gstreamermedia.NewRecordingRuntime(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -41,7 +41,7 @@ func New(opts ...Option) *Application {
 		}
 	}
 	if a.recordingRuntime == nil {
-		a.recordingRuntime = ffmpegmedia.NewRecordingRuntime()
+		a.recordingRuntime = gstreamermedia.NewRecordingRuntime()
 	}
 	return a
 }
@@ -196,7 +196,7 @@ func (a *Application) RecordFile(ctx context.Context, file string, options Recor
 func (a *Application) RecordPlan(ctx context.Context, plan *dsl.CompiledPlan, options RecordOptions) (*RecordSummary, error) {
 	runtime := a.recordingRuntime
 	if runtime == nil {
-		runtime = ffmpegmedia.NewRecordingRuntime()
+		runtime = gstreamermedia.NewRecordingRuntime()
 	}
 
 	session, err := runtime.StartRecording(ctx, plan, media.RecordingOptions{
