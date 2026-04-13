@@ -90,15 +90,16 @@ type sharedVideoSource struct {
 	pipeline  *gst.Pipeline
 	tee       *gst.Element
 
-	mu        sync.Mutex
-	watch     *busWatch
-	resultCh  chan error
-	stopWait  chan struct{}
-	started   bool
-	closed    bool
-	refCount  int
-	consumers map[string]*sharedPreviewConsumer
-	counter   atomic.Uint64
+	mu           sync.Mutex
+	watch        *busWatch
+	resultCh     chan error
+	stopWait     chan struct{}
+	started      bool
+	closed       bool
+	refCount     int
+	consumers    map[string]*sharedPreviewConsumer
+	rawConsumers map[string]*sharedRawConsumer
+	counter      atomic.Uint64
 }
 
 func newSharedVideoSource(source dsl.EffectiveVideoSource, signature string, registry *captureRegistry) (*sharedVideoSource, error) {
@@ -107,13 +108,14 @@ func newSharedVideoSource(source dsl.EffectiveVideoSource, signature string, reg
 		return nil, err
 	}
 	return &sharedVideoSource{
-		registry:  registry,
-		signature: signature,
-		source:    source,
-		pipeline:  pipeline,
-		tee:       tee,
-		stopWait:  make(chan struct{}),
-		consumers: map[string]*sharedPreviewConsumer{},
+		registry:     registry,
+		signature:    signature,
+		source:       source,
+		pipeline:     pipeline,
+		tee:          tee,
+		stopWait:     make(chan struct{}),
+		consumers:    map[string]*sharedPreviewConsumer{},
+		rawConsumers: map[string]*sharedRawConsumer{},
 	}, nil
 }
 
@@ -135,7 +137,7 @@ func (s *sharedVideoSource) releaseReference() {
 	if s.refCount > 0 {
 		s.refCount--
 	}
-	shouldShutdown := s.refCount == 0 && len(s.consumers) == 0
+	shouldShutdown := s.refCount == 0 && len(s.consumers) == 0 && len(s.rawConsumers) == 0
 	s.mu.Unlock()
 	if shouldShutdown {
 		s.shutdown(nil)
@@ -294,7 +296,12 @@ func (s *sharedVideoSource) failAll(err error) {
 	for _, consumer := range s.consumers {
 		consumers = append(consumers, consumer)
 	}
+	rawConsumers := make([]*sharedRawConsumer, 0, len(s.rawConsumers))
+	for _, consumer := range s.rawConsumers {
+		rawConsumers = append(rawConsumers, consumer)
+	}
 	s.consumers = map[string]*sharedPreviewConsumer{}
+	s.rawConsumers = map[string]*sharedRawConsumer{}
 	s.refCount = 0
 	signalStop := s.stopWait
 	watch := s.watch
@@ -306,6 +313,9 @@ func (s *sharedVideoSource) failAll(err error) {
 		s.registry.remove(s.signature, s)
 	}
 	for _, consumer := range consumers {
+		consumer.finish(err)
+	}
+	for _, consumer := range rawConsumers {
 		consumer.finish(err)
 	}
 	if watch != nil {
@@ -338,7 +348,7 @@ func (s *sharedVideoSource) detachPreviewConsumer(consumerID string, err error) 
 		s.refCount--
 	}
 	remainingConsumers := len(s.consumers)
-	shouldShutdown := !s.closed && s.refCount == 0 && remainingConsumers == 0
+	shouldShutdown := !s.closed && s.refCount == 0 && remainingConsumers == 0 && len(s.rawConsumers) == 0
 	s.mu.Unlock()
 
 	s.teardownPreviewConsumer(consumer, err)
@@ -384,7 +394,12 @@ func (s *sharedVideoSource) shutdown(err error) {
 	for _, consumer := range s.consumers {
 		consumers = append(consumers, consumer)
 	}
+	rawConsumers := make([]*sharedRawConsumer, 0, len(s.rawConsumers))
+	for _, consumer := range s.rawConsumers {
+		rawConsumers = append(rawConsumers, consumer)
+	}
 	s.consumers = map[string]*sharedPreviewConsumer{}
+	s.rawConsumers = map[string]*sharedRawConsumer{}
 	s.refCount = 0
 	signalStop := s.stopWait
 	watch := s.watch
@@ -397,6 +412,9 @@ func (s *sharedVideoSource) shutdown(err error) {
 	}
 	for _, consumer := range consumers {
 		s.teardownPreviewConsumer(consumer, err)
+	}
+	for _, consumer := range rawConsumers {
+		s.teardownRawConsumer(consumer, err)
 	}
 	if watch != nil {
 		watch.Stop()
