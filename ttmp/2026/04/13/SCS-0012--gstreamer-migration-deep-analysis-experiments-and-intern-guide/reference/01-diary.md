@@ -59,6 +59,8 @@ RelatedFiles:
         Step 19 live audio controls
     - Path: pkg/media/gst/shared_video.go
       Note: Step 23 shared video source registry and preview branch lifecycle foundation for Phase 4
+    - Path: pkg/media/gst/shared_video_recording_bridge.go
+      Note: Step 24 isolated shared-source recording bridge prototype for Phase 4.1e
     - Path: pkg/media/types.go
       Note: |-
         New media runtime interfaces introduced in Step 10
@@ -87,12 +89,15 @@ RelatedFiles:
       Note: Step 21 shared source bridge experiment narrowing the remaining issue to appsrc segment/timestamp handling
     - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/19-go-gst-shared-preview-runtime-smoke/main.go
       Note: Step 23 focused harness proving shared preview attach/detach and source recreation behavior
+    - Path: ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke/main.go
+      Note: Step 24 bridge harness proving preview continuity while recorder-side appsrc issues remain
 ExternalSources: []
 Summary: Chronological diary of the SCS-0012 GStreamer migration investigation and implementation work.
 LastUpdated: 2026-04-13T15:12:03-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
 
 
 
@@ -2543,3 +2548,160 @@ preview 3 recreated successfully
 ```
 
 - That is the exact lifetime behavior we needed before moving on to recording-sharing work.
+
+---
+
+## Step 24: Phase 4.1e — Isolated Shared-Source Recording Bridge Prototype
+
+After the shared-preview foundation was stable, I implemented the next Phase 4 slice as an isolated prototype rather than touching the stable recording runtime: a raw shared-source consumer plus an experimental shared video recorder built as an `appsink -> appsrc -> x264enc -> mp4mux -> filesink` bridge. This is intentionally not yet wired into `pkg/media/gst/recording.go`; the goal of this step was to create production-like code for the bridge architecture and validate the lifecycle behavior in isolation.
+
+The key outcome is that the architecture direction remains viable: preview stayed alive while the bridge recorder ran, and preview continued after the bridge recorder stopped. The remaining bug is now sharply localized to the recorder side: the bridge still emits repeated `gst_segment_to_running_time: assertion 'segment->format == format' failed` messages and only produces a tiny output file, so valid finalized MP4 output is still unfinished. That means this step completes the isolated bridge implementation task (4.1e), but not the full validation task (4.1f).
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, go ahead."
+
+**Assistant interpretation:** Continue immediately with the next concrete Phase 4 task from the agreed sequence.
+
+**Inferred user intent:** Keep executing the plan without pausing for another planning round.
+
+### What I did
+- Extended `pkg/media/gst/shared_video.go` so a shared source can now track two consumer classes:
+  - preview consumers
+  - raw frame consumers
+- Added new file:
+  - `pkg/media/gst/shared_video_recording_bridge.go`
+- Implemented in that file:
+  - `sharedRawConsumer`
+  - raw branch attach/detach on top of a shared video source
+  - `ExperimentalSharedVideoRecorder`
+  - `StartExperimentalSharedVideoRecorder(...)`
+  - lazy bridge recorder creation from the first real sample caps
+  - `bridgeVideoRecorder` with:
+    - `appsrc`
+    - `videoconvert`
+    - `x264enc`
+    - `mp4mux`
+    - `filesink`
+  - stop path using `appsrc.EndStream()` + recorder-pipeline EOS wait
+- Added new focused harness:
+  - `ttmp/.../scripts/20-go-gst-shared-bridge-recorder-smoke/main.go`
+  - `ttmp/.../scripts/20-go-gst-shared-bridge-recorder-smoke.sh`
+- The harness:
+  - starts a shared preview session on a source
+  - starts the experimental shared bridge recorder on the same source
+  - waits while both run
+  - stops the bridge recorder
+  - confirms preview continues afterwards
+  - stats / probes the output file
+- Re-ran repo tests:
+
+```bash
+go test ./... -count=1
+```
+
+- Ran the bridge harness:
+
+```bash
+./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke.sh
+```
+
+### Why
+- The previous experiments proved that a pure tee branch is not yet enough for valid MP4 finalization plus preview continuity.
+- The bridge approach is therefore still the leading hypothesis, but it needed to exist as real package code rather than only as one-off experimental scripts.
+- This step turns the bridge into reusable runtime code while keeping it safely isolated from the stable app path.
+
+### What worked
+- The new bridge code compiles cleanly.
+- `go test ./... -count=1` remained green.
+- The focused bridge harness proved the shared-source lifecycle behavior we care about:
+  - preview remained active during the bridge recording run
+  - preview continued after the bridge recorder stopped
+  - stopping the bridge recorder did not poison the shared preview source
+- This means the source-sharing and consumer-lifetime side of the bridge architecture is still promising.
+
+### What didn't work
+- The recorder side is still not producing a healthy finalized MP4.
+- The focused harness produced repeated critical messages:
+
+```text
+GStreamer-CRITICAL **: gst_segment_to_running_time: assertion 'segment->format == format' failed
+```
+
+- The output file was still tiny:
+
+```text
+output size: 852 bytes
+duration=N/A
+size=852
+```
+
+- So the bridge is not yet ready for integration into the stable recording runtime.
+
+### What I learned
+- The bridge architecture still looks better than the pure tee approach for preview continuity.
+- The remaining failure is now isolated to the `appsrc` side much more clearly than before.
+- Starting the bridge recorder lazily from the first sample caps did not eliminate the segment-format issue, but it did confirm that the problem is not simply “recorder created too early.”
+
+### What was tricky to build
+- The hardest part was keeping the step scoped correctly.
+- It would have been tempting to immediately wire this into `pkg/media/gst/recording.go`, but that would have mixed two concerns:
+  - proving the bridge architecture can work,
+  - and integrating it into the production recording session model.
+- Keeping the bridge isolated was the correct move because the recorder side still emits critical warnings; the stable app path should not inherit that yet.
+- Another subtle issue was cleanup ordering: the raw shared-source consumer must detach cleanly, and then the bridge recorder must end its appsrc stream and wait for its own EOS, without killing preview.
+
+### What warrants a second pair of eyes
+- The exact `appsrc` configuration on the bridge recorder pipeline (`SetFormat`, stream type, timestamp handling, live/non-live assumptions)
+- Whether the buffer-copy strategy should preserve more metadata than the current `Buffer.Copy()` path does
+- Whether the bridge recorder should explicitly normalize raw consumer caps further before they ever reach `appsrc`
+
+### What should be done in the future
+- Work Phase 4.1f next: make the bridge harness produce a valid finalized MP4 while keeping preview continuity.
+- Do not integrate the bridge into the stable recording runtime until the harness proves:
+  - preview continuity during recording,
+  - continued preview after stop,
+  - and valid finalized MP4 output.
+
+### Code review instructions
+- Start with:
+  - `pkg/media/gst/shared_video_recording_bridge.go`
+  - the raw-consumer changes in `pkg/media/gst/shared_video.go`
+- Then run:
+
+```bash
+go test ./... -count=1
+./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke.sh
+```
+
+- Review the harness output for these two facts separately:
+  - preview continuity works
+  - finalized output is still not good enough
+
+### Technical details
+- New production file:
+
+```text
+/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go
+```
+
+- New focused harness:
+
+```text
+/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke/main.go
+```
+
+- Key successful lifecycle output from the harness:
+
+```text
+preview during recording reached 17 frames
+recorder stopped
+preview after recorder stop reached 31 frames
+```
+
+- Key remaining failure output from the harness:
+
+```text
+GStreamer-CRITICAL **: gst_segment_to_running_time: assertion 'segment->format == format' failed
+output size: 852 bytes
+```

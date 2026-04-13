@@ -32,7 +32,7 @@
 - [x] Phase 4.1b: Migrate `pkg/media/gst/preview.go` to acquire shared video sources from the registry instead of creating standalone source pipelines per preview session.
 - [x] Phase 4.1c: Add a focused shared-preview validation harness/script proving preview branch attach/detach and last-consumer shutdown behavior for the shared source implementation.
 - [x] Phase 4.1d: Re-run existing preview runtime + web preview validation against the shared-source preview runtime and record any regressions.
-- [ ] Phase 4.1e: Design and implement a bridge-style recording consumer for shared video sources (`appsink -> appsrc` or better if discovered), keeping it isolated from the stable recording runtime until validated.
+- [x] Phase 4.1e: Design and implement a bridge-style recording consumer for shared video sources (`appsink -> appsrc` or better if discovered), keeping it isolated from the stable recording runtime until validated.
 - [ ] Phase 4.1f: Add a focused shared-source recording harness proving all of the following at once: preview continuity during recording, valid finalized MP4 output, and continued preview after recording stop.
 - [ ] Phase 4.1g: Integrate shared-source video capture into `pkg/media/gst/recording.go` for video jobs while leaving audio jobs on the current stable implementation.
 - [ ] Phase 4.1h: Validate the real default app/server constructors end-to-end with shared capture via the Phase 4 web harness (preview stays active, screenshot works, audio controls still work, output finalizes correctly).

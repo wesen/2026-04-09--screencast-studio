@@ -144,3 +144,14 @@ Completed the first production Phase 4 shared-capture slice: added a shared GStr
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go — New shared video source registry and tee-backed preview consumer primitives
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview.go — Preview runtime now acquires shared sources from the registry instead of building standalone source pipelines
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/19-go-gst-shared-preview-runtime-smoke/main.go — Focused validation harness for shared-preview branch lifetime behavior
+
+
+## 2026-04-13
+
+Implemented an isolated shared-source recording bridge prototype on top of the new shared video registry: a raw shared-source consumer plus an experimental `appsink -> appsrc -> x264enc -> mp4mux -> filesink` recorder. Added a focused bridge smoke harness that proved preview continuity during and after bridge recording without touching the stable production recording runtime. The remaining failure is recorder-side only: the bridge still emits `gst_segment_to_running_time` assertions and produces a tiny output file, so this is a bridge implementation milestone, not yet the Phase 4 recording-validation milestone.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go — Experimental shared-source recording bridge implementation kept isolated from the stable runtime
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go — Extended shared source lifecycle to support raw recording consumers as well as preview consumers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/20-go-gst-shared-bridge-recorder-smoke/main.go — Focused validation harness for preview continuity plus isolated bridge recorder stop behavior
