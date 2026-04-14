@@ -1,0 +1,3 @@
+codec_name=pcm_s16le
+duration=7.960000
+size=1528364

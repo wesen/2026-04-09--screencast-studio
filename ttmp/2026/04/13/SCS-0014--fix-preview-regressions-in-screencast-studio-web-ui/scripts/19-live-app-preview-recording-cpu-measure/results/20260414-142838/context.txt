@@ -1,0 +1,8 @@
+label=before-pre-adaptive
+repo=/tmp/scs-pre-adaptive-1554243
+port=7784
+server=http://127.0.0.1:7784
+display=:0
+root=2880x1920
+region=0,960,2880,960
+duration=8

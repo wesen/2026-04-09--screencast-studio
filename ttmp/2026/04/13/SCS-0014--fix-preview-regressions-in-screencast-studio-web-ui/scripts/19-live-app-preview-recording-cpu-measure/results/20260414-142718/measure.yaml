@@ -1,0 +1,43 @@
+schema: "recorder.config/v1"
+session_id: "adaptive-preview-measure-current"
+destination_templates:
+  audio_mix: "/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/19-live-app-preview-recording-cpu-measure/results/20260414-142718/output/audio-mix.{ext}"
+  per_source: "/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/19-live-app-preview-recording-cpu-measure/results/20260414-142718/output/{source_name}.{ext}"
+audio_defaults:
+  output:
+    codec: "pcm_s16le"
+    sample_rate_hz: 48000
+    channels: 2
+audio_mix:
+  destination_template: "audio_mix"
+video_sources:
+  - id: "measure-region"
+    name: "Measure Region"
+    type: "region"
+    enabled: true
+    target:
+      display: ":0"
+      rect:
+        x: 0
+        y: 960
+        w: 2880
+        h: 960
+    settings:
+      capture:
+        fps: 24
+        cursor: true
+        follow_resize: false
+      output:
+        container: "mov"
+        video_codec: "h264"
+        quality: 75
+    destination_template: "per_source"
+audio_sources:
+  - id: "mic-1"
+    name: "Built-in Mic"
+    device: "default"
+    enabled: true
+    settings:
+      gain: 1
+      noise_gate: false
+      denoise: false

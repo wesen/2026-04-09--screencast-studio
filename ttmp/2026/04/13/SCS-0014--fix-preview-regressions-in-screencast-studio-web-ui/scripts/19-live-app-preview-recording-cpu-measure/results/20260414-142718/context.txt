@@ -1,0 +1,8 @@
+label=current
+repo=/home/manuel/code/wesen/2026-04-09--screencast-studio
+port=7781
+server=http://127.0.0.1:7781
+display=:0
+root=2880x1920
+region=0,960,2880,960
+duration=8

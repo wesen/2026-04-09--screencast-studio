@@ -194,3 +194,52 @@ The existing real default-runtime E2E harness still completed successfully after
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go — preview consumers now derive recipes from the shared source and can have their profile reapplied in place
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go — raw consumer attach/detach now triggers preview-profile rebalance on the shared source
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_test.go — focused tests now cover layout selection, recording-time profile selection, and desired preview recipe selection under raw-consumer contention
+
+### Adaptive preview runtime prototype — slice 3
+
+Added a new live app-path measurement script under `scripts/19-live-app-preview-recording-cpu-measure/` and used it to compare a pre-adaptive revision against the current adaptive-preview runtime behavior.
+
+The script runs a real `screencast-studio serve` process from a specified repo/revision, drives preview + recording through the HTTP API, measures the actual server process with `pidstat`, and saves screenshots plus `ffprobe` output.
+
+Measured revisions:
+
+- before: `1554243058be6ecd73651a240fd1b7fc8272e286`
+- after: `e27ebdfa5bdda660bdd0caa00ee926e7c4c3435b`
+
+Saved results:
+
+- `scripts/19-live-app-preview-recording-cpu-measure/results/20260414-142838/01-summary.md` — before pre-adaptive
+- `scripts/19-live-app-preview-recording-cpu-measure/results/20260414-142808/01-summary.md` — after current adaptive-preview runtime
+- `scripts/20-live-app-adaptive-preview-runtime-summary.md` — human-readable comparison summary
+
+Key result from the real server/API path for the same `2880x960 @ 24 fps` region scenario:
+
+- before avg CPU: `188.27%`
+- after avg CPU: `170.82%`
+
+That is an improvement of about `17.45` percentage points absolute, or about `9.3%` relative. CPU is still high, but the adaptive-preview direction is now supported by a real app-path before/after win, not just by standalone harnesses.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/19-live-app-preview-recording-cpu-measure/run.sh — reproducible live server/API path measurement script for preview plus recording CPU
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/19-live-app-preview-recording-cpu-measure/results/20260414-142838/01-summary.md — before pre-adaptive live measurement
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/19-live-app-preview-recording-cpu-measure/results/20260414-142808/01-summary.md — after adaptive-preview live measurement
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/20-live-app-adaptive-preview-runtime-summary.md — app-path before/after interpretation note
+
+The live measurement slice was followed by one more targeted runtime safety check: I re-used the existing `scripts/05-preview-freeze-poll.sh` against the current adaptive-preview revision and saved the artifacts under:
+
+- `scripts/21-adaptive-preview-freeze-check/20260414-143226/`
+
+The important result was that `lastFrameAt` continued advancing throughout recording:
+
+- during 1: `2026-04-14T14:32:34-04:00`
+- during 2: `2026-04-14T14:32:35-04:00`
+- during 3: `2026-04-14T14:32:37-04:00`
+- during 4: `2026-04-14T14:32:38-04:00`
+
+That means the adaptive-preview profile rebalance did **not** reintroduce the earlier preview-freeze-on-record regression in this targeted runtime check.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-check.stdout.log — targeted freeze-check output against the current adaptive-preview runtime
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/frame-times.txt — saved `lastFrameAt` progression showing preview continued advancing during recording

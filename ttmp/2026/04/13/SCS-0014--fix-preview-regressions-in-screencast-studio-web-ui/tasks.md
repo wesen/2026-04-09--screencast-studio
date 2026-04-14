@@ -44,11 +44,11 @@
 - [x] Choose and document an initial constrained camera profile for recording-time preview
 - [x] Recompute or reapply preview profiles when a recorder raw consumer attaches to a shared source
 - [x] Restore the normal preview profile automatically when the recorder raw consumer detaches
-- [ ] Ensure profile changes happen without reintroducing the preview-freeze regression fixed by the async recording bridge
+- [x] Ensure profile changes happen without reintroducing the preview-freeze regression fixed by the async recording bridge
 - [x] Add focused unit tests for preview layout selection and preview profile selection
 - [x] Add focused unit tests for recording-time preview downgrade and post-record restore behavior
 - [x] Extend the existing validation harnesses or add one focused runtime test that proves preview remains live while recording under the adaptive-preview path
-- [ ] Measure real app/runtime CPU before and after the adaptive-preview prototype using the live `scs-web-ui` path
+- [x] Measure real app/runtime CPU before and after the adaptive-preview prototype using the live `scs-web-ui` path
 - [ ] Evaluate whether preview quality during recording remains acceptable with the constrained profile
 - [ ] Decide whether adaptive-preview behavior should be the default runtime policy or a configurable feature flag after real-app validation
 - [ ] Record the production-path results in the ticket diary, changelog, and a follow-up summary note

@@ -72,6 +72,7 @@ Current deliverable status:
 - A dedicated shared-source preview/recorder interplay benchmark now shows that preview + recorder together is dramatically more expensive than recorder-only, and that cheaper preview settings help but do not remove the spike
 - A follow-up preview-branch ablation benchmark now isolates second-branch cost, JPEG cost, raw frame-copy cost, the current preview path, and a cheap preview profile while recording
 - New standalone confirmation and repeatability benchmarks now test the imported adaptive-preview proposal directly; the repeated results support the combined direction of constrained recording-time preview plus rate-first preview ordering more strongly than either ingredient on its own
+- The first real app-path before/after measurement now shows the adaptive-preview prototype reducing average server CPU for the preview+recording case from about `188.27%` to about `170.82%` in the same live region-capture scenario
 - `docmgr doctor` passed cleanly
 - Bug report bundle uploaded to reMarkable and verified in `/ai/2026/04/13/SCS-0014`
 

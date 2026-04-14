@@ -1,0 +1,24 @@
+preview_id=preview-bb149fdf80ab
+pre 1 05646d04ee45fb9cbd8e9235c1788fd307b04e0fd8718291c41cc9057973f6c2  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/pre-shot.jpg
+pre 2 81ca5f0d584a837c0396a58a4c14157c8cadbdd62f9c3c71ac9ce99fe2d30f60  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/pre-shot.jpg
+pre 3 81ca5f0d584a837c0396a58a4c14157c8cadbdd62f9c3c71ac9ce99fe2d30f60  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/pre-shot.jpg
+during 1 81ca5f0d584a837c0396a58a4c14157c8cadbdd62f9c3c71ac9ce99fe2d30f60  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/during-shot.jpg
+during 2 6ca65b8e4ed2f0da39cc485b0e10cda2b1d30d8eb2b45e0fac57a9d34bd9caa5  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/during-shot.jpg
+during 3 6ca65b8e4ed2f0da39cc485b0e10cda2b1d30d8eb2b45e0fac57a9d34bd9caa5  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/during-shot.jpg
+during 4 6ca65b8e4ed2f0da39cc485b0e10cda2b1d30d8eb2b45e0fac57a9d34bd9caa5  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/during-shot.jpg
+post 1 81ca5f0d584a837c0396a58a4c14157c8cadbdd62f9c3c71ac9ce99fe2d30f60  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/post-shot.jpg
+post 2 81ca5f0d584a837c0396a58a4c14157c8cadbdd62f9c3c71ac9ce99fe2d30f60  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/post-shot.jpg
+post 3 81ca5f0d584a837c0396a58a4c14157c8cadbdd62f9c3c71ac9ce99fe2d30f60  ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work/post-shot.jpg
+
+pre 1 running 2026-04-14T14:32:31-04:00 True
+pre 2 running 2026-04-14T14:32:32-04:00 True
+pre 3 running 2026-04-14T14:32:33-04:00 True
+during 1 running 2026-04-14T14:32:34-04:00 True
+during 2 running 2026-04-14T14:32:35-04:00 True
+during 3 running 2026-04-14T14:32:37-04:00 True
+during 4 running 2026-04-14T14:32:38-04:00 True
+post 1 running 2026-04-14T14:32:41-04:00 True
+post 2 running 2026-04-14T14:32:42-04:00 True
+post 3 running 2026-04-14T14:32:43-04:00 True
+
+Artifacts: ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-work

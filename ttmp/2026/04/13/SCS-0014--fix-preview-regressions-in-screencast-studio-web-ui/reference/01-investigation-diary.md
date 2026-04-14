@@ -2252,3 +2252,159 @@ Tasks completed in this slice:
 - `Add focused unit tests for preview layout selection and preview profile selection`
 - `Add focused unit tests for recording-time preview downgrade and post-record restore behavior`
 - `Extend the existing validation harnesses or add one focused runtime test that proves preview remains live while recording under the adaptive-preview path`
+
+## Step 22: Measured the Adaptive-Preview Prototype in the Real Server/API Path Before and After
+
+Once the adaptive-preview behavior change was in place, I wanted one result that lived closer to the actual product than the standalone harnesses. The standalone experiments had already been useful for narrowing the direction, but at this point the more important question was whether the real server/API path improved at all.
+
+To answer that cleanly, I built a new ticket-local measurement script that starts a real `screencast-studio serve` process from a specified repo/revision, drives preview + recording through the HTTP API, measures the real server process with `pidstat`, and saves the resulting media plus screenshots and hashes.
+
+I then ran it twice:
+
+- once on the pre-adaptive revision,
+- and once on the current adaptive-preview revision.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, build task by task, commit at ppropriate intervals, and keep a detailed diary"
+
+**Assistant interpretation:** After landing the adaptive-preview runtime slice, continue into real validation instead of stopping at unit tests and the in-process default-runtime harness.
+
+**Inferred user intent:** Prove whether the prototype helps in the actual app path, not only in isolated media experiments.
+
+### What I did
+
+Added:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/19-live-app-preview-recording-cpu-measure/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/20-live-app-adaptive-preview-runtime-summary.md`
+
+Then measured:
+
+- before revision: `1554243058be6ecd73651a240fd1b7fc8272e286`
+- after revision: `e27ebdfa5bdda660bdd0caa00ee926e7c4c3435b`
+
+Saved runs:
+
+- before: `scripts/19-live-app-preview-recording-cpu-measure/results/20260414-142838/`
+- after: `scripts/19-live-app-preview-recording-cpu-measure/results/20260414-142808/`
+
+### What worked
+
+The real app-path comparison produced a meaningful before/after result.
+
+From the saved summaries:
+
+- before avg CPU: `188.27%`
+- after avg CPU: `170.82%`
+
+That is an improvement of about:
+
+- `17.45` percentage points absolute
+- about `9.3%` relative
+
+This matters because it is not just a synthetic harness result anymore. It is a real server/API-path improvement.
+
+### What didn't work
+
+I initially made a measurement mistake: the first version of the script ran `go run` and measured the wrapper `go` process rather than the long-lived server binary. That yielded nonsense CPU data (`0.00%`).
+
+I corrected the script by building a real binary first and then measuring that binary’s PID instead.
+
+That fix was important. Without it, the “before/after” result would have looked cleaner than it actually deserved.
+
+### What I learned
+
+The adaptive-preview prototype is helping in the real app path, not just in the standalone media experiments.
+
+But it is also clear that:
+
+- CPU is still high,
+- the adaptive preview change is a useful mitigation, not a complete fix,
+- and the next question is now partly a product question: is the constrained preview still acceptable while recording?
+
+### What was tricky to build
+
+The trickiest part here was measurement validity. It is easy to collect a number from the wrong PID or from the wrong execution path and then talk yourself into believing you validated production behavior. I had to explicitly correct that when I noticed the impossible `0.00%` result from measuring the `go run` wrapper process.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/19-live-app-preview-recording-cpu-measure/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/20-live-app-adaptive-preview-runtime-summary.md`
+
+The main review question is whether this script is a good enough reproducible app-path comparison harness for future tuning work.
+
+### What should be done in the future
+
+The next step should be to inspect the live preview quality during recording and decide whether the constrained profile is acceptable enough to keep as the default runtime behavior.
+
+### Code review instructions
+
+Re-run the current revision measurement with:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+LABEL=after-current PORT=7783 bash ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/19-live-app-preview-recording-cpu-measure/run.sh
+```
+
+Re-run the pre-adaptive comparison by creating a detached worktree at:
+
+```text
+1554243058be6ecd73651a240fd1b7fc8272e286
+```
+
+and then pointing `REPO=` at that worktree when invoking the same measurement script.
+
+### Technical details
+
+The key app-path comparison currently is:
+
+```text
+before avg CPU: 188.27%
+after  avg CPU: 170.82%
+```
+
+That is why the adaptive-preview prototype currently looks worth keeping and iterating on rather than backing out immediately.
+
+## Step 23: Re-ran the Preview-Freeze Check Against the Adaptive-Preview Runtime
+
+After the live CPU before/after comparison came back positive, I wanted one more runtime safety check before calling the adaptive-preview prototype a serious keeper: I needed to make sure the new preview-profile rebalance on raw attach/detach had not accidentally reintroduced the earlier preview-freeze regression.
+
+Instead of inventing a new script, I reused the existing freeze-poll workflow and pointed it at a fresh server started from the current adaptive-preview revision. I saved the artifacts under the ticket so the check is reproducible and reviewable.
+
+### What I did
+
+- built a fresh server binary from the current repo,
+- started it on `:7785`,
+- ran the existing `scripts/05-preview-freeze-poll.sh` against it,
+- and saved the output under:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/`
+
+### What worked
+
+The important result was that `lastFrameAt` kept advancing during recording:
+
+```text
+during 1 running 2026-04-14T14:32:34-04:00 True
+during 2 running 2026-04-14T14:32:35-04:00 True
+during 3 running 2026-04-14T14:32:37-04:00 True
+during 4 running 2026-04-14T14:32:38-04:00 True
+```
+
+That is exactly the evidence I wanted here. It means the adaptive-preview profile rebalance did **not** bring back the old preview-freeze-on-record failure in this targeted runtime check.
+
+### What didn't work
+
+My first one-liner that wrapped the freeze-check had a shell scoping bug around `WORK_DIR` under `set -u`. I fixed that and re-ran successfully.
+
+### What I learned
+
+The adaptive-preview change is looking more credible now because it has passed three different kinds of post-change validation:
+
+1. unit tests and full repo tests,
+2. the default-runtime server/app seam harness,
+3. and the targeted freeze-poll check.
+
+### What should be done in the future
+
+The remaining open task is more product-facing now: judge whether the constrained live preview during recording is acceptable enough to keep as the default behavior, or whether it should remain configurable.
