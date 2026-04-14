@@ -23,6 +23,8 @@ RelatedFiles:
         Preview cache and fan-out behavior shaped the first-step reasoning
     - Path: internal/web/preview_metrics.go
       Note: Metric-family definitions were added in the first code slice
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/reference/02-browser-preview-streaming-lab-report.md
+      Note: New ongoing lab report created and backfilled in Step 6
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/01-restart-scs-web-ui.sh
       Note: Added and validated in the second helper-script slice
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh
@@ -49,10 +51,11 @@ RelatedFiles:
         Frontend preview lifecycle likely explains differences between browser-driven and API-only runs
 ExternalSources: []
 Summary: Diary for the browser preview streaming and web-UI performance investigation ticket.
-LastUpdated: 2026-04-14T17:10:00-04:00
+LastUpdated: 2026-04-14T17:24:00-04:00
 WhatFor: Record the chronology of how the browser preview streaming performance investigation was set up and how its conclusions are derived.
 WhenToUse: Read when continuing SCS-0015 and you need the exact reasoning, commands, and file boundaries used to define the new browser-streaming research track.
 ---
+
 
 
 
@@ -687,4 +690,110 @@ The clearest current numeric contrast is:
 fresh server + 1 plain MJPEG client + desktop recording  -> 158.56% avg CPU
 live Studio page + 1 real browser tab + desktop recording -> 410.60% avg CPU
 live Studio page + 2 real browser tabs + desktop recording -> 432.97% avg CPU
+```
+
+## Step 6: Backfilled a Dedicated Ongoing Lab Report for SCS-0015
+
+After the first browser-backed matrix pass, the ticket already had enough moving pieces that the design doc, report draft, changelog, and diary were no longer the best place to hold the raw experimental story in one continuation-friendly view. The user asked specifically for a lab report document that we keep as we investigate, so I created that document and backfilled the current experiment set in detail rather than leaving the evidence spread across result directories and summary notes.
+
+The goal of this step was not to invent new measurements. It was to preserve the measurements we already ran in a form that makes future investigation easier: one place that records the exact experiment purpose, script used, command shape, result directory, CPU summary, caveats, and the current working explanation for the `~400%` desktop preview-plus-recording browser spike.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, write up your current experiments and results in detail in a lab report document that we keep as we investigate (backfill in detail), commit appropriately, then moving forward keep track of your experiments, update your diary."
+
+**Assistant interpretation:** Create a durable ticket-local lab report for SCS-0015, backfill the experiments already run into it in detail, update the diary and ticket bookkeeping, and treat that report plus the diary as the ongoing record from here forward.
+
+**Inferred user intent:** Turn the current measurement work into a maintained research artifact so future investigation does not depend on reconstructing the history from scattered result directories, chat messages, or half-polished summaries.
+
+**Commit (docs):** `Add browser preview lab report`
+
+### What I did
+
+- Added a new ongoing lab report document:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/reference/02-browser-preview-streaming-lab-report.md`
+- Backfilled the current experiment inventory into that document, including:
+  - metrics smoke validation,
+  - the first desktop HTTP-client baseline matrix,
+  - the larger fresh-server HTTP-client matrix with recording,
+  - the live browser-backed desktop one-tab and two-tab runs,
+  - the desktop-plus-camera one-tab runs,
+  - the improved sampler validation after the heredoc bug fix,
+  - the browser-tool network artifact,
+  - and the saved Playwright browser-state artifact.
+- Updated ticket docs to point at the new lab report:
+  - `index.md`
+  - `tasks.md`
+  - `changelog.md`
+  - `reference/01-investigation-diary.md`
+- Kept the lab report framed explicitly as a **living experiment ledger**, not as the final polished report.
+
+### Why
+
+By this point in SCS-0015, the experiment set was already large enough that “just read the result directories” was no longer a good continuation strategy. The lab report is the right middle layer between:
+
+- raw result trees,
+- and the higher-level performance report.
+
+It preserves the details needed for debugging and future A/B work without forcing every future reader to manually piece the story back together.
+
+### What worked
+
+- The new lab report now gives the ticket one canonical place to read the current experimental record.
+- The report backfills the strongest result clearly:
+  - fresh server + one plain MJPEG client + desktop recording → `158.56%`
+  - real Studio page + one real browser tab + desktop recording → `410.60%`
+- The report also captures the subtler current interpretation that served MJPEG bytes alone do not explain the browser-path spike.
+
+### What didn't work
+
+There was no new implementation failure in this documentation step itself. The main limitation is still analytical rather than editorial: we do not yet have the next round of server-path A/B instrumentation to prove exactly how much of the hot slice comes from websocket event fanout versus MJPEG serving versus upstream shared-capture interaction.
+
+### What I learned
+
+The ticket is now at a stage where the **desktop preview + recording + one real browser tab** scenario is already strong enough to carry the next investigation phase by itself. The lab report made that easier to see because it puts the fresh-server and real-browser runs side by side in one place.
+
+### What was tricky to build
+
+The main tricky part was deciding what belongs in the lab report versus the diary versus the main performance report. I treated the lab report as the place for experiment-by-experiment preservation, exact result locations, and current working hypotheses. I left the main performance report as the more structured summary document and the diary as the chronological narrative of what I changed and why.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/reference/02-browser-preview-streaming-lab-report.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/design/02-browser-preview-streaming-performance-report.md`
+
+The main review question is whether the current lab-report structure is the right level of detail for future experimental additions, especially once we start adding deeper A/B instrumentation around websocket versus MJPEG cost.
+
+### What should be done in the future
+
+- Keep the new lab report updated after each meaningful experimental slice.
+- Keep the diary updated in parallel for chronology and implementation/debugging narrative.
+- Use the desktop preview + recording + one real browser tab scenario as the main repro while we instrument deeper.
+
+### Code review instructions
+
+Start with:
+
+- `reference/02-browser-preview-streaming-lab-report.md`
+
+Then compare it against:
+
+- `scripts/09-browser-preview-matrix-findings-summary.md`
+- `design/02-browser-preview-streaming-performance-report.md`
+- the saved result directories listed in the lab report
+
+### Technical details
+
+The lab report now explicitly records these key directories and their role:
+
+```text
+scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/
+scripts/05-desktop-preview-http-client-recording-matrix/results/20260414-163154/
+scripts/results/20260414-163610/
+scripts/results/20260414-163951/
+scripts/results/20260414-164457/
+scripts/results/20260414-164535/
+scripts/results/20260414-164657/
+scripts/results/20260414-164720/
+scripts/results/20260414-165126/
 ```

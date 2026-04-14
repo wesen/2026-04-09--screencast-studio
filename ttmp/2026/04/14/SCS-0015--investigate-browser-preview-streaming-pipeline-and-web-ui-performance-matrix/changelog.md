@@ -224,3 +224,39 @@ The findings note records another important nuance: during the browser recording
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/09-browser-preview-matrix-findings-summary.md — first human-readable combined findings note for the larger matrix pass
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/10-browser-session-network-summary.txt — raw browser-tool network summary saved as a ticket artifact
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/11-browser-playwright-state-desktop-camera.json — saved browser-side preview state showing both desktop and camera previews loaded successfully
+
+Added a dedicated ongoing lab report document and backfilled the current SCS-0015 experiment set in detail in the docs commit `Add browser preview lab report`.
+
+The new document is:
+
+- `reference/02-browser-preview-streaming-lab-report.md`
+
+This lab report is meant to stay “live” as the investigation continues. Unlike the more polished design/report documents, it preserves the actual experiment ledger in a continuation-friendly form:
+
+- the purpose of each experiment,
+- the exact harness or helper scripts used,
+- the commands run,
+- the saved result directories,
+- the measured CPU summaries,
+- important caveats,
+- and the current working interpretation of the `~400%` desktop preview+recording browser-path spike.
+
+The report explicitly backfills the current experiment inventory, including:
+
+- metrics export smoke validation,
+- the first desktop HTTP-client baseline matrix,
+- the larger fresh-server HTTP-client matrix with recording,
+- the live browser-backed desktop one-tab and two-tab measurements,
+- the desktop-plus-camera one-tab measurements,
+- the improved browser sampler validation after the heredoc bug fix,
+- and the browser-tool network-summary and Playwright-state artifacts.
+
+The lab report also records the strongest current explanation in one place:
+
+- simple MJPEG client fan-out alone does not explain the browser-path spike,
+- the real browser-connected recording path is substantially hotter than the plain-client baseline,
+- and the most likely explanation is a combination of shared preview+recording cost, MJPEG serving work, multiple Go-side frame copies, and browser-only websocket/event fanout during recording.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/reference/02-browser-preview-streaming-lab-report.md — ongoing detailed experiment ledger and working interpretation for SCS-0015

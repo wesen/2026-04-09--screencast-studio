@@ -49,6 +49,7 @@
 ## Reporting and conclusions
 
 - [ ] Write the final browser preview streaming performance report
+- [x] Create and maintain an ongoing lab report document that backfills the current experiments in detail
 - [x] Summarize the raw result directories and matrix outcomes in a human-readable report note
 - [x] Decide whether the dominant web-UI-specific cost is upstream preview generation, MJPEG serving fan-out, frontend lifecycle behavior, or a combination
 - [x] Propose concrete optimization options ranked by impact and implementation risk
