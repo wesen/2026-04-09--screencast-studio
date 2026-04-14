@@ -30,6 +30,7 @@
 - [x] Save the staged bridge-overhead results under the ticket `scripts/` folder and summarize the findings
 - [x] Add a standalone shared-source benchmark that measures preview-only, recorder-only, and preview+recorder together
 - [x] Record whether cheaper preview settings materially reduce the combined preview+recorder CPU spike
+- [x] Add a preview-branch ablation benchmark that isolates second-branch overhead, JPEG, raw frame copying, and the current preview path while recording
 
 ## Bug-fix themes captured by this ticket
 

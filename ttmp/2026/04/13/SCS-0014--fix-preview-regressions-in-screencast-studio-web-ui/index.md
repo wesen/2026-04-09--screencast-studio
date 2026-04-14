@@ -66,6 +66,7 @@ Current deliverable status:
 - A second staged bridge-overhead benchmark now isolates `appsink`, Go buffer copy, async queueing, `appsrc`, and `x264`
 - A same-session reconciliation run now compares the direct GStreamer, shared-runtime, and staged bridge benchmarks side by side and shows recorder-only CPU is broadly aligned across those three paths; the larger remaining cost spike is preview + recorder together
 - A dedicated shared-source preview/recorder interplay benchmark now shows that preview + recorder together is dramatically more expensive than recorder-only, and that cheaper preview settings help but do not remove the spike
+- A follow-up preview-branch ablation benchmark now isolates second-branch cost, JPEG cost, raw frame-copy cost, the current preview path, and a cheap preview profile while recording
 - `docmgr doctor` passed cleanly
 - Bug report bundle uploaded to reMarkable and verified in `/ai/2026/04/13/SCS-0014`
 

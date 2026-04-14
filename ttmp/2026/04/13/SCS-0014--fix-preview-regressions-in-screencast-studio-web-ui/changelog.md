@@ -83,3 +83,21 @@ So the remaining large cost spike is now strongly localized to the **combined pr
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/run.sh — runner for the preview/recorder interplay benchmark
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/results/20260414-070646/01-summary.md — raw saved summary for the interplay benchmark run
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/13-preview-recorder-interplay-summary.md — human-readable interpretation of the interplay benchmark
+
+The next standalone step was a more targeted ablation suite under `scripts/14-go-preview-branch-ablation-matrix/` plus the summary note `scripts/15-preview-branch-ablation-summary.md`. That benchmark kept the recorder path fixed and varied only the preview branch to separate:
+
+- second active branch cost (`preview-fakesink-plus-recorder`),
+- JPEG cost without Go frame copying (`preview-jpeg-discard-plus-recorder`),
+- raw frame-copy cost without JPEG (`preview-raw-copy-plus-recorder`),
+- the current real preview path (`preview-current-plus-recorder`),
+- and a cheap preview profile (`preview-cheap-plus-recorder`).
+
+This run reinforced the current direction: within that benchmark, every non-trivial preview branch was more expensive than recorder-only, and the current real preview path was more expensive than the stripped-down preview variants. A very cheap preview profile reduced total CPU materially. The absolute recorder-only baseline in that run was higher than the earlier reconciled recorder-only baseline, so the safest reading is relative within-run rather than replacing the earlier absolute baseline. Still, the ablation result supports the idea that the next most practical optimization target is **degrading preview work while recording** before attempting more invasive recorder-architecture changes.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/main.go — standalone benchmark that isolates second-branch overhead, JPEG, raw frame-copy, and current preview-path cost while recording
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/run.sh — runner for the preview-branch ablation benchmark
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/results/20260414-081748/01-summary.md — raw saved summary for the ablation benchmark run
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/15-preview-branch-ablation-summary.md — human-readable interpretation of the ablation benchmark
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/reference/03-research-brief-preview-and-recording-performance-investigation-handoff.md — copied ticket-local version of the detailed researcher handoff brief from the Obsidian vault so the research package also lives inside the ticket workspace

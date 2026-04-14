@@ -1644,3 +1644,197 @@ preview-cheap-plus-recorder: 170.00% avg CPU
 ```
 
 That is why my current optimization target shifted again: the remaining expensive case is the live preview branch interacting with recording, not recorder-only bridge overhead.
+
+## Step 17: Copied the Researcher Handoff Brief into the Ticket Workspace
+
+After creating the detailed researcher-facing handoff brief in the Obsidian vault, the user asked to copy it into the ticket as well. I treated that as a packaging step rather than new analysis work: the point was to make sure the same handoff package exists both in the long-term vault and in the ticket workspace where the benchmark evidence and diary already live.
+
+### Prompt Context
+
+**User prompt (verbatim):** "yes"
+
+**Assistant interpretation:** Copy the just-created vault research brief into the ticket workspace too.
+
+**Inferred user intent:** Keep the researcher handoff package co-located with the ticket evidence, not only in the vault.
+
+### What I did
+
+Copied:
+
+- source: `/home/manuel/code/wesen/obsidian-vault/Research/Institute/Projects/Screencast Gstreamer Port/Research Brief - Preview and Recording Performance Investigation Handoff.md`
+- destination: `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/reference/03-research-brief-preview-and-recording-performance-investigation-handoff.md`
+
+Then re-ran:
+
+```bash
+docmgr doctor --ticket SCS-0014 --stale-after 30
+```
+
+and confirmed the ticket still passed cleanly.
+
+### What worked
+
+- the copied brief now exists inside the ticket workspace,
+- the ticket still validates cleanly,
+- and the handoff package now lives in both the vault and the repo-local research context.
+
+### What didn't work
+
+Nothing failed in this step.
+
+### What I learned
+
+For longer investigations like this one, it is useful to store the handoff package in both places:
+
+- the Obsidian vault for long-term knowledge organization,
+- and the ticket for repo-local continuity and review.
+
+### What should be done in the future
+
+If the researcher updates the brief materially, consider keeping the ticket copy and the vault copy synchronized rather than letting them drift too far apart.
+
+## Step 18: Isolated the Preview Branch More Aggressively with an Ablation Matrix
+
+After the preview/recorder interplay benchmark made it clear that the combined case was the remaining big spike, I wanted one more decomposition step before touching production code. The next benchmark held the recorder path fixed and varied only the preview branch so I could separate three different ideas that had previously been bundled together: the cost of having a second active branch at all, the cost of JPEG generation, and the cost of copying preview data into Go.
+
+This step did not give a final production tuning answer by itself, but it did make the next likely mitigation path much clearer: a degraded recording-mode preview is now the most practical next thing to test in production.
+
+### Prompt Context
+
+**User prompt (verbatim):** "yes"
+
+**Assistant interpretation:** Proceed with the next proposed experiment, namely the preview-branch ablation benchmark.
+
+**Inferred user intent:** Keep moving the standalone investigation forward rather than stopping at the previous summary.
+
+### What I did
+
+Added the benchmark suite:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/main.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/15-preview-branch-ablation-summary.md`
+
+Saved raw results under:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/results/20260414-081748/`
+
+Measured scenarios:
+
+1. `recorder-only`
+2. `preview-fakesink-plus-recorder`
+3. `preview-jpeg-discard-plus-recorder`
+4. `preview-raw-copy-plus-recorder`
+5. `preview-current-plus-recorder`
+6. `preview-cheap-plus-recorder`
+
+### Why
+
+The previous interplay benchmark had already told me that preview + recorder together is expensive. But it still bundled together several different sources of preview work:
+
+- second-branch transform work,
+- JPEG generation,
+- Go-side byte copying,
+- and the current combined real preview path.
+
+This ablation matrix was the next clean way to separate those concerns.
+
+### What worked
+
+The benchmark produced a coherent within-run ordering.
+
+Saved results from `14-go-preview-branch-ablation-matrix/results/20260414-081748/01-summary.md`:
+
+- `recorder-only`: `125.33%` avg CPU
+- `preview-fakesink-plus-recorder`: `134.00%`
+- `preview-jpeg-discard-plus-recorder`: `137.83%`
+- `preview-raw-copy-plus-recorder`: `141.33%`
+- `preview-current-plus-recorder`: `152.33%`
+- `preview-cheap-plus-recorder`: `112.00%`
+
+The counters also helped explain the branch behavior:
+
+- `preview-jpeg-discard-plus-recorder` pulled preview samples but copied no preview bytes into Go
+- `preview-raw-copy-plus-recorder` copied about `133 MB` of raw preview bytes in 6 seconds
+- `preview-current-plus-recorder` copied about `13 MB` of JPEG preview bytes
+- the cheap preview profile reduced copied preview bytes to about `1.36 MB`
+
+### What didn't work
+
+The absolute recorder-only baseline in this run (`125.33%`) was higher than the earlier reconciled recorder-only baseline (~`94%`). That means I should not over-read the absolute numbers from this one benchmark in isolation.
+
+So the safest interpretation of this ablation run is **relative within-run**, not “this new run replaces every earlier recorder-only number.”
+
+### What I learned
+
+The benchmark still taught something useful despite that variability.
+
+Within this run:
+
+- having a second active branch already costs something,
+- JPEG adds more cost,
+- raw Go-side copying adds more cost,
+- the full current preview path is more expensive than the more stripped-down preview variants,
+- and a strong cheap-preview profile materially reduces total CPU.
+
+That supports the current practical next step:
+
+> Try degrading preview while recording before attempting deeper architecture changes.
+
+### What was tricky to build
+
+The tricky part here was choosing preview variants that were simple enough to interpret but still meaningful for the real system.
+
+I specifically wanted to separate:
+
+- branch existence without preview sink work,
+- JPEG without Go copy,
+- Go copy without JPEG,
+- the real current preview path,
+- and a plausible low-cost recording-mode preview.
+
+That gave the most interpretable matrix so far for the preview side.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/main.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go`
+
+The key review question is whether the within-run ordering is enough to justify production experiments with degraded recording-mode preview settings.
+
+### What should be done in the future
+
+- Re-run the ablation matrix to check stability of the relative ordering.
+- Try production-side preview degradation while recording.
+- Measure more cheap-preview profiles instead of just one.
+- Investigate whether some preview branch work can be shared or moved upstream.
+
+### Code review instructions
+
+Start with:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/15-preview-branch-ablation-summary.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/results/20260414-081748/01-summary.md`
+
+Re-run with:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+bash ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/run.sh
+```
+
+### Technical details
+
+The key within-run ordering was:
+
+```text
+recorder-only: 125.33%
+preview-fakesink-plus-recorder: 134.00%
+preview-jpeg-discard-plus-recorder: 137.83%
+preview-raw-copy-plus-recorder: 141.33%
+preview-current-plus-recorder: 152.33%
+preview-cheap-plus-recorder: 112.00%
+```
+
+That is why the next practical optimization idea is a degraded preview mode while recording.
