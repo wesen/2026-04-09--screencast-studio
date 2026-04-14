@@ -24,32 +24,34 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+	websocketConnections.Inc(nil)
+	defer websocketConnections.Dec(nil)
 
 	events, unsubscribe := s.events.Subscribe(64)
 	defer unsubscribe()
 
-	if err := writeProtoWebsocketJSON(conn, mapServerEvent(ServerEvent{
+	if err := writeWebsocketServerEvent(conn, ServerEvent{
 		Type:    "session.state",
 		Payload: mapRecordingSession(s.recordings.Current()),
-	})); err != nil {
+	}); err != nil {
 		return
 	}
-	if err := writeProtoWebsocketJSON(conn, mapServerEvent(ServerEvent{
+	if err := writeWebsocketServerEvent(conn, ServerEvent{
 		Type:    "preview.list",
 		Payload: mapPreviewListResponse(s.previews.List()),
-	})); err != nil {
+	}); err != nil {
 		return
 	}
-	if err := writeProtoWebsocketJSON(conn, mapServerEvent(ServerEvent{
+	if err := writeWebsocketServerEvent(conn, ServerEvent{
 		Type:    "telemetry.audio_meter",
 		Payload: mapAudioMeterSnapshot(s.telemetry.AudioMeter()),
-	})); err != nil {
+	}); err != nil {
 		return
 	}
-	if err := writeProtoWebsocketJSON(conn, mapServerEvent(ServerEvent{
+	if err := writeWebsocketServerEvent(conn, ServerEvent{
 		Type:    "telemetry.disk_status",
 		Payload: mapDiskTelemetrySnapshot(s.telemetry.DiskStatus()),
-	})); err != nil {
+	}); err != nil {
 		return
 	}
 
@@ -70,7 +72,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				if !ok {
 					return nil
 				}
-				if err := writeProtoWebsocketJSON(conn, mapServerEvent(event)); err != nil {
+				if err := writeWebsocketServerEvent(conn, event); err != nil {
 					return err
 				}
 			}
@@ -78,4 +80,14 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	})
 
 	_ = group.Wait()
+}
+
+func writeWebsocketServerEvent(conn *websocket.Conn, event ServerEvent) error {
+	labels := eventMetricLabels(event.Type)
+	if err := writeProtoWebsocketJSON(conn, mapServerEvent(event)); err != nil {
+		websocketEventWriteErrors.Inc(labels)
+		return err
+	}
+	websocketEventsWritten.Inc(labels)
+	return nil
 }

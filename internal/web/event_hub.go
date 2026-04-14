@@ -27,6 +27,8 @@ func (h *EventHub) Publish(event ServerEvent) {
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now()
 	}
+	labels := eventMetricLabels(event.Type)
+	eventHubEventsPublished.Inc(labels)
 
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -34,7 +36,9 @@ func (h *EventHub) Publish(event ServerEvent) {
 	for _, ch := range h.subscribers {
 		select {
 		case ch <- event:
+			eventHubEventsDelivered.Inc(labels)
 		default:
+			eventHubEventsDropped.Inc(labels)
 		}
 	}
 }
@@ -52,12 +56,14 @@ func (h *EventHub) Subscribe(buffer int) (<-chan ServerEvent, func()) {
 
 	ch := make(chan ServerEvent, buffer)
 	h.subscribers[id] = ch
+	eventHubSubscribers.Set(nil, int64(len(h.subscribers)))
 
 	unsubscribe := func() {
 		h.mu.Lock()
 		defer h.mu.Unlock()
 		if existing, ok := h.subscribers[id]; ok {
 			delete(h.subscribers, id)
+			eventHubSubscribers.Set(nil, int64(len(h.subscribers)))
 			close(existing)
 		}
 	}

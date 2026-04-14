@@ -65,8 +65,14 @@ def parse(path):
 first = parse(files[0])
 last = parse(files[-1])
 lines = []
-for key in sorted(k for k in last if k.startswith('screencast_studio_preview_http_')):
-    if 'clients{' in key:
+prefixes = (
+    'screencast_studio_preview_http_',
+    'screencast_studio_preview_frame_updates_total',
+    'screencast_studio_eventhub_',
+    'screencast_studio_websocket_',
+)
+for key in sorted(k for k in last if k.startswith(prefixes)):
+    if key in ('screencast_studio_eventhub_subscribers', 'screencast_studio_websocket_connections') or 'clients{' in key:
         lines.append(f'{key}\tlast={last[key]:.0f}')
     else:
         delta = last.get(key, 0.0) - first.get(key, 0.0)
