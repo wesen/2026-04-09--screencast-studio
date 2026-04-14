@@ -1,0 +1,23 @@
+Playwright browser network summary captured after the desktop/camera one-tab scenarios:
+
+[GET] http://127.0.0.1:7777/api/healthz => [200] OK
+[GET] http://127.0.0.1:7777/api/discovery => [200] OK
+[GET] http://127.0.0.1:7777/api/recordings/current => [200] OK
+[POST] http://127.0.0.1:7777/api/setup/normalize => [200] OK
+[POST] http://127.0.0.1:7777/api/setup/compile => [200] OK
+[POST] http://127.0.0.1:7777/api/previews/ensure => [200] OK
+[POST] http://127.0.0.1:7777/api/recordings/start => [200] OK
+[GET] http://127.0.0.1:7777/api/recordings/current => [200] OK
+[POST] http://127.0.0.1:7777/api/recordings/stop => [200] OK
+[GET] http://127.0.0.1:7777/api/recordings/current => [200] OK
+[POST] http://127.0.0.1:7777/api/previews/ensure => [200] OK
+[POST] http://127.0.0.1:7777/api/setup/normalize => [200] OK
+[POST] http://127.0.0.1:7777/api/setup/compile => [200] OK
+[POST] http://127.0.0.1:7777/api/recordings/start => [200] OK
+[GET] http://127.0.0.1:7777/api/recordings/current => [200] OK
+[POST] http://127.0.0.1:7777/api/recordings/stop => [200] OK
+[GET] http://127.0.0.1:7777/api/recordings/current => [200] OK
+
+Caveat:
+- The browser tool's network summary did not show the long-lived MJPEG GET stream lines directly in this capture, even though the page clearly had live preview images loaded.
+- For per-run preview-stream evidence, the server-side metrics (`preview_http_clients`, `frames_served_total`, `bytes_served_total`) were the more reliable artifact in this pass.

@@ -1,0 +1,123 @@
+2026-04-14T16:32:49.688057406-04:00 INF recording and preview managers already bound to serve runtime context event=runtime.context.bind
+2026-04-14T16:32:49.688139816-04:00 INF telemetry manager starting event=runtime.telemetry.start
+2026-04-14T16:32:49.688134301-04:00 INF web server starting addr=:7815 event=runtime.http.start initial_dsl_path= preview_limit=4 shutdown_timeout=5000 static_dir=
+2026-04-14T16:32:49.688204036-04:00 INF telemetry manager run loop starting event=telemetry.run.start
+2026-04-14T16:32:49.688245022-04:00 INF audio telemetry loop starting event=telemetry.audio.start interval=500
+2026-04-14T16:32:49.688275865-04:00 INF disk telemetry loop starting event=telemetry.disk.start interval=2000
+2026-04-14T16:32:50.679098177-04:00 INF http request duration=0.171577 method=GET path=/api/healthz
+2026-04-14T16:32:50.759393555-04:00 INF preview ensure requested dsl_bytes=756 event=preview.ensure.requested source_id=desktop-1
+2026-04-14T16:32:50.759600724-04:00 INF created preview worker event=preview.ensure.created preview_id=preview-909758a3cc65 source_id=desktop-1 source_name="Full Desktop" source_type=display
+2026-04-14T16:32:50.770794117-04:00 INF created shared gstreamer video source event=capture.gst.shared.acquire.created signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1 source_type=display
+2026-04-14T16:32:50.773805016-04:00 INF started shared gstreamer video source pipeline event=capture.gst.shared.start signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1 source_type=display
+2026-04-14T16:32:50.773872955-04:00 INF attached shared preview consumer consumer_count=1 consumer_id=preview-type-display-display--0--1 event=capture.gst.shared.preview.attach ref_count=1 signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1
+2026-04-14T16:32:50.773898354-04:00 INF started gstreamer preview session on shared source event=preview.gst.start shared_signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1 source_name="Full Desktop" source_type=display
+2026-04-14T16:32:50.77398543-04:00 INF http request duration=14.675902 method=POST path=/api/previews/ensure
+2026-04-14T16:32:50.774018808-04:00 INF preview session waiting event=preview.run.begin preview_id=preview-909758a3cc65 source_id=desktop-1
+2026-04-14T16:32:50.841956455-04:00 INF http request duration=0.068269 method=GET path=/api/previews/preview-909758a3cc65/screenshot
+2026-04-14T16:32:51.099213365-04:00 INF http request duration=0.229384 method=GET path=/api/previews/preview-909758a3cc65/screenshot
+2026-04-14T16:32:51.106571351-04:00 INF recording session starting event=recording.session.start grace_period=0 max_duration=6000 output_count=1 session_id=browser-preview-stream-recording-matrix warning_count=0
+2026-04-14T16:32:51.106691601-04:00 INF recording session worker running event=recording.session.run.begin session_id=browser-preview-stream-recording-matrix
+2026-04-14T16:32:51.106729267-04:00 INF http request duration=0.424059 method=POST path=/api/recordings/start
+2026-04-14T16:32:51.106767802-04:00 INF reused shared gstreamer video source event=capture.gst.shared.acquire.reused ref_count=2 signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1 source_type=display
+2026-04-14T16:32:51.10764604-04:00 INF http request duration=0.062244 method=GET path=/metrics
+2026-04-14T16:32:51.119052396-04:00 INF attached shared raw consumer consumer_id=raw-type-display-display--0--2 event=capture.gst.shared.raw.attach raw_consumer_count=1 ref_count=2 signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1
+2026-04-14T16:32:51.119127583-04:00 INF started experimental shared video recording bridge event=capture.gst.shared.recording_bridge.start fps=24 output_path="/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/05-desktop-preview-http-client-recording-matrix/results/20260414-163154/record-two-clients/output/Full Desktop.mov" signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1
+2026-04-14T16:32:51.119164087-04:00 INF started gstreamer recording pipeline event=recording.gst.start output_path="/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/05-desktop-preview-http-client-recording-matrix/results/20260414-163154/record-two-clients/output/Full Desktop.mov" process_label="Full Desktop" recording_mode=shared-source-bridge source_type=display
+2026-04-14T16:32:51.119192477-04:00 INF recording session state updated active=true event=recording.session.state reason="gstreamer recording session created" session_id=browser-preview-stream-recording-matrix state=starting
+2026-04-14T16:32:51.119228036-04:00 INF recording subprocess started event received event=recording.process.started output_path="/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/05-desktop-preview-http-client-recording-matrix/results/20260414-163154/record-two-clients/output/Full Desktop.mov" process_label="Full Desktop" session_id=browser-preview-stream-recording-matrix
+2026-04-14T16:32:51.119240966-04:00 INF recording session state updated active=true event=recording.session.state reason="all gstreamer recording pipelines started" session_id=browser-preview-stream-recording-matrix state=running
+2026-04-14T16:32:51.172906757-04:00 INF http request duration=0.089589 method=GET path=/metrics
+2026-04-14T16:32:51.187359575-04:00 INF http request duration=0.107083 method=GET path=/api/recordings/current
+2026-04-14T16:32:51.25486929-04:00 INF started experimental shared bridge recorder pipeline caps="video/x-raw, width=(int)2880, height=(int)1920, framerate=(fraction)24/1, pixel-aspect-ratio=(fraction)1/1, format=(string)I420" event=capture.gst.shared.bridge_recorder.start fps=24 output_path="/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/05-desktop-preview-http-client-recording-matrix/results/20260414-163154/record-two-clients/output/Full Desktop.mov"
+2026-04-14T16:32:51.254956591-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=1 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=0
+2026-04-14T16:32:51.303970089-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=10 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=374.999994
+2026-04-14T16:32:51.388330144-04:00 INF http request duration=0.059011 method=GET path=/api/recordings/current
+2026-04-14T16:32:51.589568613-04:00 INF http request duration=0.088843 method=GET path=/api/recordings/current
+2026-04-14T16:32:51.627425049-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=20 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=791.666654
+2026-04-14T16:32:51.790779325-04:00 INF http request duration=0.058411 method=GET path=/api/recordings/current
+2026-04-14T16:32:51.991679382-04:00 INF http request duration=0.067453 method=GET path=/api/recordings/current
+2026-04-14T16:32:52.047867288-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=30 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=1208.333314
+2026-04-14T16:32:52.180237439-04:00 INF http request duration=0.100824 method=GET path=/metrics
+2026-04-14T16:32:52.19259416-04:00 INF http request duration=0.056723 method=GET path=/api/recordings/current
+2026-04-14T16:32:52.393481747-04:00 INF http request duration=0.059958 method=GET path=/api/recordings/current
+2026-04-14T16:32:52.467630957-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=40 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=1624.999974
+2026-04-14T16:32:52.594446225-04:00 INF http request duration=0.06393 method=GET path=/api/recordings/current
+2026-04-14T16:32:52.795252773-04:00 INF http request duration=0.050805 method=GET path=/api/recordings/current
+2026-04-14T16:32:52.877409377-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=50 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=2041.666634
+2026-04-14T16:32:52.996002517-04:00 INF http request duration=0.073613 method=GET path=/api/recordings/current
+2026-04-14T16:32:53.187304104-04:00 INF http request duration=0.099022 method=GET path=/metrics
+2026-04-14T16:32:53.196899638-04:00 INF http request duration=0.078727 method=GET path=/api/recordings/current
+2026-04-14T16:32:53.293908178-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=60 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=2458.333294
+2026-04-14T16:32:53.397712948-04:00 INF http request duration=0.058314 method=GET path=/api/recordings/current
+2026-04-14T16:32:53.598553604-04:00 INF http request duration=0.079769 method=GET path=/api/recordings/current
+2026-04-14T16:32:53.710557283-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=70 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=2874.999954
+2026-04-14T16:32:53.799465142-04:00 INF http request duration=0.085871 method=GET path=/api/recordings/current
+2026-04-14T16:32:54.000299932-04:00 INF http request duration=0.054353 method=GET path=/api/recordings/current
+2026-04-14T16:32:54.127239854-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=80 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=3291.666614
+2026-04-14T16:32:54.195563309-04:00 INF http request duration=0.092975 method=GET path=/metrics
+2026-04-14T16:32:54.200992851-04:00 INF http request duration=0.051 method=GET path=/api/recordings/current
+2026-04-14T16:32:54.401898005-04:00 INF http request duration=0.081774 method=GET path=/api/recordings/current
+2026-04-14T16:32:54.543906982-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=90 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=3708.333274
+2026-04-14T16:32:54.602824034-04:00 INF http request duration=0.078863 method=GET path=/api/recordings/current
+2026-04-14T16:32:54.803557099-04:00 INF http request duration=0.048839 method=GET path=/api/recordings/current
+2026-04-14T16:32:54.960612639-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=100 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=4124.999934
+2026-04-14T16:32:55.004486492-04:00 INF http request duration=0.10302 method=GET path=/api/recordings/current
+2026-04-14T16:32:55.20301801-04:00 INF http request duration=0.094095 method=GET path=/metrics
+2026-04-14T16:32:55.205209404-04:00 INF http request duration=0.047515 method=GET path=/api/recordings/current
+2026-04-14T16:32:55.377227996-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=110 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=4541.666594
+2026-04-14T16:32:55.405872053-04:00 INF http request duration=0.056465 method=GET path=/api/recordings/current
+2026-04-14T16:32:55.60664224-04:00 INF http request duration=0.058148 method=GET path=/api/recordings/current
+2026-04-14T16:32:55.793909154-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=120 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=4958.333254
+2026-04-14T16:32:55.807631682-04:00 INF http request duration=0.081167 method=GET path=/api/recordings/current
+2026-04-14T16:32:56.00876135-04:00 INF http request duration=0.054933 method=GET path=/api/recordings/current
+2026-04-14T16:32:56.209689128-04:00 INF http request duration=0.052952 method=GET path=/api/recordings/current
+2026-04-14T16:32:56.210545328-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=130 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=5374.999914
+2026-04-14T16:32:56.211486341-04:00 INF http request duration=0.088378 method=GET path=/metrics
+2026-04-14T16:32:56.410356685-04:00 INF http request duration=0.059766 method=GET path=/api/recordings/current
+2026-04-14T16:32:56.611356246-04:00 INF http request duration=0.055337 method=GET path=/api/recordings/current
+2026-04-14T16:32:56.627301623-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=140 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=5791.666574
+2026-04-14T16:32:56.812832281-04:00 INF http request duration=0.058326 method=GET path=/api/recordings/current
+2026-04-14T16:32:57.013577635-04:00 INF http request duration=0.065463 method=GET path=/api/recordings/current
+2026-04-14T16:32:57.044055956-04:00 INF pushed buffer into experimental shared bridge recorder buffer_count=150 duration=41.666666 event=capture.gst.shared.bridge_recorder.push pts=6208.333234
+2026-04-14T16:32:57.106950608-04:00 INF recording session state updated active=true event=recording.session.state reason="max duration reached after 6s" session_id=browser-preview-stream-recording-matrix state=stopping
+2026-04-14T16:32:57.107224031-04:00 INF detached shared raw consumer consumer_id=raw-type-display-display--0--2 event=capture.gst.shared.raw.detach raw_consumer_count=0 signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1
+2026-04-14T16:32:57.107279897-04:00 INF stopping experimental shared bridge recorder buffer_count=151 event=capture.gst.shared.bridge_recorder.stop
+2026-04-14T16:32:57.214681363-04:00 INF http request duration=0.148586 method=GET path=/api/recordings/current
+2026-04-14T16:32:57.416271612-04:00 INF http request duration=0.091177 method=GET path=/api/recordings/current
+2026-04-14T16:32:57.620501204-04:00 INF http request duration=0.105229 method=GET path=/api/recordings/current
+2026-04-14T16:32:57.785385254-04:00 INF recording session state updated active=false event=recording.session.state reason="max duration reached after 6s" session_id=browser-preview-stream-recording-matrix state=finished
+2026-04-14T16:32:57.785471481-04:00 INF recording session finished event=recording.session.finish finished_at=2026-04-14T16:32:57.785378815-04:00 reason="max duration reached after 6s" session_id=browser-preview-stream-recording-matrix started_at=2026-04-14T16:32:51.119182755-04:00 state=finished
+2026-04-14T16:32:57.8221881-04:00 INF http request duration=0.093721 method=GET path=/api/recordings/current
+2026-04-14T16:32:57.838479412-04:00 INF http request duration=6733.891065 method=GET path=/api/previews/preview-909758a3cc65/mjpeg
+2026-04-14T16:32:57.839311054-04:00 INF http request duration=6734.725798 method=GET path=/api/previews/preview-909758a3cc65/mjpeg
+2026-04-14T16:33:00.107172097-04:00 INF http request duration=0.136903 method=GET path=/api/previews/preview-909758a3cc65/screenshot
+2026-04-14T16:33:00.111812294-04:00 INF http request duration=0.077306 method=GET path=/api/previews
+2026-04-14T16:33:00.228313301-04:00 INF audio telemetry loop exiting event=telemetry.audio.exit reason="context canceled"
+2026-04-14T16:33:00.228313302-04:00 INF disk telemetry loop exiting event=telemetry.disk.exit reason="context canceled"
+2026-04-14T16:33:00.228379112-04:00 INF telemetry manager run loop exited event=telemetry.run.exit reason="context canceled"
+2026-04-14T16:33:00.228409916-04:00 INF telemetry manager exited event=runtime.telemetry.exit reason="context canceled"
+2026-04-14T16:33:00.228314491-04:00 INF runtime shutdown triggered event=runtime.shutdown.begin reason="context canceled" shutdown_timeout=5000
+2026-04-14T16:33:00.228425208-04:00 INF http server shutdown starting event=runtime.http.shutdown.begin reason="context canceled"
+2026-04-14T16:33:00.228484052-04:00 INF http server exited cleanly addr=:7815 event=runtime.http.exit
+2026-04-14T16:33:00.228512456-04:00 INF http server shutdown finished event=runtime.http.shutdown.done reason="context canceled"
+2026-04-14T16:33:00.228532126-04:00 INF recording manager shutdown starting event=runtime.recordings.shutdown.begin
+2026-04-14T16:33:00.228543302-04:00 INF recording manager shutdown starting active=false event=recording.shutdown.begin session_id=browser-preview-stream-recording-matrix state=finished
+2026-04-14T16:33:00.228566611-04:00 INF recording manager shutdown finished event=recording.shutdown.done session_id=browser-preview-stream-recording-matrix
+2026-04-14T16:33:00.228578563-04:00 INF recording manager shutdown finished event=runtime.recordings.shutdown.done
+2026-04-14T16:33:00.228587409-04:00 INF preview manager shutdown starting event=runtime.previews.shutdown.begin
+2026-04-14T16:33:00.228570655-04:00 INF detached shared preview consumer consumer_count=0 consumer_id=preview-type-display-display--0--1 event=capture.gst.shared.preview.detach signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1
+2026-04-14T16:33:00.228598136-04:00 INF preview manager shutdown starting event=preview.shutdown.begin preview_count=1
+2026-04-14T16:33:00.228610443-04:00 INF preview manager requested preview cancellation event=preview.shutdown.cancel preview_id=preview-909758a3cc65 source_id=desktop-1
+2026-04-14T16:33:00.2286175-04:00 INF preview finished event=preview.finish preview_id=preview-909758a3cc65 reason="shutdown requested" source_id=desktop-1 state=finished
+2026-04-14T16:33:00.228638901-04:00 INF removing preview from manager maps event=preview.cleanup preview_id=preview-909758a3cc65 signature=909758a3cc65bd0e39a108375a740be6a0bc4bd5
+2026-04-14T16:33:00.228648903-04:00 INF preview shutdown wait completed event=preview.shutdown.wait.done preview_id=preview-909758a3cc65 remaining=0 source_id=desktop-1
+2026-04-14T16:33:00.228659277-04:00 INF preview manager shutdown finished event=preview.shutdown.done preview_count=1
+2026-04-14T16:33:00.228666961-04:00 INF preview manager shutdown finished event=runtime.previews.shutdown.done
+2026-04-14T16:33:00.2286719-04:00 INF waiting for runtime participant to exit event=runtime.participant.wait.begin participant="http server goroutine"
+2026-04-14T16:33:00.22868081-04:00 INF runtime participant exited event=runtime.participant.wait.done participant="http server goroutine"
+2026-04-14T16:33:00.228686611-04:00 INF waiting for telemetry goroutine to exit event=runtime.telemetry.wait.begin
+2026-04-14T16:33:00.228691435-04:00 INF waiting for runtime participant to exit event=runtime.participant.wait.begin participant="telemetry goroutine"
+2026-04-14T16:33:00.228696933-04:00 INF runtime participant exited event=runtime.participant.wait.done participant="telemetry goroutine"
+2026-04-14T16:33:00.228702294-04:00 INF telemetry goroutine exited event=runtime.telemetry.wait.done
+2026-04-14T16:33:00.228708911-04:00 INF runtime shutdown component summary event=runtime.shutdown.components recording_active=false recording_session_id=browser-preview-stream-recording-matrix remaining_previews=0
+2026-04-14T16:33:00.228722722-04:00 INF server runtime exited cleanly event=runtime.shutdown.summary

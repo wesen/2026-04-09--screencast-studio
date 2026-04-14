@@ -27,7 +27,7 @@ RelatedFiles:
       Note: New metrics registry will be extended for browser-preview observability
 ExternalSources: []
 Summary: Ticket for investigating the browser-connected preview streaming path and measuring why the real Studio page can drive the server much hotter than earlier backend/API-only performance matrices suggested.
-LastUpdated: 2026-04-14T15:44:00-04:00
+LastUpdated: 2026-04-14T17:05:00-04:00
 WhatFor: Track the browser preview streaming investigation, its measurement plan, and the final report.
 WhenToUse: Start here when working on browser-preview serving overhead, frontend preview lifecycle performance, or MJPEG/metrics measurement work.
 ---
@@ -68,9 +68,13 @@ Current deliverable status:
 - preview-serving metrics have been added for active MJPEG clients, stream starts/finishes, frames, bytes, flushes, frame updates, and preview ensure/release events
 - focused metrics tests and `/metrics` validation are complete
 - initial runtime helper scripts now exist for local server restart and `/metrics` sampling, with the first saved smoke result under `scripts/results/20260414-160358/`
-- a first desktop preview HTTP-client baseline matrix has been added and run under `scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/`
-- early baseline result: 0 and 1 MJPEG client looked similar in this short run, while 2 clients pushed server CPU higher
-- real browser-tab matrix harnesses are still pending
+- a first desktop preview HTTP-client baseline matrix was added and run under `scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/`
+- a larger fresh-server HTTP-client matrix with recording now exists under `scripts/05-desktop-preview-http-client-recording-matrix/results/20260414-163154/`
+- real browser scenario scripts now exist under `scripts/08-playwright-browser-matrix/`
+- live browser-backed measurements now exist for desktop one-tab, desktop two-tab, and desktop-plus-camera one-tab scenarios under `scripts/results/20260414-163610/`, `20260414-163951/`, `20260414-164457/`, `20260414-164535/`, `20260414-164657/`, and `20260414-164720/`
+- strongest current finding: the **browser-connected recording** path is the missing hot slice, with desktop one-tab preview+recording around `410.60%` avg CPU and desktop two-tab preview+recording around `432.97%`, far above the fresh-server plain-MJPEG-client recording baseline around `158–165%`
+- a first human-readable findings note now exists at `scripts/09-browser-preview-matrix-findings-summary.md`
+- camera-only browser-tab scenarios are still pending
 
 ## Tasks
 

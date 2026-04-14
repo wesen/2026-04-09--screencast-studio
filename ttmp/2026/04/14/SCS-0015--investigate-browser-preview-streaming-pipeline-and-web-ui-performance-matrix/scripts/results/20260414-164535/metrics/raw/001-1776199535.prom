@@ -1,0 +1,47 @@
+# HELP screencast_studio_gst_audio_level_parse_failures_total Total audio level message parse failures in the GStreamer recording runtime.
+# TYPE screencast_studio_gst_audio_level_parse_failures_total counter
+screencast_studio_gst_audio_level_parse_failures_total{reason="extract_failed",rms_type="unsafe.Pointer"} 3203
+# HELP screencast_studio_gst_shared_bridge_recorder_appsrc_pushed_total Total buffers successfully pushed from the shared video recorder bridge worker into appsrc.
+# TYPE screencast_studio_gst_shared_bridge_recorder_appsrc_pushed_total counter
+screencast_studio_gst_shared_bridge_recorder_appsrc_pushed_total{source_type="display"} 3924
+# HELP screencast_studio_gst_shared_bridge_recorder_buffers_copied_total Total GStreamer buffers copied by the shared video recorder bridge before enqueueing.
+# TYPE screencast_studio_gst_shared_bridge_recorder_buffers_copied_total counter
+screencast_studio_gst_shared_bridge_recorder_buffers_copied_total{source_type="display"} 21889
+# HELP screencast_studio_gst_shared_bridge_recorder_dropped_total Total copied buffers dropped because the shared video recorder bridge async queue was full or closed.
+# TYPE screencast_studio_gst_shared_bridge_recorder_dropped_total counter
+screencast_studio_gst_shared_bridge_recorder_dropped_total{source_type="display"} 17965
+# HELP screencast_studio_gst_shared_bridge_recorder_enqueued_total Total copied buffers successfully enqueued into the shared video recorder bridge async queue.
+# TYPE screencast_studio_gst_shared_bridge_recorder_enqueued_total counter
+screencast_studio_gst_shared_bridge_recorder_enqueued_total{source_type="display"} 3924
+# HELP screencast_studio_gst_shared_bridge_recorder_samples_received_total Total samples received by the shared video recorder bridge from the upstream appsink callback.
+# TYPE screencast_studio_gst_shared_bridge_recorder_samples_received_total counter
+screencast_studio_gst_shared_bridge_recorder_samples_received_total{source_type="display"} 21889
+# HELP screencast_studio_gst_shared_bridge_recorder_worker_handled_total Total buffers handled by the shared video recorder bridge worker goroutine.
+# TYPE screencast_studio_gst_shared_bridge_recorder_worker_handled_total counter
+screencast_studio_gst_shared_bridge_recorder_worker_handled_total{source_type="display"} 3924
+# HELP screencast_studio_preview_ensures_total Total preview ensure attempts handled by PreviewManager.
+# TYPE screencast_studio_preview_ensures_total counter
+screencast_studio_preview_ensures_total{source_type="display",result="created"} 1
+screencast_studio_preview_ensures_total{source_type="display",result="reused"} 1
+# HELP screencast_studio_preview_frame_updates_total Total preview frame updates stored by PreviewManager.
+# TYPE screencast_studio_preview_frame_updates_total counter
+screencast_studio_preview_frame_updates_total{source_type="display"} 4952
+# HELP screencast_studio_preview_http_bytes_served_total Total bytes written to HTTP MJPEG preview clients, including multipart framing.
+# TYPE screencast_studio_preview_http_bytes_served_total counter
+screencast_studio_preview_http_bytes_served_total{source_type="display"} 1620772936
+# HELP screencast_studio_preview_http_clients Current number of active HTTP MJPEG preview clients connected to the server.
+# TYPE screencast_studio_preview_http_clients gauge
+screencast_studio_preview_http_clients{source_type="display"} 2
+# HELP screencast_studio_preview_http_flushes_total Total HTTP flush calls performed while serving MJPEG preview streams.
+# TYPE screencast_studio_preview_http_flushes_total counter
+screencast_studio_preview_http_flushes_total{source_type="display"} 5364
+# HELP screencast_studio_preview_http_frames_served_total Total JPEG preview frames written to HTTP MJPEG clients.
+# TYPE screencast_studio_preview_http_frames_served_total counter
+screencast_studio_preview_http_frames_served_total{source_type="display"} 5364
+# HELP screencast_studio_preview_http_streams_finished_total Total HTTP MJPEG preview streams finished by the server.
+# TYPE screencast_studio_preview_http_streams_finished_total counter
+# HELP screencast_studio_preview_http_streams_started_total Total HTTP MJPEG preview streams started by the server.
+# TYPE screencast_studio_preview_http_streams_started_total counter
+screencast_studio_preview_http_streams_started_total{source_type="display"} 2
+# HELP screencast_studio_preview_releases_total Total preview release requests handled by PreviewManager.
+# TYPE screencast_studio_preview_releases_total counter

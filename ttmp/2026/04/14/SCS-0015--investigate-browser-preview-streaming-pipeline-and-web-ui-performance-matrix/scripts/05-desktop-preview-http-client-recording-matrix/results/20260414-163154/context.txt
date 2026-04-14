@@ -1,0 +1,5 @@
+repo=/home/manuel/code/wesen/2026-04-09--screencast-studio
+display=:0
+duration=6
+scenarios=preview-no-client:0:0 preview-one-client:1:0 preview-two-clients:2:0 record-no-client:0:1 record-one-client:1:1 record-two-clients:2:1
+server_bin=/tmp/scs-0015-http-recording-matrix-CvYTMt

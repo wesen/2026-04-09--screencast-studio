@@ -1,0 +1,11 @@
+screencast_studio_preview_http_bytes_served_total{source_type="camera"}	delta=3815988
+screencast_studio_preview_http_bytes_served_total{source_type="display"}	delta=8108165
+screencast_studio_preview_http_clients{source_type="camera"}	last=1
+screencast_studio_preview_http_clients{source_type="display"}	last=1
+screencast_studio_preview_http_flushes_total{source_type="camera"}	delta=27
+screencast_studio_preview_http_flushes_total{source_type="display"}	delta=31
+screencast_studio_preview_http_frames_served_total{source_type="camera"}	delta=27
+screencast_studio_preview_http_frames_served_total{source_type="display"}	delta=31
+screencast_studio_preview_http_streams_finished_total{source_type="display",reason="client_done"}	delta=0
+screencast_studio_preview_http_streams_started_total{source_type="camera"}	delta=0
+screencast_studio_preview_http_streams_started_total{source_type="display"}	delta=0

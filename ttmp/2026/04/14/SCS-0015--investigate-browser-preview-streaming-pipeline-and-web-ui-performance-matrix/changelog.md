@@ -135,3 +135,92 @@ That is not yet enough to explain the full web-UI problem, but it does support o
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/one-client/01-summary.md — one-client desktop preview baseline
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/two-clients/01-summary.md — two-client desktop preview baseline
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/04-desktop-preview-http-client-baseline-summary.md — human-readable interpretation note for the first baseline run
+
+Implemented the next SCS-0015 script bundle in commit `ad0523a5d8d8f1a891d9187577402f528491b691` (`Add browser preview performance matrix harnesses`).
+
+This slice added four major pieces:
+
+1. a larger fresh-server desktop preview matrix that includes recording,
+2. a live-server sampler for real browser scenarios,
+3. a reusable Playwright script bundle for one-tab, two-tab, recording, and camera-add scenarios,
+4. a small cleanup to the earlier HTTP-client baseline harness so it no longer writes a built server binary into the saved result tree.
+
+The new measurement scripts are:
+
+- `scripts/05-desktop-preview-http-client-recording-matrix/run.sh`
+- `scripts/07-live-server-browser-scenario-sample.sh`
+- `scripts/08-playwright-browser-matrix/00-usage.txt`
+- `scripts/08-playwright-browser-matrix/01-open-studio-and-wait-desktop.js`
+- `scripts/08-playwright-browser-matrix/02-open-second-desktop-tab.js`
+- `scripts/08-playwright-browser-matrix/03-start-recording.js`
+- `scripts/08-playwright-browser-matrix/04-stop-recording.js`
+- `scripts/08-playwright-browser-matrix/05-add-camera-if-needed.js`
+- `scripts/08-playwright-browser-matrix/06-capture-browser-preview-state.js`
+
+I then used those scripts to produce the first larger result set.
+
+### Fresh-server HTTP-client matrix with recording
+
+Saved under:
+
+- `scripts/05-desktop-preview-http-client-recording-matrix/results/20260414-163154/`
+
+Key CPU results:
+
+- `preview-no-client` → `15.67%`
+- `preview-one-client` → `18.11%`
+- `preview-two-clients` → `19.22%`
+- `record-no-client` → `162.22%`
+- `record-one-client` → `158.56%`
+- `record-two-clients` → `165.00%`
+
+That matrix says plain MJPEG client fan-out alone does **not** explain the user-observed browser-path `~400%` CPU behavior.
+
+### Live browser-backed measurements against the real Studio page
+
+Saved under:
+
+- `scripts/results/20260414-163610/` — desktop, one tab, preview only
+- `scripts/results/20260414-163951/` — desktop, one tab, preview + recording
+- `scripts/results/20260414-164457/` — desktop, two tabs, preview only
+- `scripts/results/20260414-164535/` — desktop, two tabs, preview + recording
+- `scripts/results/20260414-164657/` — desktop + camera, one tab, preview only
+- `scripts/results/20260414-164720/` — desktop + camera, one tab, preview + recording
+- `scripts/results/20260414-165126/` — short validation rerun of the improved browser sampler with direct metric-delta output
+
+Key CPU results from the browser-backed scenarios:
+
+- desktop, one tab, preview only → `14.20%`
+- desktop, one tab, preview + recording → `410.60%`
+- desktop, two tabs, preview only → `12.69%`
+- desktop, two tabs, preview + recording → `432.97%`
+- desktop + camera, one tab, preview only → `20.10%`
+- desktop + camera, one tab, preview + recording → `343.71%`
+
+This is the strongest current SCS-0015 finding: the **real browser-connected recording path** is dramatically hotter than the fresh-server plain-MJPEG-client baseline.
+
+The clearest side-by-side comparison is:
+
+- fresh server, desktop preview + recording + one plain MJPEG client → `158.56%` avg CPU
+- live server, desktop preview + recording + one real browser tab → `410.60%` avg CPU
+
+I also saved additional human-readable/browser-evidence files:
+
+- `scripts/09-browser-preview-matrix-findings-summary.md`
+- `scripts/10-browser-session-network-summary.txt`
+- `scripts/11-browser-playwright-state-desktop-camera.json`
+
+The findings note records another important nuance: during the browser recording runs, the per-run MJPEG frame/byte deltas were relatively modest compared with preview-only runs. That means the browser-path heat is **not** explained simply by “the server had to send vastly more JPEG data.” The likely explanation is a combination of browser-connected lifecycle behavior plus the already-expensive upstream preview-plus-recording interaction.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/05-desktop-preview-http-client-recording-matrix/run.sh — larger fresh-server matrix for preview-only and preview-plus-recording across 0/1/2 MJPEG clients
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/07-live-server-browser-scenario-sample.sh — live server sampler for browser-backed scenarios, including per-run preview-metric deltas in the newer runs
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/08-playwright-browser-matrix/01-open-studio-and-wait-desktop.js — opens the Studio page and waits for the desktop preview to load
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/08-playwright-browser-matrix/02-open-second-desktop-tab.js — second-tab helper for the multi-tab matrix slice
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/08-playwright-browser-matrix/03-start-recording.js — browser-side recording start helper
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/08-playwright-browser-matrix/04-stop-recording.js — browser-side recording stop helper
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/08-playwright-browser-matrix/05-add-camera-if-needed.js — browser-side camera-add helper used for the desktop+camera scenarios
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/09-browser-preview-matrix-findings-summary.md — first human-readable combined findings note for the larger matrix pass
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/10-browser-session-network-summary.txt — raw browser-tool network summary saved as a ticket artifact
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/11-browser-playwright-state-desktop-camera.json — saved browser-side preview state showing both desktop and camera previews loaded successfully

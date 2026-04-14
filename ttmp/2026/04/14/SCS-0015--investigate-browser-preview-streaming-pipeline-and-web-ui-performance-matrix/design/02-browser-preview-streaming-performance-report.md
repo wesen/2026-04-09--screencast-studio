@@ -12,56 +12,208 @@ Topics:
 DocType: design-doc
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/05-desktop-preview-http-client-recording-matrix/run.sh
+      Note: Fresh-server preview and recording MJPEG-client matrix harness
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/07-live-server-browser-scenario-sample.sh
+      Note: Live browser-backed server sampler used for the real Studio-page measurements
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/09-browser-preview-matrix-findings-summary.md
+      Note: Human-readable first findings summary for the larger matrix pass
 ExternalSources: []
-Summary: Report skeleton for the browser preview streaming investigation. Fill this in after the new browser-driven measurement matrix has been run and summarized.
-LastUpdated: 2026-04-14T15:43:00-04:00
-WhatFor: Hold the final matrix results and engineering conclusions for SCS-0015.
-WhenToUse: Update this after the measurement scripts and metrics instrumentation exist and the browser-driven experiments have been run.
+Summary: First substantive report draft for the browser preview streaming investigation, based on the fresh-server HTTP-client matrix and the first live browser-backed measurement pass.
+LastUpdated: 2026-04-14T17:08:00-04:00
+WhatFor: Hold the matrix results and engineering conclusions for SCS-0015 as the browser-connected preview investigation progresses.
+WhenToUse: Read after the first measurement pass to understand what is already proven, what remains pending, and what optimization directions are now justified.
 ---
+
 
 # Browser preview streaming performance report
 
 ## Status
 
-This is a report scaffold. Populate it after the browser-preview metrics and matrix scripts have been implemented and run.
+This report is now partially populated from the first real measurement pass. It is still a draft because camera-only browser scenarios and deeper handler-path instrumentation are not finished yet.
 
 ## Executive summary
 
-_TODO_
+The strongest current SCS-0015 finding is that the **real browser-connected recording path** is dramatically hotter than the fresh-server plain-MJPEG-client baseline.
+
+The clearest side-by-side comparison is:
+
+- fresh dedicated server, desktop preview + recording + one plain MJPEG client → `158.56%` avg CPU
+- live shared `:7777` server, desktop preview + recording + one real browser tab → `410.60%` avg CPU
+- live shared `:7777` server, desktop preview + recording + two real browser tabs → `432.97%` avg CPU
+
+This means the missing hot slice was real: earlier API-only and curl-like measurements were not enough to explain the browser-connected Studio-page behavior the user reported.
+
+At the same time, the browser-backed recording runs did **not** show proportionally huge MJPEG frame/byte deltas. That suggests the browser-path heat is not explained simply by “the server had to send vastly more JPEG bytes.” The current evidence points more toward a combination of:
+
+- expensive upstream preview + recording interaction,
+- browser-connected consumer behavior that differs materially from a dumb `curl` reader,
+- and possibly frontend/browser lifecycle effects on the preview transport.
 
 ## Measurement environment
 
-_TODO_
+- Repository: `/home/manuel/code/wesen/2026-04-09--screencast-studio`
+- Date: `2026-04-14`
+- Dedicated fresh-server matrix used temporary built binaries on fresh ports.
+- Live browser-backed runs used the real local server on `http://127.0.0.1:7777`.
+- CPU measurement used `pidstat` against the real listening server PID.
+- Metrics sampling used the ticket-local `/metrics` sampler.
+- Browser interaction used the ticket-local Playwright code snippets executed through the browser tool.
 
 ## Scenario matrix
 
-_TODO_
+### Fresh dedicated-server HTTP-client matrix
+
+Saved under:
+
+- `scripts/05-desktop-preview-http-client-recording-matrix/results/20260414-163154/`
+
+Measured scenarios:
+
+| Scenario | Avg CPU |
+| --- | ---: |
+| preview-no-client | 15.67% |
+| preview-one-client | 18.11% |
+| preview-two-clients | 19.22% |
+| record-no-client | 162.22% |
+| record-one-client | 158.56% |
+| record-two-clients | 165.00% |
+
+### Live browser-backed scenarios
+
+Saved under:
+
+- `scripts/results/20260414-163610/` — desktop, one tab, preview only
+- `scripts/results/20260414-163951/` — desktop, one tab, preview + recording
+- `scripts/results/20260414-164457/` — desktop, two tabs, preview only
+- `scripts/results/20260414-164535/` — desktop, two tabs, preview + recording
+- `scripts/results/20260414-164657/` — desktop + camera, one tab, preview only
+- `scripts/results/20260414-164720/` — desktop + camera, one tab, preview + recording
+
+Measured scenarios:
+
+| Scenario | Avg CPU |
+| --- | ---: |
+| desktop, one tab, preview only | 14.20% |
+| desktop, one tab, preview + recording | 410.60% |
+| desktop, two tabs, preview only | 12.69% |
+| desktop, two tabs, preview + recording | 432.97% |
+| desktop + camera, one tab, preview only | 20.10% |
+| desktop + camera, one tab, preview + recording | 343.71% |
 
 ## Raw result locations
 
-_TODO_
+### Script bundles
+
+- `scripts/05-desktop-preview-http-client-recording-matrix/run.sh`
+- `scripts/07-live-server-browser-scenario-sample.sh`
+- `scripts/08-playwright-browser-matrix/`
+
+### Human-readable summary artifacts
+
+- `scripts/09-browser-preview-matrix-findings-summary.md`
+- `scripts/10-browser-session-network-summary.txt`
+- `scripts/11-browser-playwright-state-desktop-camera.json`
 
 ## Key findings
 
-_TODO_
+### 1. Plain MJPEG client fan-out is not enough to explain the browser-path spike
+
+The fresh-server recording results stayed in a narrow band:
+
+- `record-no-client` → `162.22%`
+- `record-one-client` → `158.56%`
+- `record-two-clients` → `165.00%`
+
+That means simple HTTP-client fan-out alone does not explain the much hotter real browser runs.
+
+### 2. The browser-connected recording path is the missing hot slice
+
+The desktop one-tab recording run on the real Studio page reached `410.60%` avg CPU, and the desktop two-tab recording run reached `432.97%` avg CPU.
+
+That is a major gap relative to the fresh-server plain-client matrix and matches the earlier user report that the real web UI could push the server into a much hotter regime.
+
+### 3. More browser tabs amplify the hot slice, but they do not fully explain it
+
+Going from one browser tab to two browser tabs raised desktop preview+recording from `410.60%` to `432.97%` avg CPU. That matters, but the bigger story is that even **one** real tab is already far hotter than the plain-client baseline.
+
+### 4. The browser recording runs were hot even without huge MJPEG-byte deltas
+
+Per-run deltas computed from the first and last saved metric snapshots showed that browser recording runs served relatively modest numbers of frames and bytes compared with preview-only runs.
+
+Examples:
+
+- desktop, one tab, preview only:
+  - frames served delta: `71`
+  - bytes served delta: `23,498,705`
+- desktop, one tab, preview + recording:
+  - frames served delta: `28`
+  - bytes served delta: `3,198,438`
+
+That means the browser-path heat is not explained simply by larger MJPEG output volume.
+
+### 5. Desktop + camera changes the mix but does not invalidate the browser finding
+
+Desktop + camera one-tab preview-only was hotter than desktop-only preview-only (`20.10%` vs `14.20%`).
+
+Desktop + camera one-tab preview+recording reached `343.71%`, which is still extremely hot even though it did not exceed the desktop-only two-tab recording case.
 
 ## Comparison against earlier SCS-0014 backend-focused measurements
 
-_TODO_
+Earlier SCS-0014 work already showed that preview + recorder interaction on the shared source was expensive. But the most representative backend/API-only and curl-like measurements still did not show the same scale as the real browser path.
+
+The new SCS-0015 matrix explains why the user’s `~400%` CPU report did not line up with the earlier isolated results:
+
+- the backend-only work was measuring an important part of the system,
+- but the **browser-connected** path remained under-measured,
+- and that path really does enter a much hotter server CPU regime when recording is started from the Studio page.
 
 ## Metrics interpretation
 
-_TODO_
+The current preview-serving metrics are useful, but there is one important caveat:
+
+- the counters are cumulative across the live server lifetime,
+- so per-run interpretation depends on comparing the first and last snapshot inside a result directory.
+
+The improved browser sampler now emits `metric-deltas.txt` directly for newer runs. For the earlier browser-backed runs in this pass, the deltas were computed manually from the saved `.prom` snapshots.
+
+The most helpful current metrics are:
+
+- `screencast_studio_preview_http_clients`
+- `screencast_studio_preview_http_frames_served_total`
+- `screencast_studio_preview_http_bytes_served_total`
+- `screencast_studio_preview_http_flushes_total`
 
 ## Likely bottlenecks
 
-_TODO_
+Current best interpretation:
+
+1. **Upstream preview + recording interaction is still a major cost center.**
+2. **Real browser-connected preview consumption is materially different from a dumb HTTP reader.**
+3. **Simple MJPEG fan-out is only part of the story.**
+4. **Served-byte volume is not the whole explanation.**
+
+That points away from a simplistic “just lower JPEG quality” answer and toward deeper investigation of the browser-facing preview loop and the browser-connected shared-source workload.
 
 ## Recommended optimizations
 
-_TODO_
+Ranked by current confidence and likely value:
+
+1. **Add deeper handler/path instrumentation**
+   - preview write-loop timing,
+   - per-stream skip/drop reasons,
+   - blocked write/flush timing,
+   - maybe frame-age or stale-frame counters.
+2. **Complete the remaining browser matrix slices**
+   - especially camera-only one-tab preview and preview+recording.
+3. **Compare visible browser tabs with a more minimal/headless browser consumer**
+   - to separate UI-rendering effects from server-side streaming behavior.
+4. **Continue tuning the preview profile during recording**
+   - but do not assume JPEG byte reduction alone will solve the full browser-path spike.
 
 ## Risks and open questions
 
-_TODO_
+- Camera-only browser scenarios are still missing.
+- The browser tool’s request summary did not directly expose the long-lived MJPEG GET lines in the saved network note, so server-side metrics were the more reliable proof surface in this pass.
+- We still need a more explicit model of where the extra server CPU time is being spent inside the browser-connected recording path.

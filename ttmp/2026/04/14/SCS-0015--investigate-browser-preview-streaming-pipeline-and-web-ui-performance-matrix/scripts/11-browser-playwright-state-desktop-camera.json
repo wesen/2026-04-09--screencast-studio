@@ -1,0 +1,23 @@
+{
+  "action": "capture-browser-preview-state",
+  "recording": false,
+  "sourceCountText": "Sources (2)",
+  "previews": [
+    {
+      "alt": "Preview of desktop-1",
+      "src": "/api/previews/preview-18daabfb09b6/mjpeg",
+      "currentSrc": "http://127.0.0.1:7777/api/previews/preview-18daabfb09b6/mjpeg",
+      "complete": true,
+      "naturalWidth": 960,
+      "naturalHeight": 640
+    },
+    {
+      "alt": "Preview of laptop-camera-laptop-camera-usb-0000-00-14-0-7",
+      "src": "/api/previews/preview-dc54cc832d0f/mjpeg",
+      "currentSrc": "http://127.0.0.1:7777/api/previews/preview-dc54cc832d0f/mjpeg",
+      "complete": true,
+      "naturalWidth": 1280,
+      "naturalHeight": 720
+    }
+  ]
+}
