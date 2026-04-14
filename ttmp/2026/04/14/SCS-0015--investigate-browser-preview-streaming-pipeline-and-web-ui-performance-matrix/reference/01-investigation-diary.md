@@ -1,0 +1,279 @@
+---
+Title: Investigation diary
+Ticket: SCS-0015
+Status: active
+Topics:
+    - screencast-studio
+    - gstreamer
+    - video
+    - backend
+    - ui
+    - analysis
+DocType: reference
+Intent: long-term
+Owners: []
+RelatedFiles:
+    - Path: internal/web/handlers_preview.go
+      Note: |-
+        Browser-facing MJPEG streaming handler is the main backend boundary for this ticket
+        Main backend boundary for the new browser streaming investigation
+    - Path: internal/web/preview_manager.go
+      Note: |-
+        Preview lifecycle, reuse, and cached-frame fan-out behavior shape the browser streaming path
+        Preview cache and fan-out behavior shaped the first-step reasoning
+    - Path: internal/web/preview_metrics.go
+      Note: Metric-family definitions were added in the first code slice
+    - Path: ui/src/components/preview/PreviewStream.tsx
+      Note: |-
+        The actual browser media transport is an img tag pointed at the MJPEG endpoint
+        Proof that the browser path is plain img-plus-MJPEG rather than a richer transport
+    - Path: ui/src/pages/StudioPage.tsx
+      Note: |-
+        Frontend preview ensure/release lifecycle likely explains differences between API-only and browser-driven runs
+        Frontend preview lifecycle likely explains differences between browser-driven and API-only runs
+ExternalSources: []
+Summary: Diary for the browser preview streaming and web-UI performance investigation ticket.
+LastUpdated: 2026-04-14T15:42:00-04:00
+WhatFor: Record the chronology of how the browser preview streaming performance investigation was set up and how its conclusions are derived.
+WhenToUse: Read when continuing SCS-0015 and you need the exact reasoning, commands, and file boundaries used to define the new browser-streaming research track.
+---
+
+
+
+# Diary
+
+## Goal
+
+Capture the setup and evidence-backed planning for investigating the browser preview streaming path, especially the CPU gap between backend/API-only performance experiments and the much hotter real Studio page behavior.
+
+## Step 1: Created a dedicated ticket for the browser-connected preview path
+
+The previous performance work in SCS-0014 narrowed the strongest remaining cost center to the combined preview-plus-recorder case, but the user then reported an even hotter effect in the real web UI: server CPU shooting much higher when recording is started from the Studio page, including cases where desktop-only recording still runs much hotter through the browser path than earlier isolated matrices suggested. That was enough evidence to split browser streaming into its own dedicated ticket instead of continuing to overload SCS-0014.
+
+I created SCS-0015 specifically to investigate the browser preview transport and the real web-UI measurement gap. Since the user explicitly said they had closed the server while this setup work happened, I kept the first step offline-friendly: ticket scaffolding, current-state architecture mapping, and a concrete performance-matrix plan rather than pretending we could already produce runtime measurements.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Ok, let's create a new ticket to investigate the browser streaming part of the pipeline, and do a performance matrix analysis just as we did before, with a plan/analysis document, standalone experiments, and a proper report."
+
+**Assistant interpretation:** Create a new docmgr ticket focused on the browser-connected preview streaming path, with the same rigor as the earlier performance tickets: design doc, diary, scripts, measurements, and a report.
+
+**Inferred user intent:** Separate the unexplained browser/UI-specific CPU spike into its own investigation track so it can be measured and optimized systematically rather than mixed into the older recorder-focused work.
+
+### What I did
+
+- Ran:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+docmgr status --summary-only
+docmgr ticket create-ticket --ticket SCS-0015 --title "Investigate browser preview streaming pipeline and web UI performance matrix" --topics screencast-studio,gstreamer,video,backend,ui,analysis
+```
+
+- Confirmed the created workspace path:
+
+```text
+/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/
+```
+
+- Wrote the new primary design doc:
+  - `design/01-browser-preview-streaming-pipeline-analysis-and-performance-matrix-plan.md`
+- Wrote this diary:
+  - `reference/01-investigation-diary.md`
+- Planned a future proper report as part of the tasks/checklist rather than pretending it already exists.
+
+### Why
+
+The earlier tickets already did a strong job investigating backend preview/recording interaction. What was still missing was the explicit browser-connected path:
+
+- the MJPEG HTTP stream,
+- the `<img>` rendering model,
+- preview ensure/release behavior driven by the Studio page,
+- and possible amplification from stale or duplicate browser tabs.
+
+That is different enough from backend-only measurement that it deserves its own deliverable and experiment suite.
+
+### What worked
+
+- The new ticket workspace was created successfully.
+- The user’s clarified scope was specific enough that the first design doc could be evidence-based even before restarting the server.
+- The existing codebase already contains strong file boundaries for this investigation: preview handler, preview manager, GStreamer preview branch, frontend ensure/release logic, and preview rendering.
+
+### What didn't work
+
+Immediately after ticket creation, `docmgr doc add --ticket SCS-0015 ...` failed with:
+
+```text
+Error: failed to find ticket directory: ticket not found: SCS-0015
+```
+
+The workspace itself had been created correctly, so I continued by writing the initial docs directly into the created ticket path.
+
+### What I learned
+
+The browser-streaming investigation can be scoped much more cleanly now than it could earlier. We already know enough to state a concrete hypothesis:
+
+- the project has good backend/shared-runtime measurements,
+- but it does not yet have a proper matrix for **browser-attached MJPEG preview clients**,
+- and that missing slice is probably why the real Studio page still surprises us.
+
+### What was tricky to build
+
+The tricky part in this setup step was resisting the urge to over-claim. The user reported real browser-path CPU spikes, but with the server intentionally shut down during setup, it would have been misleading to pretend we had already confirmed the new hypothesis with fresh measurements. The right move here was to create a continuation-friendly investigation package first, then restart the runtime later for carefully staged experiments.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/design/01-browser-preview-streaming-pipeline-analysis-and-performance-matrix-plan.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+
+The main review question is whether the new ticket scope is correctly isolating the browser-connected delta rather than drifting back into generic recorder optimization.
+
+### What should be done in the future
+
+- Extend `/metrics` with browser-preview-serving metrics.
+- Build a browser-driven matrix harness under this ticket’s `scripts/` directory.
+- Compare no-browser, one-tab, and multi-tab runs while holding backend capture/recording constant.
+- Write the final report after results exist.
+
+### Code review instructions
+
+Start with the new design doc, then verify the main browser-path evidence in:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/pages/StudioPage.tsx`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/components/preview/PreviewStream.tsx`
+
+### Technical details
+
+The key current-state evidence gathered for the new ticket includes:
+
+- `internal/web/handlers_preview.go:79-149` — MJPEG is served as `multipart/x-mixed-replace` with a `100ms` polling ticker.
+- `internal/web/preview_manager.go:95-220` — PreviewManager caches the latest JPEG frame and exposes it to HTTP readers.
+- `pkg/media/gst/shared_video.go:492-560` — The shared preview branch already JPEG-encodes frames before they reach Go.
+- `ui/src/pages/StudioPage.tsx:531-592` — The Studio page ensures and releases previews based on active desired sources.
+- `ui/src/components/preview/PreviewStream.tsx:79-95` — The browser consumes previews via plain `<img src="/api/previews/{id}/mjpeg">`.
+
+## Step 2: Added the First Browser-Preview Metrics Slice and Committed It
+
+Once the ticket scope was clear, I started with observability rather than with another blind benchmark run. The browser-streaming question needs time-series evidence, so the first code slice was to make `/metrics` materially more useful for the preview-serving path. That meant both extending the tiny metrics package itself and wiring preview-serving counters/gauges into the real HTTP MJPEG handler and PreviewManager.
+
+I also used this slice to fold the initial metrics foundation into a clean commit, because the earlier runtime metrics changes were still only local modifications. After the code was in place, I ran focused tests plus full repo tests and committed the slice as one code change before touching ticket bookkeeping.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 1)
+
+**Assistant interpretation:** Begin the new browser-streaming investigation incrementally, keep the work grouped into reviewable slices, and keep the diary and ticket state synchronized as code lands.
+
+**Inferred user intent:** Build the browser-preview investigation the same way the earlier performance work was built: one concrete measurement-enabling step at a time, with real commits and continuation-friendly documentation.
+
+**Commit (code):** `1c99094caf1a3661562c26332b2e57fd257de2a4` — `Add preview serving and runtime metrics`
+
+### What I did
+
+- Extended `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/metrics/metrics.go` to support both counters and gauges.
+- Added `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/metrics/metrics_test.go` to verify mixed counter/gauge rendering.
+- Added `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_metrics.go` defining the first browser-preview metric families.
+- Wired the MJPEG handler in `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go` to track:
+  - active HTTP clients,
+  - stream starts,
+  - stream finishes by reason,
+  - frames served,
+  - bytes served,
+  - flush count.
+- Wired `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go` to track:
+  - preview ensure results,
+  - preview release results,
+  - preview frame updates.
+- Kept labels intentionally low-cardinality:
+  - `source_type`
+  - bounded `result`
+  - bounded `reason`
+- Validated with:
+
+```bash
+gofmt -w pkg/metrics/metrics.go pkg/metrics/metrics_test.go internal/web/preview_metrics.go internal/web/handlers_preview.go internal/web/preview_manager.go internal/web/metrics_test.go internal/web/handlers_metrics.go internal/web/routes.go pkg/media/gst/recording.go pkg/media/gst/shared_video_recording_bridge.go
+go test ./pkg/metrics ./internal/web ./pkg/media/gst -count=1
+go test ./... -count=1
+```
+
+### Why
+
+Before building the next browser-driven performance matrix, I needed a better measurement surface than raw `pidstat` alone. Counters and gauges tied to the preview-serving path let us ask better questions later:
+
+- how many MJPEG clients are actually attached,
+- how many frames were served,
+- how many bytes were written,
+- and whether the browser path is hotter because of preview fan-out, not just because recording is active.
+
+### What worked
+
+- The minimal metrics registry was easy to extend to gauges without introducing external dependencies.
+- The browser-serving metric families fit naturally into the MJPEG handler and PreviewManager boundaries.
+- The entire repo test suite still passed after the instrumentation.
+
+### What didn't work
+
+Nothing materially failed in this slice after implementation. The main non-code complication was that the metrics foundation changes already existed locally and needed to be folded into a clean commit rather than left drifting uncommitted.
+
+### What I learned
+
+The first metrics slice is enough to make Prometheus/Grafana-style investigation realistic. We still cannot answer every browser-path question yet, but we now have the minimum observability needed to correlate CPU with:
+
+- active preview clients,
+- preview-serving volume,
+- and preview lifecycle events.
+
+### What was tricky to build
+
+The sharp edge here was **label discipline**. It would have been easy to emit per-preview or per-source IDs because those are available in the code, but that would make the new metrics much harder to reason about and potentially much noisier in Prometheus. I deliberately kept the first slice to `source_type` plus small bounded `reason`/`result` enums so the metrics stay useful for plotting and aggregation.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/metrics/metrics.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go`
+
+The main review question is whether the chosen label set is the right first compromise between useful detail and low cardinality.
+
+### What should be done in the future
+
+- Restart the local server and verify the new metrics families in a real runtime.
+- Add the browser-driven measurement scripts under this ticket’s `scripts/` directory.
+- Use the new metrics to compare no-browser, one-tab, and multi-tab runs.
+
+### Code review instructions
+
+Start with the new metrics definitions and then trace where they are emitted:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_metrics.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_manager.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/metrics/metrics.go`
+
+Re-run:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+go test ./pkg/metrics ./internal/web ./pkg/media/gst -count=1
+go test ./... -count=1
+```
+
+### Technical details
+
+The first browser-preview metric slice now exposes these families:
+
+```text
+screencast_studio_preview_http_clients
+screencast_studio_preview_http_streams_started_total
+screencast_studio_preview_http_streams_finished_total
+screencast_studio_preview_http_frames_served_total
+screencast_studio_preview_http_bytes_served_total
+screencast_studio_preview_http_flushes_total
+screencast_studio_preview_frame_updates_total
+screencast_studio_preview_ensures_total
+screencast_studio_preview_releases_total
+```
