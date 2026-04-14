@@ -51,7 +51,7 @@
 - [x] Measure real app/runtime CPU before and after the adaptive-preview prototype using the live `scs-web-ui` path
 - [ ] Evaluate whether preview quality during recording remains acceptable with the constrained profile
 - [ ] Decide whether adaptive-preview behavior should be the default runtime policy or a configurable feature flag after real-app validation
-- [ ] Record the production-path results in the ticket diary, changelog, and a follow-up summary note
+- [x] Record the production-path results in the ticket diary, changelog, and a follow-up summary note
 
 ## Bug-fix themes captured by this ticket
 
