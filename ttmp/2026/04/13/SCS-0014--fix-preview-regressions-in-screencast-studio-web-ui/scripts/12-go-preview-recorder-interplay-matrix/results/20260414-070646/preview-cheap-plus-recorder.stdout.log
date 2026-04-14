@@ -1,0 +1,15 @@
+scenario=preview-cheap-plus-recorder
+display=:0
+root=2880x1920
+region=0,960,2880,960
+fps=24
+duration=6s
+output=/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/results/20260414-070646/preview-cheap-plus-recorder.mp4
+preview_frames=31
+preview_bytes_copied=1637529
+recorder_samples_pulled=145
+recorder_buffers_copied=145
+recorder_enqueued=145
+recorder_dropped=0
+recorder_worker_handled=145
+recorder_appsrc_pushed=145
