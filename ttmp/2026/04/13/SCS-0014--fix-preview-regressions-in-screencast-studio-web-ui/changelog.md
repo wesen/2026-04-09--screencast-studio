@@ -100,4 +100,35 @@ This run reinforced the current direction: within that benchmark, every non-triv
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/run.sh — runner for the preview-branch ablation benchmark
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/14-go-preview-branch-ablation-matrix/results/20260414-081748/01-summary.md — raw saved summary for the ablation benchmark run
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/15-preview-branch-ablation-summary.md — human-readable interpretation of the ablation benchmark
+
+After importing the two externally researched markdown notes into the ticket, I did not treat them as already-proven truth. Instead I built two more standalone benchmark families specifically to test the imported mitigation idea independently of the production runtime.
+
+First, `scripts/16-go-preview-adaptive-confirmation-matrix/` added a direct standalone confirmation harness that keeps the recorder path fixed and varies only two dimensions of the preview path:
+
+- ordering (`scale-first` vs `rate-first`), and
+- preview profile (`current` vs imported `constrained`).
+
+That harness produced a useful first signal but showed enough single-run noise that I did not want to overstate confidence from one matrix alone.
+
+Second, `scripts/17-go-preview-adaptive-repeatability-matrix/` re-ran the same standalone harness across three rounds with alternating scenario order. Those repeated measurements were the more important result. In the saved summary `scripts/17-go-preview-adaptive-repeatability-matrix/results/20260414-135308/01-summary.md`, the mean CPU values came out as:
+
+- `recorder-only`: `91.00%`
+- `preview-scale-first-current-plus-recorder`: `108.28%`
+- `preview-rate-first-current-plus-recorder`: `106.45%`
+- `preview-scale-first-constrained-plus-recorder`: `104.95%`
+- `preview-rate-first-constrained-plus-recorder`: `87.61%`
+
+The clearest interpretation is not that every individual piece of the imported proposal wins strongly in isolation. Instead, the repeated standalone result supports the **combined** adaptive direction most strongly: a constrained recording-time preview profile plus rate-first preview ordering was the best preview+recorder variant and landed essentially in the same band as recorder-only. That is a strong enough independent confirmation to justify a real runtime prototype of those two changes together.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/sources/local/preview-and-recording-performance-improvement-report.md — imported external report that proposed adaptive preview degradation and rate-first ordering
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/sources/local/preview-and-recording-performance-improvement-diary.md — imported external diary that documented the same proposed mitigation path
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/16-go-preview-adaptive-confirmation-matrix/main.go — standalone confirmation harness for scale-first vs rate-first ordering and current vs constrained preview profiles
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/16-go-preview-adaptive-confirmation-matrix/run.sh — runner for the direct confirmation matrix
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/16-go-preview-adaptive-confirmation-matrix/results/20260414-135008/01-summary.md — first direct confirmation run, useful but noisy
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/16-go-preview-adaptive-confirmation-matrix/results/20260414-135103/01-summary.md — second direct confirmation run, again useful but still variable
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/17-go-preview-adaptive-repeatability-matrix/run.sh — repeatability wrapper that reruns the adaptive confirmation scenarios across alternating rounds
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/17-go-preview-adaptive-repeatability-matrix/results/20260414-135308/01-summary.md — repeated standalone confirmation result that best supports the combined adaptive-preview direction
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/18-preview-adaptive-confirmation-summary.md — human-readable interpretation of the adaptive-preview confirmation experiments
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/reference/03-research-brief-preview-and-recording-performance-investigation-handoff.md — copied ticket-local version of the detailed researcher handoff brief from the Obsidian vault so the research package also lives inside the ticket workspace

@@ -31,6 +31,7 @@
 - [x] Add a standalone shared-source benchmark that measures preview-only, recorder-only, and preview+recorder together
 - [x] Record whether cheaper preview settings materially reduce the combined preview+recorder CPU spike
 - [x] Add a preview-branch ablation benchmark that isolates second-branch overhead, JPEG, raw frame copying, and the current preview path while recording
+- [x] Run standalone confirmation experiments for the imported adaptive-preview proposal, including repeated runs that compare scale-first vs rate-first ordering and current vs constrained recording-time preview profiles
 
 ## Bug-fix themes captured by this ticket
 

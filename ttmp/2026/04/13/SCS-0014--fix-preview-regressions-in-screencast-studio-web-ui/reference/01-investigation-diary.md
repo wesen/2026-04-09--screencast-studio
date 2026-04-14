@@ -1838,3 +1838,151 @@ preview-cheap-plus-recorder: 112.00%
 ```
 
 That is why the next practical optimization idea is a degraded preview mode while recording.
+
+## Step 19: Confirmed the Imported Adaptive-Preview Idea with New Standalone Benchmarks
+
+After importing the two newly researched markdown notes, I did not want to jump straight into production code. The imported report proposed a very specific mitigation direction — constrained preview while recording plus rate-first preview ordering — and the right next step was to test that idea independently of the main software so the result would be reproducible and attributable to the media-graph change itself rather than to unrelated runtime behavior.
+
+So I built two new standalone experiment families under the ticket. The first was a direct confirmation matrix. The second was a repeatability wrapper because the first single-run matrix showed enough variance that I did not trust it alone as the basis for a production decision.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, run experiments to confirm these new findings, independently of the main software, so that we c an repeoduce it and measure things in isolation."
+
+**Assistant interpretation:** Build and run standalone benchmarks that directly test the imported mitigation ideas without modifying the main runtime first.
+
+**Inferred user intent:** Verify the external research by reproducing it locally in controlled, ticket-local experiments before changing production code.
+
+### What I did
+
+Added and ran:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/16-go-preview-adaptive-confirmation-matrix/main.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/16-go-preview-adaptive-confirmation-matrix/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/17-go-preview-adaptive-repeatability-matrix/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/18-preview-adaptive-confirmation-summary.md`
+
+Saved direct confirmation runs under:
+
+- `scripts/16-go-preview-adaptive-confirmation-matrix/results/20260414-135008/`
+- `scripts/16-go-preview-adaptive-confirmation-matrix/results/20260414-135103/`
+
+Saved repeated runs under:
+
+- `scripts/17-go-preview-adaptive-repeatability-matrix/results/20260414-135308/`
+
+### Experimental design
+
+The standalone harness deliberately kept the recorder path fixed and varied only two preview-path dimensions:
+
+1. preview ordering:
+   - `scale-first`
+   - `rate-first`
+2. preview profile:
+   - `current`
+   - imported `constrained`
+
+Scenarios:
+
+- `recorder-only`
+- `preview-scale-first-current-plus-recorder`
+- `preview-rate-first-current-plus-recorder`
+- `preview-scale-first-constrained-plus-recorder`
+- `preview-rate-first-constrained-plus-recorder`
+
+The constrained profile matched the imported screen-like recommendation:
+
+- `640 max width`
+- `4 fps`
+- `jpeg quality 50`
+
+### What worked
+
+The first direct confirmation matrix was useful, but noisy. That was enough to justify the repeatability wrapper.
+
+The repeated results were much more helpful. From:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/17-go-preview-adaptive-repeatability-matrix/results/20260414-135308/01-summary.md`
+
+mean CPU across three rounds came out to:
+
+- `recorder-only`: `91.00%`
+- `preview-scale-first-current-plus-recorder`: `108.28%`
+- `preview-rate-first-current-plus-recorder`: `106.45%`
+- `preview-scale-first-constrained-plus-recorder`: `104.95%`
+- `preview-rate-first-constrained-plus-recorder`: `87.61%`
+
+That gives the clearest independent support so far to the **combined** adaptive-preview direction.
+
+### What didn't work
+
+The first direct confirmation matrix by itself was too noisy to support a strong claim. In particular, one run suggested one ordering result while the next run shifted enough that I did not want to over-interpret it. That is exactly why I added the repeatability wrapper instead of pretending the first matrix was already definitive.
+
+### What I learned
+
+The imported notes were useful, but not in the way “somebody else already solved it” would imply. They were useful because they suggested a focused hypothesis that we could then test ourselves.
+
+The repeated standalone result suggests:
+
+- the **combined** mitigation direction is promising,
+- rate-first ordering alone is only a modest win in the current-profile case,
+- constrained profile alone is not strongly convincing by itself,
+- but constrained profile **plus** rate-first ordering is the best preview+recorder variant we measured in repeated standalone runs.
+
+In other words, the imported idea appears more convincing as a **paired change** than as two separately dominant tweaks.
+
+### What was tricky to build
+
+The tricky part was not the media graph itself. The trickiest part was evidence quality. Single-run CPU measurements can be misleading enough that they encourage confident but brittle interpretations. The repeatability wrapper was necessary because I wanted something I could actually trust before recommending the next production-side prototype.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/16-go-preview-adaptive-confirmation-matrix/main.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/17-go-preview-adaptive-repeatability-matrix/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/18-preview-adaptive-confirmation-summary.md`
+
+The main review question is whether the repeated standalone result is strong enough to justify changing the real runtime next.
+
+### What should be done in the future
+
+Prototype the combined adaptive change in the production shared runtime:
+
+1. constrain preview while recording is active,
+2. reorder preview to `videorate -> videoscale -> jpegenc`.
+
+Then validate it in the real app path, not only in the standalone harness.
+
+### Code review instructions
+
+Start with:
+
+- `scripts/18-preview-adaptive-confirmation-summary.md`
+- `scripts/17-go-preview-adaptive-repeatability-matrix/results/20260414-135308/01-summary.md`
+
+Re-run the direct matrix with:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+bash ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/16-go-preview-adaptive-confirmation-matrix/run.sh
+```
+
+Re-run the repeated matrix with:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+bash ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/17-go-preview-adaptive-repeatability-matrix/run.sh
+```
+
+### Technical details
+
+The repeated means that currently matter most are:
+
+```text
+recorder-only: 91.00%
+scale-first current + recorder: 108.28%
+rate-first current + recorder: 106.45%
+scale-first constrained + recorder: 104.95%
+rate-first constrained + recorder: 87.61%
+```
+
+That is why the current recommendation is to prototype the **combined adaptive-preview change** next, not just one isolated tweak.

@@ -21,12 +21,16 @@ RelatedFiles:
       Note: Preview limit accounting and async release behavior explain the preview-limit race
     - Path: /home/manuel/code/wesen/2026-04-09--screencast-studio/ui/src/features/setup-draft/conversion.ts
       Note: Source picker creates duplicate logical source IDs for the same physical device rather than deduplicating it
-ExternalSources: []
+ExternalSources:
+    - local:preview-and-recording-performance-improvement-diary.md
+    - local:preview-and-recording-performance-improvement-report.md
 Summary: Ticket for the preview regressions observed in the running screencast-studio web UI, now including implementation progress on camera deduplication, preview-quality tuning, preview-limit race hardening, a full postmortem on the window/region full-display bug, standalone recording-performance measurements for the shared GStreamer recording path, and a staged benchmark of the appsink-to-Go-to-appsrc bridge overhead.
-LastUpdated: 2026-04-13T23:36:00-04:00
+LastUpdated: 2026-04-14T13:45:02.856581348-04:00
 WhatFor: Track and document the preview bugs observed during live manual testing of the running screencast-studio web UI.
 WhenToUse: Start here when triaging or fixing the preview regressions reproduced in the running app and documented from real logs and UI behavior.
 ---
+
+
 
 # Fix preview regressions in screencast-studio web UI
 
@@ -67,6 +71,7 @@ Current deliverable status:
 - A same-session reconciliation run now compares the direct GStreamer, shared-runtime, and staged bridge benchmarks side by side and shows recorder-only CPU is broadly aligned across those three paths; the larger remaining cost spike is preview + recorder together
 - A dedicated shared-source preview/recorder interplay benchmark now shows that preview + recorder together is dramatically more expensive than recorder-only, and that cheaper preview settings help but do not remove the spike
 - A follow-up preview-branch ablation benchmark now isolates second-branch cost, JPEG cost, raw frame-copy cost, the current preview path, and a cheap preview profile while recording
+- New standalone confirmation and repeatability benchmarks now test the imported adaptive-preview proposal directly; the repeated results support the combined direction of constrained recording-time preview plus rate-first preview ordering more strongly than either ingredient on its own
 - `docmgr doctor` passed cleanly
 - Bug report bundle uploaded to reMarkable and verified in `/ai/2026/04/13/SCS-0014`
 
