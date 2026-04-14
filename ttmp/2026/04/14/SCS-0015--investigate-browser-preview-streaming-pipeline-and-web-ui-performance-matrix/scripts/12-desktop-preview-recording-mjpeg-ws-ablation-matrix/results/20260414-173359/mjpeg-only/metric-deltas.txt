@@ -1,0 +1,6 @@
+screencast_studio_eventhub_events_published_total{event_type="preview.state"}	delta=0
+screencast_studio_eventhub_events_published_total{event_type="session.log"}	delta=0
+screencast_studio_eventhub_events_published_total{event_type="session.state"}	delta=0
+screencast_studio_eventhub_events_published_total{event_type="telemetry.disk_status"}	delta=3
+screencast_studio_preview_http_clients{source_type="display"}	last=1
+screencast_studio_preview_http_streams_started_total{source_type="display"}	delta=0

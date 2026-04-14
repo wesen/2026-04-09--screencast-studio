@@ -1,0 +1,21 @@
+schema: "recorder.config/v1"
+session_id: "browser-preview-mjpeg-ws-ablation"
+destination_templates:
+  per_source: "/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/mjpeg-only/output/{source_name}.{ext}"
+video_sources:
+  - id: "desktop-1"
+    name: "Full Desktop"
+    type: "display"
+    enabled: true
+    target:
+      display: ":0"
+    settings:
+      capture:
+        fps: 24
+        cursor: true
+        follow_resize: false
+      output:
+        container: "mov"
+        video_codec: "h264"
+        quality: 75
+    destination_template: "per_source"

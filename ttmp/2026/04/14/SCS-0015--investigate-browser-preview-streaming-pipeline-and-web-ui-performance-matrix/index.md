@@ -27,7 +27,7 @@ RelatedFiles:
       Note: New metrics registry will be extended for browser-preview observability
 ExternalSources: []
 Summary: Ticket for investigating the browser-connected preview streaming path and measuring why the real Studio page can drive the server much hotter than earlier backend/API-only performance matrices suggested.
-LastUpdated: 2026-04-14T17:24:00-04:00
+LastUpdated: 2026-04-14T17:48:00-04:00
 WhatFor: Track the browser preview streaming investigation, its measurement plan, and the final report.
 WhenToUse: Start here when working on browser-preview serving overhead, frontend preview lifecycle performance, or MJPEG/metrics measurement work.
 ---
@@ -74,9 +74,12 @@ Current deliverable status:
 - real browser scenario scripts now exist under `scripts/08-playwright-browser-matrix/`
 - live browser-backed measurements now exist for desktop one-tab, desktop two-tab, and desktop-plus-camera one-tab scenarios under `scripts/results/20260414-163610/`, `20260414-163951/`, `20260414-164457/`, `20260414-164535/`, `20260414-164657/`, and `20260414-164720/`
 - strongest current finding: the **browser-connected recording** path is the missing hot slice, with desktop one-tab preview+recording around `410.60%` avg CPU and desktop two-tab preview+recording around `432.97%`, far above the fresh-server plain-MJPEG-client recording baseline around `158–165%`
+- a newer focused ablation now exists at `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/`
+- that ablation showed one MJPEG client plus one synthetic websocket consumer only moved avg CPU from `166.56%` to `170.48%`, which lowers confidence that websocket fanout alone explains the browser spike
 - a first human-readable findings note now exists at `scripts/09-browser-preview-matrix-findings-summary.md`
+- a focused ablation summary note now exists at `scripts/13-mjpeg-websocket-ablation-summary.md`
 - an ongoing detailed lab report now exists at `reference/02-browser-preview-streaming-lab-report.md` and backfills the current experiments in detail
-- camera-only browser-tab scenarios are still pending
+- camera-only browser-tab scenarios are still pending, but the current priority is the desktop preview+recording one-tab repro rather than scenario expansion
 
 ## Tasks
 

@@ -41,6 +41,8 @@ RelatedFiles:
       Note: Used to create the desktop-plus-camera browser scenarios
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/09-browser-preview-matrix-findings-summary.md
       Note: Saved the first larger findings note after the matrix run
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh
+      Note: Added and used during Step 7
     - Path: ui/src/components/preview/PreviewStream.tsx
       Note: |-
         The actual browser media transport is an img tag pointed at the MJPEG endpoint
@@ -51,10 +53,11 @@ RelatedFiles:
         Frontend preview lifecycle likely explains differences between browser-driven and API-only runs
 ExternalSources: []
 Summary: Diary for the browser preview streaming and web-UI performance investigation ticket.
-LastUpdated: 2026-04-14T17:24:00-04:00
+LastUpdated: 2026-04-14T17:48:00-04:00
 WhatFor: Record the chronology of how the browser preview streaming performance investigation was set up and how its conclusions are derived.
 WhenToUse: Read when continuing SCS-0015 and you need the exact reasoning, commands, and file boundaries used to define the new browser-streaming research track.
 ---
+
 
 
 
@@ -796,4 +799,162 @@ scripts/results/20260414-164535/
 scripts/results/20260414-164657/
 scripts/results/20260414-164720/
 scripts/results/20260414-165126/
+```
+
+## Step 7: Added EventHub/WebSocket Metrics and Ran a Focused MJPEG-vs-WebSocket Ablation
+
+After the larger browser matrix pass and the lab-report backfill, the next question was narrower: if websocket event traffic is the key browser-only extra load, can I reproduce a large chunk of the browser-path spike by taking the same desktop preview+recording workload and adding a synthetic `/ws` consumer on top of one MJPEG client? Rather than broadening scenarios, I chose the cleanest server-side A/B I could build around the current hypothesis.
+
+This step ended up being especially useful because it both improved observability and changed the working theory. I added explicit EventHub and websocket metrics first, then built a fresh-server ablation harness with two scenarios: `mjpeg-only` and `mjpeg-plus-ws`. The trusted rerun showed that websocket/event fanout is real, but by itself it only moved avg CPU from `166.56%` to `170.48%`. That is nowhere near enough to explain the real browser one-tab desktop preview+recording result of `410.60%`.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 6)
+
+**Assistant interpretation:** Continue the browser-preview investigation in small, reviewable slices, keep the new lab report and diary updated, and dig deeper into the strongest current desktop preview+recording repro instead of broadening the scenario matrix.
+
+**Inferred user intent:** Turn the current explanation into something more evidence-based by testing the strongest remaining hypothesis directly and preserving the result carefully.
+
+**Commit (code):** `ede87bb2fb824ee4f427813ba29daedf1b280b22` — `Add websocket and eventhub metrics`
+
+**Commit (code):** `23234634f3e73c822c58b7af9dc91756519cf2f0` — `Add MJPEG websocket ablation harness`
+
+### What I did
+
+First, I added low-cardinality observability around the event/websocket path:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/event_metrics.go`
+- updated `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/event_hub.go`
+- updated `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+- added `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/event_hub_test.go`
+- updated `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/metrics_test.go`
+
+The new metric families are:
+
+```text
+screencast_studio_eventhub_subscribers
+screencast_studio_eventhub_events_published_total
+screencast_studio_eventhub_events_delivered_total
+screencast_studio_eventhub_events_dropped_total
+screencast_studio_websocket_connections
+screencast_studio_websocket_events_written_total
+screencast_studio_websocket_event_write_errors_total
+```
+
+I also updated the live browser sampler so `metric-deltas.txt` includes:
+
+- preview HTTP metrics,
+- preview frame updates,
+- EventHub metrics,
+- websocket metrics.
+
+Then I added the focused ablation harness:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/ws_client/main.go`
+
+The harness runs a fresh server for two scenarios:
+
+- one MJPEG client only
+- one MJPEG client plus one synthetic websocket consumer
+
+I first hit a harness problem: the initial run under:
+
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173359/`
+
+produced an invalid `mjpeg-only` comparison because recording started before the preview path had clearly produced an initial frame. I fixed the harness by waiting for an initial preview screenshot before measurement in both scenarios and reran it.
+
+The trusted rerun is:
+
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/`
+
+I also wrote a short summary note:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/13-mjpeg-websocket-ablation-summary.md`
+
+### Why
+
+This was the cleanest way to test the current websocket hypothesis without depending on a flaky browser-tool session. The big browser result (`410.60%`) was still real, but I needed to know whether the missing cost was plausibly “MJPEG plus websocket fanout” or whether something more browser-specific was still hiding behind the real tab.
+
+### What worked
+
+The trusted rerun gave a clear result:
+
+- `mjpeg-only` → `166.56%` avg CPU
+- `mjpeg-plus-ws` → `170.48%` avg CPU
+
+The websocket-enabled case also proved the event/websocket path was active and measurable:
+
+- `preview.state` published: `33`
+- `preview.state` delivered: `23`
+- websocket `preview.state` writes: `23`
+- websocket client total messages observed: `54`
+
+So the observability slice worked, and the focused ablation answered the main question it was built to answer.
+
+### What didn't work
+
+I hit two concrete problems in this step.
+
+First, the browser tool itself remained unreliable after a profile-lock issue. Even after clearing stale Playwright-MCP Chrome processes, the direct browser tool session did not become usable again for a new real-browser rerun during this slice.
+
+Second, my first ablation run was invalid because of a harness race. The first run under `20260414-173359` let the `mjpeg-only` case start recording too early, before the preview path had clearly produced an initial frame. That yielded a bogus `11.00%` result. I fixed the harness by waiting for an initial preview screenshot before measurement in both scenarios and then reran the matrix.
+
+### What I learned
+
+This step materially changed the explanation.
+
+Before the ablation, websocket/event fanout looked like the strongest server-side suspect for the browser-only gap. After the ablation, I now think it is a **real contributor but not the dominant one by itself**. A plain websocket consumer on top of one MJPEG client only raised avg CPU by about `3.92` points in the trusted fresh-server rerun. That is far too small to explain the jump from the `~158–166%` fresh-server desktop-recording band to the `410.60%` real browser one-tab case.
+
+### What was tricky to build
+
+The hardest part was making the ablation fair. The first version looked simple, but it hid an important timing problem: if the preview path does not clearly have a first frame before recording starts, the comparison can be misleading. The fix was to make both scenarios wait for an initial preview screenshot before the actual timed measurement starts.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/event_metrics.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/event_hub.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_ws.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/13-mjpeg-websocket-ablation-summary.md`
+
+The main review question is whether the current ablation is a fair enough synthetic proxy to lower confidence in websocket fanout as the primary explanation, or whether another synthetic browser-consumer behavior still needs to be added before drawing that conclusion strongly.
+
+### What should be done in the future
+
+- Rerun the real browser one-tab desktop preview+recording case with the new websocket/event metrics once the browser tool path is healthy again.
+- If needed, add deeper handler-path timing metrics around MJPEG writes/flushes and any other browser-specific behavior that still differentiates a real tab from a plain MJPEG-plus-websocket synthetic client.
+
+### Code review instructions
+
+Start with the new metrics and harness files:
+
+- `internal/web/event_metrics.go`
+- `internal/web/event_hub.go`
+- `internal/web/handlers_ws.go`
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh`
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/ws_client/main.go`
+
+Validation commands used:
+
+```bash
+gofmt -w internal/web/event_metrics.go internal/web/event_hub.go internal/web/handlers_ws.go internal/web/metrics_test.go internal/web/event_hub_test.go
+go test ./internal/web ./pkg/metrics -count=1
+go test ./... -count=1
+DURATION=6 bash ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh
+```
+
+### Technical details
+
+Trusted ablation rerun:
+
+```text
+scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/
+```
+
+Key result:
+
+```text
+mjpeg-only    -> 166.56% avg CPU
+mjpeg-plus-ws -> 170.48% avg CPU
 ```

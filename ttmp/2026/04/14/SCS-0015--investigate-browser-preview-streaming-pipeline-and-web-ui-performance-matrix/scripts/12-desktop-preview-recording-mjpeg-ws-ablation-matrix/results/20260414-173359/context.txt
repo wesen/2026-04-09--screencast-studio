@@ -1,0 +1,4 @@
+repo=/home/manuel/code/wesen/2026-04-09--screencast-studio
+display=:0
+duration=6
+scenarios=mjpeg-only:0 mjpeg-plus-ws:1

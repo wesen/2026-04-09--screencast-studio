@@ -16,7 +16,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: First combined findings note for the browser-preview performance matrix, covering the fresh-server HTTP-client matrix and the live browser-tab measurements.
-LastUpdated: 2026-04-14T17:00:00-04:00
+LastUpdated: 2026-04-14T17:46:00-04:00
 WhatFor: Record the first large SCS-0015 performance findings pass in one human-readable place.
 WhenToUse: Read before deciding what deeper browser-path instrumentation or optimization direction should come next.
 ---
@@ -123,7 +123,32 @@ The older browser result directories were created before `scripts/07-live-server
 - camera frames served delta: `43`
 - camera bytes served delta: `2,544,617`
 
-## 4. Strongest current conclusion
+## 4. Focused MJPEG-vs-websocket ablation
+
+I added a focused fresh-server ablation at:
+
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/`
+
+This compared the same desktop preview+recording workload under:
+
+- one MJPEG client only
+- one MJPEG client plus one synthetic `/ws` consumer
+
+The result was:
+
+- `mjpeg-only` → `166.56%` avg CPU
+- `mjpeg-plus-ws` → `170.48%` avg CPU
+
+The websocket-enabled scenario clearly did produce websocket traffic:
+
+- `preview.state` published: `33`
+- `preview.state` delivered: `23`
+- websocket `preview.state` writes: `23`
+- websocket client total messages observed: `54`
+
+That is an important narrowing step: websocket/event fanout is **real**, but by itself it does **not** explain the jump from the `~158–166%` fresh-server MJPEG cases to the `~410%` real browser-tab case.
+
+## 5. Strongest current conclusion
 
 The biggest new SCS-0015 finding is this:
 
@@ -136,7 +161,7 @@ The clearest comparison is:
 
 That gap is too large to hand-wave away as minor measurement noise.
 
-## 5. Why this matters
+## 6. Why this matters
 
 The browser-backed recording scenarios did **not** show proportionally huge served-byte deltas. In fact, during recording the per-run served-frame and served-byte deltas were much smaller than in preview-only runs.
 
@@ -148,24 +173,25 @@ Instead, the current evidence points more toward a combination of:
 - the shared preview + recording interaction already known to be expensive upstream,
 - and browser-connected lifecycle/streaming behavior that is materially different from a dumb `curl` reader.
 
-## 6. Secondary observations
+## 7. Secondary observations
 
 - The preview did **not** look architecturally dead from the API side: saved `previews-*.json` snapshots showed `lastFrameAt` advancing during the browser recording runs.
 - The two-tab desktop recording run (`432.97%`) was somewhat hotter than one-tab desktop recording (`410.60%`), but not by nearly enough to say that duplicate tabs alone explain the whole problem.
 - Adding camera changed the shape of the workload: desktop + camera preview-only was hotter than desktop-only preview-only, but desktop + camera one-tab recording (`343.71%`) did not exceed the desktop-only two-tab recording case.
 
-## 7. Current practical interpretation
+## 8. Current practical interpretation
 
 At this point, the evidence supports a layered conclusion:
 
 1. **Simple MJPEG fan-out matters somewhat**, but it is not the dominant explanation.
-2. **The browser-connected recording slice is the missing hot slice** that earlier SCS-0014 API-only and curl-like tests did not fully capture.
-3. **Served-byte volume is not the whole story**, because browser recording scenarios were extremely hot even while the saved metric deltas for frames/bytes served were relatively modest.
+2. **Synthetic websocket/event fanout alone also does not explain the browser spike**, because the focused MJPEG-vs-websocket ablation only moved avg CPU by about `3.92` points.
+3. **The browser-connected recording slice is still the missing hot slice** that earlier SCS-0014 API-only and curl-like tests did not fully capture.
+4. **Served-byte volume is not the whole story**, because browser recording scenarios were extremely hot even while the saved metric deltas for frames/bytes served were relatively modest.
 
-## 8. Best next steps after this pass
+## 9. Best next steps after this pass
 
 1. Add a true per-run browser-side network/state capture for each sampled scenario, not just server metrics.
-2. Add a camera-only one-tab scenario if we want to fully complete the original matrix.
+2. Use the new event/websocket metrics during the next real browser rerun so we can measure actual browser-tab websocket behavior directly.
 3. Instrument more of the handler path if needed:
    - preview write loop wait time,
    - per-stream frame skip/drop reasons,

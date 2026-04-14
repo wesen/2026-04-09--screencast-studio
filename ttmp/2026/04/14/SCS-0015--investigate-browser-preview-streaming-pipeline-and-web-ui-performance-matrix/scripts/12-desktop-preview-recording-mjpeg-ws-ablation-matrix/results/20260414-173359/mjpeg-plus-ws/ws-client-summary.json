@@ -1,0 +1,16 @@
+{
+  "url": "ws://127.0.0.1:7831/ws",
+  "startedAt": "2026-04-14T17:34:13.144892403-04:00",
+  "finishedAt": "2026-04-14T17:34:22.200531086-04:00",
+  "messageCount": 73,
+  "byteCount": 22383,
+  "byKind": {
+    "audioMeter": 1,
+    "diskStatus": 6,
+    "previewList": 1,
+    "previewState": 55,
+    "sessionLog": 2,
+    "sessionState": 8
+  },
+  "error": "websocket: close 1006 (abnormal closure): unexpected EOF"
+}

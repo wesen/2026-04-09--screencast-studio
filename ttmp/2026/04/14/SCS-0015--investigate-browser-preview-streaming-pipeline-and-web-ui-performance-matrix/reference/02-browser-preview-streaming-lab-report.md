@@ -16,6 +16,8 @@ Owners: []
 RelatedFiles:
     - Path: internal/web/event_hub.go
       Note: Browser-connected event fanout path summarized in the lab report
+    - Path: internal/web/event_metrics.go
+      Note: EventHub and websocket metric families added during the focused ablation slice
     - Path: internal/web/handlers_preview.go
       Note: MJPEG serving loop under investigation in the lab report
     - Path: internal/web/handlers_ws.go
@@ -30,12 +32,19 @@ RelatedFiles:
       Note: Fresh-server matrix harness backfilled in the lab report
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/07-live-server-browser-scenario-sample.sh
       Note: Live browser-backed sampler backfilled in the lab report
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh
+      Note: Focused MJPEG-vs-websocket ablation harness backfilled in EXP-12
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/ws_client/main.go
+      Note: Synthetic websocket consumer used in EXP-12
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/13-mjpeg-websocket-ablation-summary.md
+      Note: Short human-readable summary of the focused ablation result
 ExternalSources: []
 Summary: Ongoing lab report for the browser preview streaming investigation, with backfilled experiments, exact result directories, scenario definitions, outcomes, caveats, and the current working explanation for the desktop preview-plus-recording CPU spike.
-LastUpdated: 2026-04-14T17:22:00-04:00
+LastUpdated: 2026-04-14T17:46:00-04:00
 WhatFor: Keep a continuation-friendly experimental record for SCS-0015 that can be updated as new browser-path measurements and instrumentation land.
 WhenToUse: Read this when continuing the browser preview investigation and you need the exact experiments already run, the result locations, and the current evidence-backed interpretation.
 ---
+
 
 
 # Browser preview streaming lab report
@@ -54,7 +63,7 @@ Why does the real Studio page drive the server so much hotter than earlier backe
 
 ## Current best answer, in one paragraph
 
-The browser-connected recording spike appears to be **real and not explained by simple MJPEG byte volume alone**. The fresh-server plain-MJPEG-client recording matrix stayed around `158–165%` avg CPU, while the real browser-backed desktop preview+recording run reached about `410.60%` avg CPU and the two-tab variant reached about `432.97%`. The current evidence suggests that the real browser path activates a more expensive combined workload than the curl-like baseline: shared-source preview + recording interaction upstream, MJPEG serving work, multiple Go-side frame copies, and browser-only websocket event fanout during recording.
+The browser-connected recording spike appears to be **real and not explained by simple MJPEG byte volume alone**. The fresh-server plain-MJPEG-client recording matrix stayed around `158–165%` avg CPU, while the real browser-backed desktop preview+recording run reached about `410.60%` avg CPU and the two-tab variant reached about `432.97%`. A newer focused ablation also showed that adding a plain `/ws` consumer on top of one MJPEG client only nudged the fresh-server desktop recording case from `166.56%` to `170.48%`, which means websocket/event fanout by itself is **not** enough to explain the full browser gap. The current evidence points more toward a combination of shared-source preview + recording interaction upstream, MJPEG serving work, multiple Go-side frame copies, and browser-specific behavior that is still not reproduced by a dumb MJPEG-plus-websocket client pair.
 
 ## Environment and methodology
 
@@ -407,6 +416,57 @@ Caveat:
 - this is **not yet fully isolated** as a product bug versus a browser-tool/session artifact
 - it is worth keeping in mind because stale browser listeners and stale preview ownership are central to this ticket’s theme
 
+### EXP-12: Desktop preview + recording MJPEG-vs-MJPEG+WS ablation
+
+Purpose:
+- isolate how much of the desktop preview+recording cost can be explained by adding a plain websocket consumer on top of one MJPEG preview client
+- test the then-current hypothesis that websocket/event fanout might explain a large part of the browser-vs-curl gap
+
+Harness:
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh`
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/ws_client/main.go`
+
+Command used:
+
+```bash
+DURATION=6 bash ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh
+```
+
+Saved result directory:
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/`
+
+Scenarios:
+- `mjpeg-only`
+- `mjpeg-plus-ws`
+
+Results:
+
+| Scenario | Avg CPU | Max CPU |
+| --- | ---: | ---: |
+| mjpeg-only | 166.56% | 469.00% |
+| mjpeg-plus-ws | 170.48% | 481.00% |
+
+Key metric deltas from `mjpeg-plus-ws`:
+- `preview.state` published: `33`
+- `preview.state` delivered: `23`
+- websocket `preview.state` written: `23`
+- websocket total messages observed by the synthetic client: `54`
+
+Saved websocket client summary:
+- `mjpeg-plus-ws/ws-client-summary.json`
+
+Important harness bug encountered and fixed before trusting the result:
+
+- The first run under `results/20260414-173359/` incorrectly started recording too early in the `mjpeg-only` case, before the preview path had clearly produced an initial frame.
+- That made the first `11.00%` `mjpeg-only` number invalid.
+- I fixed the harness by waiting for an initial preview screenshot before starting the measurement in both scenarios, then reran the matrix successfully.
+
+Interpretation:
+- websocket/event fanout is **real**, measurable, and now directly visible in metrics
+- but adding a plain `/ws` consumer on top of one MJPEG client only increased average CPU by about `3.92` percentage points in this focused fresh-server ablation (`166.56%` → `170.48%`)
+- that is far too small to explain the jump from `~158–166%` fresh-server MJPEG cases to `~410%` real one-tab browser recording
+- this materially lowers confidence that websocket fanout by itself is the dominant explanation for the browser-path spike
+
 ## Aggregated result tables
 
 ### Fresh-server MJPEG-client matrix
@@ -430,6 +490,13 @@ Caveat:
 | desktop, 2 tabs, preview + recording | 432.97% |
 | desktop + camera, 1 tab, preview only | 20.10% |
 | desktop + camera, 1 tab, preview + recording | 343.71% |
+
+### Focused MJPEG-vs-websocket ablation
+
+| Scenario | Avg CPU |
+| --- | ---: |
+| mjpeg-only | 166.56% |
+| mjpeg-plus-ws | 170.48% |
 
 ## Current working interpretation
 
@@ -479,7 +546,7 @@ This makes the preview path allocation/copy-heavy even before considering browse
 
 #### 3. Browser-only websocket event traffic
 
-This is the strongest current suspect for the browser-vs-curl gap.
+This was the strongest suspect before the focused websocket ablation, but the latest results reduce confidence that it is the dominant explanation by itself.
 
 `internal/web/preview_manager.go` currently does:
 - `m.publishPreviewState(snapshot)` on every stored preview frame update
@@ -491,11 +558,7 @@ That sends `preview.state` events into:
 
 The real browser path also receives recording/session telemetry over `/ws`, including audio-meter updates during recording from `internal/web/session_manager.go`.
 
-That means a real Studio page likely activates **two live transport paths** during recording:
-- the MJPEG preview stream
-- the websocket event stream
-
-The plain `curl` MJPEG baseline only exercised the first path.
+However, the focused fresh-server ablation that compared one MJPEG client versus one MJPEG client plus one synthetic websocket consumer only moved avg CPU from `166.56%` to `170.48%`. That means websocket/event fanout is a **real contributor**, but it does **not** appear large enough by itself to explain the jump to `~410%` in the real browser-tab run.
 
 ### Concise current hypothesis
 
@@ -504,7 +567,8 @@ The `~400%` desktop preview+recording jump is probably explained by a **combinat
 1. expensive upstream shared preview + recording interaction,
 2. MJPEG preview serving and flush work,
 3. multiple Go-side preview frame copies,
-4. browser-only websocket fanout during recording, especially `preview.state` plus recording telemetry.
+4. browser-specific behavior that is still not reproduced by a plain MJPEG-plus-websocket synthetic client,
+5. and possibly some websocket/event-path contribution, but likely not enough by itself.
 
 ## Why desktop preview + recording is the best main repro now
 

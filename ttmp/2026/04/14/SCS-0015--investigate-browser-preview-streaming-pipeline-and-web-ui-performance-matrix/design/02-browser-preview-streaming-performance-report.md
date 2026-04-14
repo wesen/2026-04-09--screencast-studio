@@ -19,12 +19,15 @@ RelatedFiles:
       Note: Live browser-backed server sampler used for the real Studio-page measurements
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/09-browser-preview-matrix-findings-summary.md
       Note: Human-readable first findings summary for the larger matrix pass
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/01-summary.md
+      Note: Focused websocket ablation summary that refined the browser-path hypothesis
 ExternalSources: []
 Summary: First substantive report draft for the browser preview streaming investigation, based on the fresh-server HTTP-client matrix and the first live browser-backed measurement pass.
-LastUpdated: 2026-04-14T17:08:00-04:00
+LastUpdated: 2026-04-14T17:46:00-04:00
 WhatFor: Hold the matrix results and engineering conclusions for SCS-0015 as the browser-connected preview investigation progresses.
 WhenToUse: Read after the first measurement pass to understand what is already proven, what remains pending, and what optimization directions are now justified.
 ---
+
 
 
 # Browser preview streaming performance report
@@ -45,11 +48,11 @@ The clearest side-by-side comparison is:
 
 This means the missing hot slice was real: earlier API-only and curl-like measurements were not enough to explain the browser-connected Studio-page behavior the user reported.
 
-At the same time, the browser-backed recording runs did **not** show proportionally huge MJPEG frame/byte deltas. That suggests the browser-path heat is not explained simply by “the server had to send vastly more JPEG bytes.” The current evidence points more toward a combination of:
+At the same time, the browser-backed recording runs did **not** show proportionally huge MJPEG frame/byte deltas. A newer focused ablation also showed that adding a plain websocket consumer on top of one MJPEG client only moved avg CPU from `166.56%` to `170.48%`. That means the browser-path heat is not explained simply by “the server had to send vastly more JPEG bytes,” and websocket/event fanout alone is also insufficient. The current evidence points more toward a combination of:
 
 - expensive upstream preview + recording interaction,
 - browser-connected consumer behavior that differs materially from a dumb `curl` reader,
-- and possibly frontend/browser lifecycle effects on the preview transport.
+- and browser-specific lifecycle/rendering/stream-consumer behavior that is still not reproduced by a plain MJPEG-plus-websocket synthetic client.
 
 ## Measurement environment
 
@@ -115,6 +118,7 @@ Measured scenarios:
 - `scripts/09-browser-preview-matrix-findings-summary.md`
 - `scripts/10-browser-session-network-summary.txt`
 - `scripts/11-browser-playwright-state-desktop-camera.json`
+- `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/01-summary.md`
 
 ## Key findings
 
@@ -153,7 +157,16 @@ Examples:
 
 That means the browser-path heat is not explained simply by larger MJPEG output volume.
 
-### 5. Desktop + camera changes the mix but does not invalidate the browser finding
+### 5. A synthetic websocket consumer is not enough to reproduce the browser spike
+
+The focused fresh-server ablation at `scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/` compared:
+
+- one MJPEG client only → `166.56%` avg CPU
+- one MJPEG client plus one synthetic websocket consumer → `170.48%` avg CPU
+
+That websocket-enabled case did generate real websocket/event traffic, including `preview.state` deliveries and websocket writes, but the CPU increase was only about `3.92` points. This materially lowers confidence that websocket/event fanout by itself is the dominant explanation for the real browser-tab result.
+
+### 6. Desktop + camera changes the mix but does not invalidate the browser finding
 
 Desktop + camera one-tab preview-only was hotter than desktop-only preview-only (`20.10%` vs `14.20%`).
 
@@ -192,7 +205,8 @@ Current best interpretation:
 1. **Upstream preview + recording interaction is still a major cost center.**
 2. **Real browser-connected preview consumption is materially different from a dumb HTTP reader.**
 3. **Simple MJPEG fan-out is only part of the story.**
-4. **Served-byte volume is not the whole explanation.**
+4. **Synthetic websocket/event fanout alone is also only part of the story.**
+5. **Served-byte volume is not the whole explanation.**
 
 That points away from a simplistic “just lower JPEG quality” answer and toward deeper investigation of the browser-facing preview loop and the browser-connected shared-source workload.
 
@@ -205,8 +219,8 @@ Ranked by current confidence and likely value:
    - per-stream skip/drop reasons,
    - blocked write/flush timing,
    - maybe frame-age or stale-frame counters.
-2. **Complete the remaining browser matrix slices**
-   - especially camera-only one-tab preview and preview+recording.
+2. **Rerun the real browser-tab desktop preview+recording case with the new event/websocket metrics enabled**
+   - this is now higher priority than broadening the scenario matrix.
 3. **Compare visible browser tabs with a more minimal/headless browser consumer**
    - to separate UI-rendering effects from server-side streaming behavior.
 4. **Continue tuning the preview profile during recording**
