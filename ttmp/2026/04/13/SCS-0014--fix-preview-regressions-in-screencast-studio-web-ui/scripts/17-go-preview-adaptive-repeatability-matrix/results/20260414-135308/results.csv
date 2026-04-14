@@ -1,0 +1,16 @@
+round,scenario,avg_cpu,max_cpu
+round1,recorder-only,95.67,140.00
+round1,preview-scale-first-current-plus-recorder,116.00,147.00
+round1,preview-rate-first-current-plus-recorder,124.00,194.00
+round1,preview-scale-first-constrained-plus-recorder,121.67,174.00
+round1,preview-rate-first-constrained-plus-recorder,89.50,116.00
+round2,recorder-only,87.83,115.00
+round2,preview-rate-first-current-plus-recorder,98.17,127.00
+round2,preview-scale-first-current-plus-recorder,101.83,131.00
+round2,preview-rate-first-constrained-plus-recorder,98.33,133.00
+round2,preview-scale-first-constrained-plus-recorder,88.50,111.00
+round3,recorder-only,89.50,130.00
+round3,preview-scale-first-current-plus-recorder,107.00,152.00
+round3,preview-rate-first-current-plus-recorder,97.17,128.00
+round3,preview-scale-first-constrained-plus-recorder,104.67,160.00
+round3,preview-rate-first-constrained-plus-recorder,75.00,91.00
