@@ -1,0 +1,13 @@
+scenario=appsink-discard
+display=:0
+root=2880x1920
+region=0,960,2880,960
+fps=24
+duration=6s
+output=/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/09-go-bridge-overhead-matrix/results/20260413-232943/appsink-discard.mp4
+samples_pulled=145
+buffers_copied=0
+enqueued=0
+dropped=0
+worker_handled=0
+appsrc_pushed=0

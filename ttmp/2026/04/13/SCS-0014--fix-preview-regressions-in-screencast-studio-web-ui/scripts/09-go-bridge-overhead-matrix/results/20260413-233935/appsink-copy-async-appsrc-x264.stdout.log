@@ -1,0 +1,13 @@
+scenario=appsink-copy-async-appsrc-x264
+display=:0
+root=2880x1920
+region=0,960,2880,960
+fps=24
+duration=6s
+output=/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/09-go-bridge-overhead-matrix/results/20260413-233935/appsink-copy-async-appsrc-x264.mp4
+samples_pulled=145
+buffers_copied=145
+enqueued=145
+dropped=0
+worker_handled=145
+appsrc_pushed=145

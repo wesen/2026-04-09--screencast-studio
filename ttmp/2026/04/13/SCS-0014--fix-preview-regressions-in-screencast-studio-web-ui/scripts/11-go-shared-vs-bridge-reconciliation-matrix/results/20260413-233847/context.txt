@@ -1,0 +1,8 @@
+display=:0
+root=2880x1920
+region=0,960,2880,960
+fps=24
+duration=6s
+preview_fps=10
+preview_width=1280
+preview_jpeg_quality=80
