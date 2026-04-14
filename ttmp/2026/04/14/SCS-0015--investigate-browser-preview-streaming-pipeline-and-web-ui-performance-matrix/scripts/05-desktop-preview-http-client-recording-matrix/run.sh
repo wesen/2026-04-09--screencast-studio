@@ -8,14 +8,14 @@ RUN_DIR="$RESULTS_ROOT/$STAMP"
 mkdir -p "$RUN_DIR"
 
 REPO="${REPO:-$(cd -- "$SCRIPT_DIR/../../../../../../.." && pwd)}"
-PORT_BASE="${PORT_BASE:-7790}"
+PORT_BASE="${PORT_BASE:-7810}"
 SERVER_BASE="http://127.0.0.1"
 DISPLAY_NAME="${DISPLAY:-:0}"
 DURATION="${DURATION:-6}"
 INTERVAL="${INTERVAL:-1}"
-SCENARIOS="${SCENARIOS:-no-client:0 one-client:1 two-clients:2}"
-PIDSTAT_COUNT="$((DURATION + 2))"
-SERVER_BIN="$(mktemp /tmp/scs-0015-http-matrix-XXXXXX)"
+SCENARIOS="${SCENARIOS:-preview-no-client:0:0 preview-one-client:1:0 preview-two-clients:2:0 record-no-client:0:1 record-one-client:1:1 record-two-clients:2:1}"
+PIDSTAT_COUNT="$((DURATION + 3))"
+SERVER_BIN="$(mktemp /tmp/scs-0015-http-recording-matrix-XXXXXX)"
 chmod +x "$SERVER_BIN"
 
 cleanup() {
@@ -26,8 +26,6 @@ cleanup() {
   rm -f "$SERVER_BIN"
 }
 trap cleanup EXIT
-
-mkdir -p "$RUN_DIR"
 
 echo "repo=$REPO" > "$RUN_DIR/context.txt"
 echo "display=$DISPLAY_NAME" >> "$RUN_DIR/context.txt"
@@ -56,11 +54,12 @@ wait_for_health() {
 
 make_measure_yaml() {
   local out="$1"
+  local output_root="$2"
   cat > "$out" <<YAML
 schema: "recorder.config/v1"
-session_id: "browser-preview-stream-matrix"
+session_id: "browser-preview-stream-recording-matrix"
 destination_templates:
-  per_source: "recordings/{session_id}/{source_name}.{ext}"
+  per_source: "${output_root}/{source_name}.{ext}"
 video_sources:
   - id: "desktop-1"
     name: "Full Desktop"
@@ -89,6 +88,7 @@ import json, pathlib, sys
 wd = pathlib.Path(sys.argv[1])
 text = (wd / 'measure.yaml').read_text()
 (wd / 'preview.json').write_text(json.dumps({'dsl': text, 'sourceId': 'desktop-1'}))
+(wd / 'record.json').write_text(json.dumps({'dsl': text, 'maxDurationSeconds': 6}))
 PY
   curl -fsS -X POST "$server/api/previews/ensure" -H 'content-type: application/json' --data-binary @"$scenario_dir/preview.json" > "$scenario_dir/preview-resp.json"
   python3 - <<'PY' "$scenario_dir"
@@ -111,6 +111,29 @@ wait_for_screenshot() {
   return 1
 }
 
+wait_for_recording_finish() {
+  local server="$1"
+  local out="$2"
+  python3 - <<'PY' "$server" "$out"
+import json, sys, time, urllib.request
+server, out = sys.argv[1:3]
+deadline = time.time() + 40
+last = None
+while time.time() < deadline:
+    with urllib.request.urlopen(server + '/api/recordings/current') as r:
+        data = json.load(r)
+    last = data
+    session = data.get('session')
+    if session and not session.get('active') and session.get('sessionId'):
+        break
+    time.sleep(0.2)
+with open(out, 'w') as f:
+    json.dump(last, f, indent=2)
+if not last or not last.get('session') or last['session'].get('active'):
+    raise SystemExit('recording did not finish in time')
+PY
+}
+
 parse_avg() {
   local file="$1"
   local avg
@@ -129,13 +152,15 @@ parse_max() {
 run_scenario() {
   local name="$1"
   local client_count="$2"
-  local index="$3"
+  local recording_enabled="$3"
+  local index="$4"
   local port="$((PORT_BASE + index))"
   local server="$SERVER_BASE:$port"
   local scenario_dir="$RUN_DIR/$name"
-  mkdir -p "$scenario_dir"
+  local output_root="$scenario_dir/output"
+  mkdir -p "$scenario_dir" "$output_root"
 
-  make_measure_yaml "$scenario_dir/measure.yaml"
+  make_measure_yaml "$scenario_dir/measure.yaml" "$output_root"
 
   "$SERVER_BIN" serve --addr ":$port" > "$scenario_dir/server.stdout.log" 2> "$scenario_dir/server.stderr.log" &
   SERVER_PID=$!
@@ -163,7 +188,12 @@ run_scenario() {
     client_pids+=("$!")
   done
 
-  sleep "$DURATION"
+  if [[ "$recording_enabled" == "1" ]]; then
+    curl -fsS -X POST "$server/api/recordings/start" -H 'content-type: application/json' --data-binary @"$scenario_dir/record.json" > "$scenario_dir/record-start.json"
+    wait_for_recording_finish "$server" "$scenario_dir/session-finish.json"
+  else
+    sleep "$DURATION"
+  fi
 
   for pid in "${client_pids[@]:-}"; do
     if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
@@ -174,15 +204,20 @@ run_scenario() {
   wait "$metrics_pid" || true
   wait "$pidstat_pid" || true
 
+  wait_for_screenshot "$server" "$preview_id" "$scenario_dir/post.jpg" || true
   curl -fsS "$server/api/previews" > "$scenario_dir/previews-after.json"
 
-  local avg_cpu max_cpu
+  local avg_cpu max_cpu video_path video_ffprobe
   avg_cpu=$(parse_avg "$scenario_dir/server.pidstat.log")
   max_cpu=$(parse_max "$scenario_dir/server.pidstat.log")
+  video_path=$(find "$output_root" -maxdepth 1 -type f \( -name '*.mov' -o -name '*.mp4' \) | head -n1 || true)
+  if [[ -n "$video_path" ]]; then
+    ffprobe -hide_banner -loglevel error -show_entries format=duration,size:stream=codec_name,width,height,avg_frame_rate -of default=noprint_wrappers=1 "$video_path" > "$scenario_dir/video.ffprobe.txt" || true
+  fi
 
   cat > "$scenario_dir/01-summary.md" <<EOF
 ---
-Title: 03 desktop preview http client matrix summary
+Title: 05 desktop preview http client recording matrix summary
 Ticket: SCS-0015
 Status: active
 Topics:
@@ -191,27 +226,30 @@ Topics:
     - performance
     - preview
     - browser
+    - recording
     - analysis
 DocType: reference
 Intent: long-term
 Owners: []
 RelatedFiles: []
 ExternalSources: []
-Summary: One desktop-preview HTTP client matrix scenario result for SCS-0015.
-LastUpdated: 2026-04-14T16:10:00-04:00
-WhatFor: Preserve one scenario result from the desktop preview HTTP client baseline matrix.
-WhenToUse: Read when comparing 0/1/2 preview-stream clients against the same server-side desktop preview workload.
+Summary: One desktop-preview HTTP-client recording matrix scenario result for SCS-0015.
+LastUpdated: 2026-04-14T16:40:00-04:00
+WhatFor: Preserve one scenario result from the desktop preview HTTP-client plus recording matrix.
+WhenToUse: Read when comparing client fan-out and recording combinations before the real browser-tab matrix.
 ---
 
-# 03 desktop preview http client matrix summary
+# 05 desktop preview http client recording matrix summary
 
 - scenario: ${name}
 - client_count: ${client_count}
+- recording_enabled: ${recording_enabled}
 - server: ${server}
 - avg_cpu: ${avg_cpu}%
 - max_cpu: ${max_cpu}%
 - preview_id: ${preview_id}
 - metrics_dir: $(cat "$scenario_dir/metrics-dir.txt")
+- video_path: ${video_path}
 
 ## Files
 
@@ -221,6 +259,30 @@ WhenToUse: Read when comparing 0/1/2 preview-stream clients against the same ser
 - server.pidstat.log
 - metrics/
 EOF
+if [[ -f "$scenario_dir/video.ffprobe.txt" ]]; then
+cat >> "$scenario_dir/01-summary.md" <<'EOF'
+
+## Video ffprobe
+
+```text
+EOF
+cat "$scenario_dir/video.ffprobe.txt" >> "$scenario_dir/01-summary.md"
+cat >> "$scenario_dir/01-summary.md" <<'EOF'
+```
+EOF
+fi
+if [[ -f "$scenario_dir/session-finish.json" ]]; then
+cat >> "$scenario_dir/01-summary.md" <<'EOF'
+
+## Session finish payload
+
+```json
+EOF
+cat "$scenario_dir/session-finish.json" >> "$scenario_dir/01-summary.md"
+cat >> "$scenario_dir/01-summary.md" <<'EOF'
+```
+EOF
+fi
 
   kill "$SERVER_PID" 2>/dev/null || true
   wait "$SERVER_PID" 2>/dev/null || true
@@ -232,14 +294,16 @@ build_server
 i=0
 for scenario in $SCENARIOS; do
   name="${scenario%%:*}"
-  clients="${scenario##*:}"
-  run_scenario "$name" "$clients" "$i"
+  rest="${scenario#*:}"
+  clients="${rest%%:*}"
+  recording="${rest##*:}"
+  run_scenario "$name" "$clients" "$recording" "$i"
   i=$((i + 1))
 done
 
 cat > "$RUN_DIR/01-summary.md" <<EOF
 ---
-Title: 03 desktop preview http client matrix run summary
+Title: 05 desktop preview http client recording matrix run summary
 Ticket: SCS-0015
 Status: active
 Topics:
@@ -248,19 +312,20 @@ Topics:
     - performance
     - preview
     - browser
+    - recording
     - analysis
 DocType: reference
 Intent: long-term
 Owners: []
 RelatedFiles: []
 ExternalSources: []
-Summary: Aggregate summary for one desktop preview HTTP client baseline matrix run.
-LastUpdated: 2026-04-14T16:10:00-04:00
-WhatFor: Preserve the scenario directories and quick CPU summary for a desktop preview MJPEG-client baseline run.
+Summary: Aggregate summary for one desktop preview HTTP-client plus recording matrix run.
+LastUpdated: 2026-04-14T16:40:00-04:00
+WhatFor: Preserve the scenario directories and quick CPU summary for the desktop preview MJPEG-client plus recording matrix.
 WhenToUse: Read before drilling into individual scenario result directories.
 ---
 
-# 03 desktop preview http client matrix run summary
+# 05 desktop preview http client recording matrix run summary
 
 - run_dir: $RUN_DIR
 - scenarios: $SCENARIOS

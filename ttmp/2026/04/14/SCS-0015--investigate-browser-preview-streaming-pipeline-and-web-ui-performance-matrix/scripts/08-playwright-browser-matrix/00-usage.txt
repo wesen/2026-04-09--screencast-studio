@@ -1,0 +1,12 @@
+Use these files with the browser tool's filename mode.
+
+Suggested workflow:
+
+1. Close old tabs before each run.
+2. Open one fresh tab and run `01-open-studio-and-wait-desktop.js`.
+3. Optionally open a second tab and run `02-open-second-desktop-tab.js` there.
+4. Optionally run `03-start-recording.js` in the primary tab.
+5. While the scenario is active, run `scripts/07-live-server-browser-scenario-sample.sh` from the shell.
+6. Use `06-capture-browser-preview-state.js` and browser network capture to save browser-side evidence.
+7. If recording was started, run `04-stop-recording.js` afterward.
+8. Close tabs after each scenario to avoid stale MJPEG listeners.
