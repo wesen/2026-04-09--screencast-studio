@@ -161,3 +161,36 @@ Validation performed:
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview_policy.go — typed preview policy, layout, stage, and recipe selection for shared preview consumers
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go — preview consumer construction now uses an explicit recipe instead of an implicit stage order
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_test.go — tests for explicit preview layout ordering and recording-time preview-profile selection
+
+### Adaptive preview runtime prototype — slice 2
+
+Implemented the first real behavior-changing adaptive-preview runtime slice in the production shared GStreamer path.
+
+What changed:
+
+- the default shared preview policy now uses `rate-first` layout,
+- recording-time constrained preview profiles are now defined in the production policy,
+- preview consumers now choose their recipe from the shared source rather than always forcing normal mode,
+- when a raw recorder consumer attaches or detaches, the shared source now re-applies the appropriate preview profile to existing preview consumers,
+- the older `scale-first` layout remains available in the policy layer so rollout comparisons are still possible.
+
+The initial recording-time constrained profiles now encoded in the policy are:
+
+- display/window/region: `640 max width`, `4 fps`, `jpeg quality 50`
+- camera: `960 max width`, `6 fps`, `jpeg quality 70`
+
+Validation performed:
+
+- `gofmt -w pkg/media/gst/preview_policy.go pkg/media/gst/shared_video.go pkg/media/gst/shared_video_recording_bridge.go pkg/media/gst/shared_video_test.go`
+- `go test ./pkg/media/gst ./internal/web ./pkg/discovery -count=1`
+- `go test ./... -count=1`
+- `bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e.sh`
+
+The existing real default-runtime E2E harness still completed successfully after this change: preview remained active during recording, recording completed, and valid output media was produced. That gave a good first production-path check before any new live CPU measurements.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview_policy.go — default shared preview policy now defaults to `rate-first` and includes recording-time constrained profiles
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go — preview consumers now derive recipes from the shared source and can have their profile reapplied in place
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go — raw consumer attach/detach now triggers preview-profile rebalance on the shared source
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_test.go — focused tests now cover layout selection, recording-time profile selection, and desired preview recipe selection under raw-consumer contention

@@ -2124,3 +2124,131 @@ Tasks completed in this slice:
 
 - `Refactor shared preview construction so preview branch ordering is selected explicitly rather than being implicitly hardcoded in one element slice`
 - `Add a small typed preview policy/recipe layer for shared preview consumers so layout and profile choices are easier to reason about and test`
+
+## Step 21: Enabled the First Real Adaptive-Preview Behavior in the Production Runtime
+
+After the policy/recipe refactor was in place, the next slice was the first one that actually changed runtime behavior. I switched the default shared preview policy to `rate-first`, added the recording-time constrained preview profiles to the production policy, and wired the shared source so that preview consumers have their profile reapplied when a recorder raw consumer attaches or detaches.
+
+This slice was intentionally still narrower than “final rollout complete.” It changed the production path, but I kept the older `scale-first` layout available in the policy layer so comparisons remain possible during rollout and future tuning.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, build task by task, commit at ppropriate intervals, and keep a detailed diary"
+
+**Assistant interpretation:** Continue from the refactor slice into the first real adaptive-preview runtime change, but keep the implementation history reviewable and documented.
+
+**Inferred user intent:** Make concrete progress now, but preserve enough narrative and checkpoints that the behavior change can be reviewed and, if needed, backed out or tuned.
+
+### What I did
+
+Updated:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview_policy.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_test.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/tasks.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/changelog.md`
+
+Behavior changes in this slice:
+
+- the default preview layout is now `rate-first`,
+- shared preview consumers now derive their recipe from the shared source rather than always forcing normal mode,
+- shared sources now define both normal and recording-time preview profiles,
+- and raw recorder attach/detach now triggers preview-profile rebalance for existing preview consumers.
+
+Initial recording-time constrained profiles encoded in the production policy:
+
+- display/window/region: `640 max width`, `4 fps`, `jpeg quality 50`
+- camera: `960 max width`, `6 fps`, `jpeg quality 70`
+
+### Why
+
+The standalone experiments had already narrowed the most promising production change to the **combined adaptive direction**:
+
+- constrained preview while recording,
+- plus rate-first preview ordering.
+
+The right next move was therefore to implement that combined direction in the real runtime and check that it still preserved the working shared-capture behavior.
+
+### What worked
+
+Validation passed cleanly.
+
+Commands that succeeded:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+gofmt -w pkg/media/gst/preview_policy.go pkg/media/gst/shared_video.go pkg/media/gst/shared_video_recording_bridge.go pkg/media/gst/shared_video_test.go
+go test ./pkg/media/gst ./internal/web ./pkg/discovery -count=1
+go test ./... -count=1
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e.sh
+```
+
+The most important production-path validation here was the existing real default-runtime harness. It still completed successfully after the adaptive-preview change:
+
+- preview remained active during recording,
+- recording finished successfully,
+- and valid output media was produced.
+
+### What didn't work
+
+No new hard failure appeared in this slice.
+
+The familiar `recording.gst.audio_level.parse.failed` log noise remained visible during the default-runtime harness, but that is the known pre-existing audio meter parsing caveat, not a new adaptive-preview regression.
+
+### What I learned
+
+The refactor in Step 20 paid off immediately. Once preview layout and preview profile were explicit policy decisions, the production behavior change became a fairly direct implementation instead of another tangled rewrite of element order and numeric constants.
+
+I also learned that the shared source was already the right place to drive preview-mode transitions. Raw consumer attach/detach is the natural event boundary for switching preview policy on the same source.
+
+### What was tricky to build
+
+The tricky part was making sure I changed **profile** dynamically but not **layout** dynamically. The default runtime now uses `rate-first`, but the attach/detach-time adaptation only reapplies profile settings in place. That keeps the runtime behavior change controlled and avoids trying to restructure a live branch graph at the moment recording starts.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview_policy.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go`
+
+The key review question is whether the attach/detach-time profile rebalance is happening at the right level and with acceptable live-pipeline risk.
+
+### What should be done in the future
+
+The next slice should measure the effect in the live app path rather than just the default-runtime harness. We now need real before/after app-path evidence, not just isolated and synthetic confirmation.
+
+### Code review instructions
+
+Review the production policy defaults in:
+
+- `pkg/media/gst/preview_policy.go`
+
+Then review the attach/detach-time rebalance hooks in:
+
+- `pkg/media/gst/shared_video.go`
+- `pkg/media/gst/shared_video_recording_bridge.go`
+
+Finally review the validation evidence by re-running:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+go test ./... -count=1
+bash ./ttmp/2026/04/13/SCS-0012--gstreamer-migration-deep-analysis-experiments-and-intern-guide/scripts/16-web-gst-default-runtime-e2e.sh
+```
+
+### Technical details
+
+Tasks completed in this slice:
+
+- `Implement a rate-first preview branch option in the real shared runtime`
+- `Keep the existing scale-first ordering available long enough to compare against the new runtime behavior during rollout`
+- `Add recording-time constrained preview profiles for shared sources`
+- `Start with the experimentally-supported constrained profile for screen-like sources`
+- `Choose and document an initial constrained camera profile for recording-time preview`
+- `Recompute or reapply preview profiles when a recorder raw consumer attaches to a shared source`
+- `Restore the normal preview profile automatically when the recorder raw consumer detaches`
+- `Add focused unit tests for preview layout selection and preview profile selection`
+- `Add focused unit tests for recording-time preview downgrade and post-record restore behavior`
+- `Extend the existing validation harnesses or add one focused runtime test that proves preview remains live while recording under the adaptive-preview path`

@@ -92,6 +92,36 @@ func TestPreviewProfileWhileRecordingUsesConstrainedProfile(t *testing.T) {
 	}
 }
 
+func TestDefaultSharedPreviewPolicyUsesRateFirstLayout(t *testing.T) {
+	policy := defaultSharedPreviewPolicy()
+	if policy.normalizedLayout() != sharedPreviewLayoutRateFirst {
+		t.Fatalf("expected default preview layout %s, got %s", sharedPreviewLayoutRateFirst, policy.normalizedLayout())
+	}
+}
+
+func TestDesiredPreviewRecipeLockedUsesRecordingModeWhenRawConsumerActive(t *testing.T) {
+	source := &sharedVideoSource{
+		source:        dsl.EffectiveVideoSource{Type: "region", Target: dsl.VideoTarget{Rect: &dsl.Rect{W: 2880, H: 960}}, Capture: dsl.VideoCaptureSettings{FPS: 24}},
+		previewPolicy: defaultSharedPreviewPolicy(),
+		rawConsumers:  map[string]*sharedRawConsumer{"raw-1": {}},
+		consumers:     map[string]*sharedPreviewConsumer{},
+	}
+
+	recipe := source.desiredPreviewRecipeLocked()
+	if recipe.Layout != sharedPreviewLayoutRateFirst {
+		t.Fatalf("expected rate-first layout, got %s", recipe.Layout)
+	}
+	if recipe.Profile.MaxWidth != 640 {
+		t.Fatalf("expected recording preview max width 640, got %d", recipe.Profile.MaxWidth)
+	}
+	if recipe.Profile.FPS != 4 {
+		t.Fatalf("expected recording preview fps 4, got %d", recipe.Profile.FPS)
+	}
+	if recipe.Profile.JPEGQuality != 50 {
+		t.Fatalf("expected recording preview jpeg quality 50, got %d", recipe.Profile.JPEGQuality)
+	}
+}
+
 func TestPreviewStagesForLayout(t *testing.T) {
 	gotScaleFirst := previewStagesForLayout(sharedPreviewLayoutScaleFirst)
 	wantScaleFirst := []sharedPreviewStage{

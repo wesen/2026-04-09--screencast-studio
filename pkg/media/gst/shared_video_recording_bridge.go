@@ -374,6 +374,7 @@ func (s *sharedVideoSource) attachRawConsumer(opts sharedRawConsumerOptions) (*s
 	}
 
 	s.rawConsumers[consumer.id] = consumer
+	s.syncPreviewProfilesLocked()
 	log.Info().
 		Str("event", "capture.gst.shared.raw.attach").
 		Str("signature", s.signature).
@@ -402,6 +403,7 @@ func (s *sharedVideoSource) detachRawConsumer(consumerID string, err error) {
 		s.refCount--
 	}
 	remainingRaw := len(s.rawConsumers)
+	s.syncPreviewProfilesLocked()
 	shouldShutdown := !s.closed && s.refCount == 0 && len(s.consumers) == 0 && remainingRaw == 0
 	s.mu.Unlock()
 

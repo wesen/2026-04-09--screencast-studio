@@ -49,7 +49,7 @@ type sharedPreviewPolicy struct {
 
 func defaultSharedPreviewPolicy() sharedPreviewPolicy {
 	return sharedPreviewPolicy{
-		Layout: sharedPreviewLayoutScaleFirst,
+		Layout: sharedPreviewLayoutRateFirst,
 		NormalProfiles: sharedPreviewProfiles{
 			Display: sharedPreviewProfile{MaxWidth: 960, FPS: 10, JPEGQuality: 75},
 			Window:  sharedPreviewProfile{MaxWidth: 1280, FPS: 10, JPEGQuality: 80},

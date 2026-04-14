@@ -225,6 +225,7 @@ func (s *sharedVideoSource) attachPreviewConsumer(opts media.PreviewOptions) (*s
 	}
 
 	s.consumers[consumer.id] = consumer
+	s.syncPreviewProfilesLocked()
 	log.Info().
 		Str("event", "capture.gst.shared.preview.attach").
 		Str("signature", s.signature).
@@ -461,9 +462,36 @@ type sharedPreviewProfile struct {
 	JPEGQuality int
 }
 
+func (s *sharedVideoSource) desiredPreviewModeLocked() sharedPreviewMode {
+	if len(s.rawConsumers) > 0 {
+		return sharedPreviewModeRecording
+	}
+	return sharedPreviewModeNormal
+}
+
+func (s *sharedVideoSource) desiredPreviewRecipe() sharedPreviewRecipe {
+	if s == nil {
+		return defaultSharedPreviewPolicy().recipeFor(dsl.EffectiveVideoSource{}, sharedPreviewModeNormal)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.desiredPreviewRecipeLocked()
+}
+
+func (s *sharedVideoSource) desiredPreviewRecipeLocked() sharedPreviewRecipe {
+	return s.previewPolicy.recipeFor(s.source, s.desiredPreviewModeLocked())
+}
+
+func (s *sharedVideoSource) syncPreviewProfilesLocked() {
+	recipe := s.desiredPreviewRecipeLocked()
+	for _, consumer := range s.consumers {
+		consumer.applyProfile(s.source, recipe.Profile)
+	}
+}
+
 func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOptions) (*sharedPreviewConsumer, error) {
 	consumerID := fmt.Sprintf("preview-%s-%d", trimSharedSignature(source.signature), source.counter.Add(1))
-	recipe := source.previewPolicy.recipeFor(source.source, sharedPreviewModeNormal)
+	recipe := source.desiredPreviewRecipe()
 	previewWidth, previewHeight := previewTargetDimensions(source.source, recipe.Profile.MaxWidth)
 	queue, err := gst.NewElementWithName("queue", consumerID+"-queue")
 	if err != nil {
@@ -668,6 +696,25 @@ func (c *sharedPreviewConsumer) setLatestFrame(frame []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.latestFrame = append([]byte(nil), frame...)
+}
+
+func (c *sharedPreviewConsumer) applyProfile(source dsl.EffectiveVideoSource, profile sharedPreviewProfile) {
+	if c == nil {
+		return
+	}
+	width, height := previewTargetDimensions(source, profile.MaxWidth)
+	if c.capsRate != nil {
+		c.capsRate.Set("caps", gst.NewCapsFromString(fmt.Sprintf("video/x-raw,framerate=%d/1", profile.FPS)))
+	}
+	if c.capsSize != nil {
+		c.capsSize.Set("caps", gst.NewCapsFromString(previewScaleCaps(width, height)))
+	}
+	if c.jpegenc != nil {
+		c.jpegenc.Set("quality", profile.JPEGQuality)
+	}
+	c.mu.Lock()
+	c.profile = profile
+	c.mu.Unlock()
 }
 
 func buildSharedVideoSourcePipeline(source dsl.EffectiveVideoSource) (*gst.Pipeline, *gst.Element, error) {

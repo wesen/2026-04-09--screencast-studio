@@ -37,17 +37,17 @@
 
 - [x] Refactor shared preview construction so preview branch ordering is selected explicitly rather than being implicitly hardcoded in one element slice
 - [x] Add a small typed preview policy/recipe layer for shared preview consumers so layout and profile choices are easier to reason about and test
-- [ ] Implement a `rate-first` preview branch option in the real shared runtime (`queue -> videorate -> fps caps -> videoscale -> size caps -> jpegenc -> appsink`)
-- [ ] Keep the existing `scale-first` ordering available long enough to compare against the new runtime behavior during rollout
-- [ ] Add recording-time constrained preview profiles for shared sources
-- [ ] Start with the experimentally-supported constrained profile for screen-like sources (`640 max width`, `4 fps`, `jpeg quality 50`)
-- [ ] Choose and document an initial constrained camera profile for recording-time preview
-- [ ] Recompute or reapply preview profiles when a recorder raw consumer attaches to a shared source
-- [ ] Restore the normal preview profile automatically when the recorder raw consumer detaches
+- [x] Implement a `rate-first` preview branch option in the real shared runtime (`queue -> videorate -> fps caps -> videoscale -> size caps -> jpegenc -> appsink`)
+- [x] Keep the existing `scale-first` ordering available long enough to compare against the new runtime behavior during rollout
+- [x] Add recording-time constrained preview profiles for shared sources
+- [x] Start with the experimentally-supported constrained profile for screen-like sources (`640 max width`, `4 fps`, `jpeg quality 50`)
+- [x] Choose and document an initial constrained camera profile for recording-time preview
+- [x] Recompute or reapply preview profiles when a recorder raw consumer attaches to a shared source
+- [x] Restore the normal preview profile automatically when the recorder raw consumer detaches
 - [ ] Ensure profile changes happen without reintroducing the preview-freeze regression fixed by the async recording bridge
-- [ ] Add focused unit tests for preview layout selection and preview profile selection
-- [ ] Add focused unit tests for recording-time preview downgrade and post-record restore behavior
-- [ ] Extend the existing validation harnesses or add one focused runtime test that proves preview remains live while recording under the adaptive-preview path
+- [x] Add focused unit tests for preview layout selection and preview profile selection
+- [x] Add focused unit tests for recording-time preview downgrade and post-record restore behavior
+- [x] Extend the existing validation harnesses or add one focused runtime test that proves preview remains live while recording under the adaptive-preview path
 - [ ] Measure real app/runtime CPU before and after the adaptive-preview prototype using the live `scs-web-ui` path
 - [ ] Evaluate whether preview quality during recording remains acceptable with the constrained profile
 - [ ] Decide whether adaptive-preview behavior should be the default runtime policy or a configurable feature flag after real-app validation
