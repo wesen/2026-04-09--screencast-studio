@@ -1,0 +1,4 @@
+sample_index	timestamp_epoch	timestamp_iso	path
+1	1776197038	2026-04-14T16:03:58-04:00	/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/raw/001-1776197038.prom
+2	1776197039	2026-04-14T16:03:59-04:00	/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/raw/002-1776197039.prom
+3	1776197040	2026-04-14T16:04:00-04:00	/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/raw/003-1776197040.prom
