@@ -1,0 +1,53 @@
+2026-04-14T16:10:41.952505705-04:00 INF recording and preview managers already bound to serve runtime context event=runtime.context.bind
+2026-04-14T16:10:41.952595306-04:00 INF telemetry manager starting event=runtime.telemetry.start
+2026-04-14T16:10:41.952671309-04:00 INF telemetry manager run loop starting event=telemetry.run.start
+2026-04-14T16:10:41.952608907-04:00 INF web server starting addr=:7792 event=runtime.http.start initial_dsl_path= preview_limit=4 shutdown_timeout=5000 static_dir=
+2026-04-14T16:10:41.952710199-04:00 INF audio telemetry loop starting event=telemetry.audio.start interval=500
+2026-04-14T16:10:41.95272828-04:00 INF disk telemetry loop starting event=telemetry.disk.start interval=2000
+2026-04-14T16:10:42.947707156-04:00 INF http request duration=0.329382 method=GET path=/api/healthz
+2026-04-14T16:10:43.025748494-04:00 INF preview ensure requested dsl_bytes=507 event=preview.ensure.requested source_id=desktop-1
+2026-04-14T16:10:43.025923765-04:00 INF created preview worker event=preview.ensure.created preview_id=preview-909758a3cc65 source_id=desktop-1 source_name="Full Desktop" source_type=display
+2026-04-14T16:10:43.037387545-04:00 INF created shared gstreamer video source event=capture.gst.shared.acquire.created signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1 source_type=display
+2026-04-14T16:10:43.04044393-04:00 INF started shared gstreamer video source pipeline event=capture.gst.shared.start signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1 source_type=display
+2026-04-14T16:10:43.040517294-04:00 INF attached shared preview consumer consumer_count=1 consumer_id=preview-type-display-display--0--1 event=capture.gst.shared.preview.attach ref_count=1 signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1
+2026-04-14T16:10:43.040539645-04:00 INF started gstreamer preview session on shared source event=preview.gst.start shared_signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1 source_name="Full Desktop" source_type=display
+2026-04-14T16:10:43.040634057-04:00 INF http request duration=14.961069 method=POST path=/api/previews/ensure
+2026-04-14T16:10:43.040663065-04:00 INF preview session waiting event=preview.run.begin preview_id=preview-909758a3cc65 source_id=desktop-1
+2026-04-14T16:10:43.116250572-04:00 INF http request duration=0.065268 method=GET path=/api/previews/preview-909758a3cc65/screenshot
+2026-04-14T16:10:43.377706602-04:00 INF http request duration=0.485401 method=GET path=/api/previews/preview-909758a3cc65/screenshot
+2026-04-14T16:10:43.390687551-04:00 INF http request duration=0.05337 method=GET path=/metrics
+2026-04-14T16:10:43.456059314-04:00 INF http request duration=0.105401 method=GET path=/metrics
+2026-04-14T16:10:44.464994308-04:00 INF http request duration=0.067933 method=GET path=/metrics
+2026-04-14T16:10:45.472286991-04:00 INF http request duration=0.061879 method=GET path=/metrics
+2026-04-14T16:10:46.480136882-04:00 INF http request duration=0.059719 method=GET path=/metrics
+2026-04-14T16:10:47.384798564-04:00 INF http request duration=3998.06511 method=GET path=/api/previews/preview-909758a3cc65/mjpeg
+2026-04-14T16:10:47.385439181-04:00 INF http request duration=3998.547477 method=GET path=/api/previews/preview-909758a3cc65/mjpeg
+2026-04-14T16:10:49.388244429-04:00 INF http request duration=0.126776 method=GET path=/api/previews
+2026-04-14T16:10:49.398373921-04:00 INF runtime shutdown triggered event=runtime.shutdown.begin reason="context canceled" shutdown_timeout=5000
+2026-04-14T16:10:49.398373032-04:00 INF audio telemetry loop exiting event=telemetry.audio.exit reason="context canceled"
+2026-04-14T16:10:49.398442499-04:00 INF disk telemetry loop exiting event=telemetry.disk.exit reason="context canceled"
+2026-04-14T16:10:49.398486867-04:00 INF telemetry manager run loop exited event=telemetry.run.exit reason="context canceled"
+2026-04-14T16:10:49.398524888-04:00 INF telemetry manager exited event=runtime.telemetry.exit reason="context canceled"
+2026-04-14T16:10:49.398450799-04:00 INF http server shutdown starting event=runtime.http.shutdown.begin reason="context canceled"
+2026-04-14T16:10:49.398583088-04:00 INF http server exited cleanly addr=:7792 event=runtime.http.exit
+2026-04-14T16:10:49.398601485-04:00 INF http server shutdown finished event=runtime.http.shutdown.done reason="context canceled"
+2026-04-14T16:10:49.398610931-04:00 INF recording manager shutdown starting event=runtime.recordings.shutdown.begin
+2026-04-14T16:10:49.398623165-04:00 INF recording manager shutdown requested with no session event=recording.shutdown.noop
+2026-04-14T16:10:49.398721967-04:00 INF recording manager shutdown finished event=runtime.recordings.shutdown.done
+2026-04-14T16:10:49.398736542-04:00 INF preview manager shutdown starting event=runtime.previews.shutdown.begin
+2026-04-14T16:10:49.398796904-04:00 INF preview manager shutdown starting event=preview.shutdown.begin preview_count=1
+2026-04-14T16:10:49.398843676-04:00 INF preview manager requested preview cancellation event=preview.shutdown.cancel preview_id=preview-909758a3cc65 source_id=desktop-1
+2026-04-14T16:10:49.39879392-04:00 INF detached shared preview consumer consumer_count=0 consumer_id=preview-type-display-display--0--1 event=capture.gst.shared.preview.detach signature=type=display|display=:0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1
+2026-04-14T16:10:49.398912182-04:00 INF preview finished event=preview.finish preview_id=preview-909758a3cc65 reason="shutdown requested" source_id=desktop-1 state=finished
+2026-04-14T16:10:49.398955915-04:00 INF removing preview from manager maps event=preview.cleanup preview_id=preview-909758a3cc65 signature=909758a3cc65bd0e39a108375a740be6a0bc4bd5
+2026-04-14T16:10:49.39898071-04:00 INF preview shutdown wait completed event=preview.shutdown.wait.done preview_id=preview-909758a3cc65 remaining=0 source_id=desktop-1
+2026-04-14T16:10:49.399007289-04:00 INF preview manager shutdown finished event=preview.shutdown.done preview_count=1
+2026-04-14T16:10:49.399030159-04:00 INF preview manager shutdown finished event=runtime.previews.shutdown.done
+2026-04-14T16:10:49.39904309-04:00 INF waiting for runtime participant to exit event=runtime.participant.wait.begin participant="http server goroutine"
+2026-04-14T16:10:49.399063397-04:00 INF runtime participant exited event=runtime.participant.wait.done participant="http server goroutine"
+2026-04-14T16:10:49.399081774-04:00 INF waiting for telemetry goroutine to exit event=runtime.telemetry.wait.begin
+2026-04-14T16:10:49.399096465-04:00 INF waiting for runtime participant to exit event=runtime.participant.wait.begin participant="telemetry goroutine"
+2026-04-14T16:10:49.399115341-04:00 INF runtime participant exited event=runtime.participant.wait.done participant="telemetry goroutine"
+2026-04-14T16:10:49.399133365-04:00 INF telemetry goroutine exited event=runtime.telemetry.wait.done
+2026-04-14T16:10:49.399176198-04:00 INF runtime shutdown component summary event=runtime.shutdown.components recording_active=false recording_session_id= remaining_previews=0
+2026-04-14T16:10:49.399222524-04:00 INF server runtime exited cleanly event=runtime.shutdown.summary

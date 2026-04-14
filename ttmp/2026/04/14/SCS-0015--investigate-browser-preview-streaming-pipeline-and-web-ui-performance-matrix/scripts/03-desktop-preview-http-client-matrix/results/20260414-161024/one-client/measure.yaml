@@ -1,0 +1,21 @@
+schema: "recorder.config/v1"
+session_id: "browser-preview-stream-matrix"
+destination_templates:
+  per_source: "recordings/{session_id}/{source_name}.{ext}"
+video_sources:
+  - id: "desktop-1"
+    name: "Full Desktop"
+    type: "display"
+    enabled: true
+    target:
+      display: ":0"
+    settings:
+      capture:
+        fps: 24
+        cursor: true
+        follow_resize: false
+      output:
+        container: "mov"
+        video_codec: "h264"
+        quality: 75
+    destination_template: "per_source"

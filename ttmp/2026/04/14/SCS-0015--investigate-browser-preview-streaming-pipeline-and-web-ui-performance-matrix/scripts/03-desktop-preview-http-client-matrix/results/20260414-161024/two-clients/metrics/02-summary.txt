@@ -1,0 +1,5 @@
+metrics_url: http://127.0.0.1:7792/metrics
+duration_seconds: 4
+interval_seconds: 1
+sample_count: 4
+output_dir: /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/two-clients/metrics
