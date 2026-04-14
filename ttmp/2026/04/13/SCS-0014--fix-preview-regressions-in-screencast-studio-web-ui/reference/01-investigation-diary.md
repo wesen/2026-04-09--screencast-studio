@@ -1986,3 +1986,141 @@ rate-first constrained + recorder: 87.61%
 ```
 
 That is why the current recommendation is to prototype the **combined adaptive-preview change** next, not just one isolated tweak.
+
+## Step 20: Refactored Shared Preview Construction into an Explicit Policy / Recipe Layer
+
+I started the production-side adaptive-preview work with a deliberate refactor-only slice instead of changing runtime behavior immediately. The reason was simple: the current preview branch ordering was still effectively “whatever order this one function happened to append elements in.” That makes future changes harder to review, harder to test, and easier to get subtly wrong.
+
+So the first slice separated three concerns that had previously been mixed together:
+
+1. **policy** — which preview profile should be used,
+2. **layout** — in what order the preview stages should appear,
+3. **assembly** — how those typed stages are turned into real GStreamer elements.
+
+The important discipline in this step was to avoid changing the live behavior yet. I kept the default layout on the existing `scale-first` normal-preview behavior so the refactor could be tested on its own merits before the more behavior-changing slice that will actually enable adaptive preview at runtime.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, let's add tasks for that"
+
+**Assistant interpretation:** After creating the adaptive-preview task list, start executing the work task by task, commit at reasonable boundaries, and keep the diary updated as implementation proceeds.
+
+**Inferred user intent:** Do not jump straight to a monolithic patch. Build the adaptive-preview prototype incrementally with a reviewable history.
+
+### What I did
+
+Added a new file:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview_policy.go`
+
+Updated:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_test.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/tasks.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/changelog.md`
+
+Implementation details of the slice:
+
+- introduced typed preview layouts:
+  - `scale-first`
+  - `rate-first`
+- introduced typed preview stages:
+  - `queue`
+  - `scale`
+  - `scale-caps`
+  - `rate`
+  - `rate-caps`
+  - `jpeg`
+  - `sink`
+- introduced a typed preview policy with:
+  - normal preview profiles,
+  - recording preview profiles,
+  - layout selection,
+  - and recipe generation for a given source + mode
+- changed shared preview consumer construction so it now builds from an explicit preview recipe rather than one implicit hard-coded element ordering slice
+- kept the current runtime on the default `scale-first` normal-preview behavior after the refactor
+
+### Why
+
+This slice unlocks the next ones.
+
+The next adaptive-preview behavior changes need to be able to say, clearly and testably:
+
+- “use a recording-time preview profile now,” and
+- “build the preview branch as `rate-first` now.”
+
+Before this refactor, those choices were buried inside one element-building function. After this refactor, they are explicit policy decisions.
+
+### What worked
+
+The refactor stayed small enough to validate cleanly.
+
+Validation that passed:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+gofmt -w pkg/media/gst/preview_policy.go pkg/media/gst/shared_video.go pkg/media/gst/shared_video_test.go
+go test ./pkg/media/gst ./internal/web ./pkg/discovery -count=1
+go test ./... -count=1
+```
+
+I also added focused tests for:
+
+- recording-time preview profile selection,
+- stage ordering for `scale-first`,
+- stage ordering for `rate-first`,
+- and preview FPS clamping for non-default profile caps.
+
+### What didn't work
+
+Nothing materially failed in this slice. The main thing I had to catch during implementation was one stale reference to `profile.FPS` after switching the builder over to `recipe.Profile.FPS`. That was a small compile-time refactor slip, not a deeper design problem.
+
+### What I learned
+
+This was a good reminder that even when we think we are “just changing pipeline order,” it helps to make the order itself a first-class typed concept. Once the ordering and profiles were explicit, the next adaptive-preview steps became much more straightforward to reason about.
+
+### What was tricky to build
+
+The tricky part was deciding how far to go with abstraction in one step. I did **not** want to invent a giant generic media-graph DSL yet. That would have been too much for the current goal.
+
+Instead I kept the abstraction tight:
+
+- enough structure to make preview layout and preview profile choices explicit,
+- but not so much machinery that the refactor itself became the project.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview_policy.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_test.go`
+
+The key review question is whether this is the right level of declaration for preview layout/policy work without over-abstracting too early.
+
+### What should be done in the future
+
+The next slice should actually use this structure for behavior change:
+
+- enable recording-time constrained preview profiles in the real runtime,
+- and switch the preview branch to `rate-first` ordering.
+
+### Code review instructions
+
+Review the new preview policy types first:
+
+- `pkg/media/gst/preview_policy.go`
+
+Then review how `buildSharedPreviewConsumer(...)` now consumes the recipe in:
+
+- `pkg/media/gst/shared_video.go`
+
+Finally confirm the new test coverage in:
+
+- `pkg/media/gst/shared_video_test.go`
+
+### Technical details
+
+Tasks completed in this slice:
+
+- `Refactor shared preview construction so preview branch ordering is selected explicitly rather than being implicitly hardcoded in one element slice`
+- `Add a small typed preview policy/recipe layer for shared preview consumers so layout and profile choices are easier to reason about and test`

@@ -85,11 +85,12 @@ func (r *captureRegistry) remove(signature string, shared *sharedVideoSource) {
 }
 
 type sharedVideoSource struct {
-	registry  *captureRegistry
-	signature string
-	source    dsl.EffectiveVideoSource
-	pipeline  *gst.Pipeline
-	tee       *gst.Element
+	registry      *captureRegistry
+	signature     string
+	source        dsl.EffectiveVideoSource
+	pipeline      *gst.Pipeline
+	tee           *gst.Element
+	previewPolicy sharedPreviewPolicy
 
 	mu           sync.Mutex
 	watch        *busWatch
@@ -109,14 +110,15 @@ func newSharedVideoSource(source dsl.EffectiveVideoSource, signature string, reg
 		return nil, err
 	}
 	return &sharedVideoSource{
-		registry:     registry,
-		signature:    signature,
-		source:       source,
-		pipeline:     pipeline,
-		tee:          tee,
-		stopWait:     make(chan struct{}),
-		consumers:    map[string]*sharedPreviewConsumer{},
-		rawConsumers: map[string]*sharedRawConsumer{},
+		registry:      registry,
+		signature:     signature,
+		source:        source,
+		pipeline:      pipeline,
+		tee:           tee,
+		previewPolicy: defaultSharedPreviewPolicy(),
+		stopWait:      make(chan struct{}),
+		consumers:     map[string]*sharedPreviewConsumer{},
+		rawConsumers:  map[string]*sharedRawConsumer{},
 	}, nil
 }
 
@@ -439,6 +441,12 @@ type sharedPreviewConsumer struct {
 	teePad   *gst.Pad
 	onLog    func(string, string)
 
+	layout   sharedPreviewLayout
+	profile  sharedPreviewProfile
+	capsRate *gst.Element
+	capsSize *gst.Element
+	jpegenc  *gst.Element
+
 	done      chan struct{}
 	closeOnce sync.Once
 
@@ -455,8 +463,8 @@ type sharedPreviewProfile struct {
 
 func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOptions) (*sharedPreviewConsumer, error) {
 	consumerID := fmt.Sprintf("preview-%s-%d", trimSharedSignature(source.signature), source.counter.Add(1))
-	profile := previewProfileForSource(source.source)
-	previewWidth, previewHeight := previewTargetDimensions(source.source, profile.MaxWidth)
+	recipe := source.previewPolicy.recipeFor(source.source, sharedPreviewModeNormal)
+	previewWidth, previewHeight := previewTargetDimensions(source.source, recipe.Profile.MaxWidth)
 	queue, err := gst.NewElementWithName("queue", consumerID+"-queue")
 	if err != nil {
 		return nil, fmt.Errorf("create preview queue: %w", err)
@@ -477,7 +485,7 @@ func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOpt
 	if err != nil {
 		return nil, fmt.Errorf("create preview videorate: %w", err)
 	}
-	capsRate, err := newCapsFilter(fmt.Sprintf("video/x-raw,framerate=%d/1", profile.FPS))
+	capsRate, err := newCapsFilter(fmt.Sprintf("video/x-raw,framerate=%d/1", recipe.Profile.FPS))
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +494,7 @@ func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOpt
 	if err != nil {
 		return nil, fmt.Errorf("create preview jpegenc: %w", err)
 	}
-	jpegenc.Set("quality", profile.JPEGQuality)
+	jpegenc.Set("quality", recipe.Profile.JPEGQuality)
 	sink, err := app.NewAppSink()
 	if err != nil {
 		return nil, fmt.Errorf("create preview appsink: %w", err)
@@ -500,9 +508,14 @@ func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOpt
 		id:       consumerID,
 		source:   source,
 		queue:    queue,
-		elements: []*gst.Element{queue, videoscale, capsScale, videorate, capsRate, jpegenc, sink.Element},
+		elements: previewElementsForRecipe(recipe, queue, videorate, capsRate, videoscale, capsScale, jpegenc, sink.Element),
 		sink:     sink,
 		onLog:    opts.OnLog,
+		layout:   recipe.Layout,
+		profile:  recipe.Profile,
+		capsRate: capsRate,
+		capsSize: capsScale,
+		jpegenc:  jpegenc,
 		done:     make(chan struct{}),
 	}
 
@@ -533,31 +546,26 @@ func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOpt
 }
 
 func previewProfileForSource(source dsl.EffectiveVideoSource) sharedPreviewProfile {
-	profile := sharedPreviewProfile{
-		MaxWidth:    960,
-		FPS:         previewFPS(source.Capture.FPS),
-		JPEGQuality: 75,
-	}
+	return defaultSharedPreviewPolicy().profileForSource(source, sharedPreviewModeNormal)
+}
 
-	switch source.Type {
-	case "camera":
-		profile.MaxWidth = 1280
-		profile.JPEGQuality = 85
-	case "window", "region":
-		profile.MaxWidth = 1280
-		profile.JPEGQuality = 80
-	case "display":
-		profile.JPEGQuality = 75
-	}
-	return profile
+func previewProfileForSourceWhileRecording(source dsl.EffectiveVideoSource) sharedPreviewProfile {
+	return defaultSharedPreviewPolicy().profileForSource(source, sharedPreviewModeRecording)
 }
 
 func previewFPS(sourceFPS int) int {
-	if sourceFPS <= 0 {
-		return 10
+	return previewFPSForProfile(sourceFPS, 10)
+}
+
+func previewFPSForProfile(sourceFPS int, maxFPS int) int {
+	if maxFPS <= 0 {
+		maxFPS = 10
 	}
-	if sourceFPS > 10 {
-		return 10
+	if sourceFPS <= 0 {
+		return maxFPS
+	}
+	if sourceFPS > maxFPS {
+		return maxFPS
 	}
 	return sourceFPS
 }
@@ -598,6 +606,26 @@ func previewSourceSize(source dsl.EffectiveVideoSource) (int, int) {
 		return width, height
 	}
 	return 0, 0
+}
+
+func previewElementsForRecipe(recipe sharedPreviewRecipe, queue, videorate, capsRate, videoscale, capsScale, jpegenc, sink *gst.Element) []*gst.Element {
+	parts := map[sharedPreviewStage]*gst.Element{
+		sharedPreviewStageQueue:     queue,
+		sharedPreviewStageRate:      videorate,
+		sharedPreviewStageRateCaps:  capsRate,
+		sharedPreviewStageScale:     videoscale,
+		sharedPreviewStageScaleCaps: capsScale,
+		sharedPreviewStageJPEG:      jpegenc,
+		sharedPreviewStageSink:      sink,
+	}
+	elements := make([]*gst.Element, 0, len(recipe.Stages))
+	for _, stage := range recipe.Stages {
+		element := parts[stage]
+		if element != nil {
+			elements = append(elements, element)
+		}
+	}
+	return elements
 }
 
 func (c *sharedPreviewConsumer) finish(err error) {

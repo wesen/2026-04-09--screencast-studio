@@ -132,3 +132,32 @@ The clearest interpretation is not that every individual piece of the imported p
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/17-go-preview-adaptive-repeatability-matrix/results/20260414-135308/01-summary.md — repeated standalone confirmation result that best supports the combined adaptive-preview direction
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/18-preview-adaptive-confirmation-summary.md — human-readable interpretation of the adaptive-preview confirmation experiments
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/reference/03-research-brief-preview-and-recording-performance-investigation-handoff.md — copied ticket-local version of the detailed researcher handoff brief from the Obsidian vault so the research package also lives inside the ticket workspace
+
+### Adaptive preview runtime prototype — slice 1
+
+Started the production-side adaptive-preview work with a refactor-only slice in the shared preview runtime. This slice does **not** yet change the effective runtime behavior. Instead, it prepares the code so later adaptive changes are easier to implement and test cleanly.
+
+What changed:
+
+- added `pkg/media/gst/preview_policy.go` with a small typed preview policy / recipe layer,
+- introduced explicit preview layouts (`scale-first`, `rate-first`),
+- made preview branch stage ordering explicit via typed stages instead of one implicit hard-coded element slice,
+- wired `pkg/media/gst/shared_video.go` to build preview consumers from a recipe,
+- added test coverage for:
+  - recording-time preview profile selection,
+  - explicit stage ordering for `scale-first` vs `rate-first`,
+  - and profile FPS clamping for non-default profile caps.
+
+Important note: the default runtime still uses the existing `scale-first` normal-preview behavior after this slice. The point of the slice was to separate **policy**, **ordering**, and **element assembly** before changing live runtime behavior.
+
+Validation performed:
+
+- `gofmt -w pkg/media/gst/preview_policy.go pkg/media/gst/shared_video.go pkg/media/gst/shared_video_test.go`
+- `go test ./pkg/media/gst ./internal/web ./pkg/discovery -count=1`
+- `go test ./... -count=1`
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/preview_policy.go — typed preview policy, layout, stage, and recipe selection for shared preview consumers
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go — preview consumer construction now uses an explicit recipe instead of an implicit stage order
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_test.go — tests for explicit preview layout ordering and recording-time preview-profile selection
