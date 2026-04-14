@@ -1,0 +1,34 @@
+display=:0
+root=2880x1920+0+0
+region=0,960,2880,960
+fps=24
+preview_fps=10
+preview_width=1280
+preview_height=427
+## capture-to-fakesink
+- avg_cpu: 23.17%
+- max_cpu: 26.00%
+## preview-like-jpeg
+- avg_cpu: 11.67%
+- max_cpu: 13.00%
+## direct-record-current
+- avg_cpu: 91.35%
+- max_cpu: 93.00%
+- output: /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/06-gst-recording-performance-matrix/results/20260413-233653/direct-record-current.mp4
+  codec_name=h264
+  width=2880
+  height=960
+  avg_frame_rate=24/1
+  duration=5.958333
+  size=1471199
+## direct-record-ultrafast
+- avg_cpu: 61.83%
+- max_cpu: 70.00%
+- output: /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/06-gst-recording-performance-matrix/results/20260413-233653/direct-record-ultrafast.mp4
+  codec_name=h264
+  width=2880
+  height=960
+  avg_frame_rate=24/1
+  duration=5.958333
+  size=1568566
+Results written to /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/06-gst-recording-performance-matrix/results/20260413-233653

@@ -25,6 +25,16 @@ topics:
       description: Recording session lifecycle and output topics
     - slug: screencast-studio
       description: Documentation related to the screencast-studio repository and runtime.
+    - slug: transcripts
+      description: Audio/video transcription and ASR processing
+    - slug: analysis
+      description: Code and content analysis
+    - slug: go
+      description: Go language and Go application/runtime design work
+    - slug: gstreamer
+      description: GStreamer runtime, pipeline, and media graph work
+    - slug: transcription
+      description: Audio transcription pipelines, transcript events, and transcript artifacts
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes

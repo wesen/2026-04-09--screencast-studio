@@ -1,0 +1,5 @@
+scenario=recorder-only
+duration=6s
+output=/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/07-go-shared-recording-performance-matrix/results/20260413-233717/recorder-only.mp4
+source_type=region region=&{X:0 Y:960 W:2880 H:960} fps=24
+recorder_stopped=true

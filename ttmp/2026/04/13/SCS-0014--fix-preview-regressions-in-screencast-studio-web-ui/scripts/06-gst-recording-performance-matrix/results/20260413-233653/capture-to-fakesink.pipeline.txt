@@ -1,0 +1,1 @@
+pipeline: ximagesrc display-name=:0 use-damage=false show-pointer=true ! videocrop left=0 top=960 right=0 bottom=0 ! videoconvert ! videoscale ! videorate ! video/x-raw,format=I420,width=2880,height=960,framerate=24/1,pixel-aspect-ratio=1/1 ! fakesink sync=false

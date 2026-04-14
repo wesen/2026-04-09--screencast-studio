@@ -1,0 +1,768 @@
+1
+00:00:02,240 --> 00:00:16,000
+Welcome back to the Go Go Golems lab spider welcome back to the welcome back to the Go Go Golems lab today a special episode
+
+2
+00:00:16,320 --> 00:00:24,800
+we're gonna be rabbit holeing with LLMs I'm sure you've gone down deep the rabbit hole talking about one thing or the other
+
+3
+00:00:25,039 --> 00:00:34,880
+I'll show you what my workflow looks and how I use it to basically learn new things, learn new skills both in terms of how
+
+4
+00:00:35,039 --> 00:00:42,000
+LLMs work, what you can do with LLMs, what can tools do that are out there, but also just pure fundamental knowledge that
+
+5
+00:00:42,560 --> 00:00:47,119
+will help me create better software at the end of the day, right?
+
+6
+00:00:47,039 --> 00:00:57,200
+So let's imagine that I wanna do something random I have a certain task I'm gonna go to Chat GPT and I'm gonna use that as
+
+7
+00:00:57,359 --> 00:01:00,560
+a starting point for a rabbit hole.
+
+8
+00:01:00,079 --> 00:01:02,160
+So So my my today's today's rabbit rabbit hole.
+
+9
+00:01:02,079 --> 00:01:09,040
+hole it's a pretty stupid one.
+
+10
+00:01:08,960 --> 00:01:18,799
+It's I want to do the square root of something so square root of and I'm gonna see you know I'm I'm using this to show how
+
+11
+00:01:19,120 --> 00:01:27,120
+LLMs can be wrong as well I'm gonna be nah I'm not sure I really trust this cause it's an LLM I don't really see what I have
+
+12
+00:01:27,680 --> 00:01:36,480
+I wanna learn more about how to get computers to do square roots because I do want to have you know a correct result so I'm
+
+13
+00:01:36,960 --> 00:01:43,840
+an instant I did that on purpose I would usually never use instant I would go to thinking at least put standard thinking so
+
+14
+00:01:43,840 --> 00:01:51,599
+that would be the first thing is hey instant did this I don't really trust that it was really fast but I'm not really sure
+
+15
+00:01:51,759 --> 00:02:00,800
+so what I'm gonna do now is I'm gonna see what does light thinking say you know so first step of the rabbit hole is basically
+
+16
+00:02:01,280 --> 00:02:09,039
+Is basically iterating on what the LLM does and I don't know if I can go back to the previous we can kind of start checking
+
+17
+00:02:09,360 --> 00:02:18,639
+so it's kind of the same is it true no one knows because there are LLMs right So here same thing and now I'm gonna go to standard
+
+18
+00:02:18,879 --> 00:02:26,400
+thinking why not learn a little bit about what these different thinking levels do oh we can see here we have a little bit
+
+19
+00:02:26,479 --> 00:02:35,920
+more happening and it is writing some code so now suddenly we can have a little bit more information we can see oh well this
+
+20
+00:02:36,000 --> 00:02:47,120
+code Python tells us the integer is this it does double check the integer which is amazing I actually hadn't seen that before
+
+21
+00:02:47,280 --> 00:02:56,240
+this is pretty cool It's a cool pattern discovered something learned something right it's bracketing square roots interesting
+
+22
+00:02:56,319 --> 00:03:04,800
+thing might go into my knowledge base which we'll get to later And and I now see how to do it in Python.
+
+23
+00:03:04,719 --> 00:03:10,240
+I can go back and see does this fully match what we had?
+
+24
+00:03:10,240 --> 00:03:21,360
+No, you can start to see the real value as computed by Python is this compared to the light thinking it's this and then compared
+
+25
+00:03:21,360 --> 00:03:32,800
+to the the original one this is interesting this one is actually correct this was the first one we did with instant so interesting
+
+26
+00:03:33,680 --> 00:03:41,680
+interesting here however we do have the code which means that we can take this code and we can you know we can we can basically
+
+27
+00:03:41,840 --> 00:03:50,879
+run it on our own anyway we're not done yet we're gonna go to extended thinking and see what happens there because we're rabbit
+
+28
+00:03:50,960 --> 00:04:02,240
+holeing so I do these things fairly often where I'm I feel bored I'm gonna do something here what's interesting is Is we we
+
+29
+00:04:02,240 --> 00:04:08,479
+don't see the Python code so maybe it got censored away and it did actually run the Python code, which is what I suspect happened
+
+30
+00:04:10,319 --> 00:04:21,759
+here I suspect it actually ran the code it's just not showing that to us and here we we do have this up to the decimal right
+
+31
+00:04:23,519 --> 00:04:37,040
+yeah so I suspect this one render code it doesn't show it to us it's interesting to see let's go to heavy thinking and I'm
+
+32
+00:04:37,040 --> 00:04:47,360
+not sure if you know if the thinking level here does make that much of a difference it's hard to tell with these censored
+
+33
+00:04:47,439 --> 00:05:00,800
+models right no need for the web so here it's definitely thinking longer what's interesting is that it was Streaming streaming
+
+34
+00:05:01,040 --> 00:05:06,879
+this this, but but here here it it puts puts it it into a single one and I can use a calculator and then here we can tell
+
+35
+00:05:07,199 --> 00:05:21,120
+it's okay, so we learned a little bit of something since we have you know a lot of time to spend I'm gonna open Pi gonna go
+
+36
+00:05:21,279 --> 00:05:30,639
+into my little Patreon and I'm gonna go into the videos and then I'm gonna go into my square root and we're gonna try out
+
+37
+00:05:30,879 --> 00:05:38,240
+the different models here so I'm using Kimmy K two P five turbo and I'm literally gonna put in the same prompt cause I wanna
+
+38
+00:05:38,240 --> 00:05:51,199
+see within the context of a coding agent what does it do the small model actually runs Python right and I actually don't know
+
+39
+00:05:51,279 --> 00:05:59,840
+how to regenerate but interesting thing it ran Python I have the Python code pretty good if I run it again what happens here
+
+40
+00:06:01,279 --> 00:06:08,480
+Here it's it's doing the doing the same Python roughly it's doing two Pythons interesting, right?
+
+41
+00:06:08,399 --> 00:06:20,240
+So here it's doing a decimal something new that I learned right I didn't know that this existed if we go back to I think it
+
+42
+00:06:20,160 --> 00:06:34,319
+was number two number three so interestingly by the way light thinking was wrong instant was right so I the bracketing here
+
+43
+00:06:35,840 --> 00:06:50,959
+so I'm gonna try that bracket E square root right so here we can see the prompting of Kimi K two P five is something I have
+
+44
+00:06:50,959 --> 00:07:01,279
+to learn cause if I had use another model I would have I if I had used maybe even GPT five it It would have would worked have
+
+45
+00:07:01,360 --> 00:07:02,079
+worked the way the way intended intended.
+
+46
+00:07:02,240 --> 00:07:19,519
+is no compute the bracketed E square root to validate I hope that this works right so now we have a nice little piece of code
+
+47
+00:07:20,160 --> 00:07:23,600
+that we could potentially reuse, right?
+
+48
+00:07:23,519 --> 00:07:36,319
+I this little bracketing kind of thing so I can tell oh Kim Ep two I learned something about prompting Kimi for example I
+
+49
+00:07:36,560 --> 00:07:47,120
+got some Python and then maybe I can say make a little interactive web app in Python so now I can leverage the fact that I'm
+
+50
+00:07:47,360 --> 00:07:53,439
+in a coding agent that I have a really fast model that it has already written code that I find interesting to say hey why
+
+51
+00:07:53,519 --> 00:08:00,879
+not make it interactive because having interactive little applications are fun and fun is Fun what is makes you what makes
+
+52
+00:08:00,959 --> 00:08:02,079
+learn you learn often often.
+
+53
+00:08:01,759 --> 00:08:17,360
+it's It's playing with things helps you learn, and now I can see right it started it it's gonna navigate to it.
+
+54
+00:08:17,279 --> 00:08:19,600
+It kind of looks very LLM esque.
+
+55
+00:08:19,519 --> 00:08:21,600
+It decided to take a screenshot sure why not?
+
+56
+00:08:22,399 --> 00:08:25,839
+It decided to click on it.
+
+57
+00:08:25,839 --> 00:08:28,240
+that's also very interesting have to.
+
+58
+00:08:28,240 --> 00:08:35,679
+I know that the playwright MCP was turned on so maybe it indexed pretty strongly on it, and now we can see we have a nice
+
+59
+00:08:35,919 --> 00:08:40,399
+little application to play with square roots, right?
+
+60
+00:08:40,399 --> 00:08:43,759
+It's taking screenshots.
+
+61
+00:08:43,679 --> 00:08:53,279
+Sure I don't know how much of its context window it's wasting here but it is definitely interesting, right now I have a little
+
+62
+00:08:53,759 --> 00:09:01,679
+application to bracket things and it's make a slider for the now I don't I don't want to have a slider.
+
+63
+00:09:01,279 --> 00:09:02,320
+perfect.
+
+64
+00:09:01,759 --> 00:09:10,240
+perfect so So we've gone through the process of starting with I want to compute the square root to trying four different settings
+
+65
+00:09:11,200 --> 00:09:18,480
+in Chat GPT and trying to understand what they did or what they didn't do to testing out Kimmy, learning a little bit about
+
+66
+00:09:18,960 --> 00:09:26,080
+Kimi prompting and now having a little square root app that's interactive that I can reuse in the future maybe have a daughter
+
+67
+00:09:26,159 --> 00:09:36,000
+and I want to show her some math problems maybe I just having fun but now we can go one step further right we saw LLMs not
+
+68
+00:09:36,000 --> 00:09:42,720
+good at math writing code pretty good at if they can write code they can write interactive code pretty fun we saw that Kimmy
+
+69
+00:09:42,799 --> 00:09:50,559
+has certain behaviors when prompting I I literally got it this morning so it's very new to me the next thing we can do is
+
+70
+00:09:50,879 --> 00:09:56,720
+hey I want to learn about square root and computation I don't know how a computer does square root right so I can literally
+
+71
+00:09:57,120 --> 00:10:10,320
+say how does a computer do square root and And I'm gonna do this, but also sticking with the you know with the overall context
+
+72
+00:10:11,120 --> 00:10:21,440
+concept I'm going to go back to standard maybe and then just say this here we have the full thinking stream which often is
+
+73
+00:10:21,519 --> 00:10:30,240
+hidden right often we'll just see this I love looking at them and that's why I think small models are really powerful is that
+
+74
+00:10:31,440 --> 00:10:39,679
+this might explain why it does some nonsense later on and here I don't see why it doesn't I don't I don't understand why it
+
+75
+00:10:39,759 --> 00:10:49,440
+did nonsense right if we go back here and light thinking wrong I don't know why did it call a tool did it not why is this
+
+76
+00:10:49,519 --> 00:10:51,600
+wrong and why is this correct?
+
+77
+00:10:51,519 --> 00:11:00,559
+I don't know here I see I have a fairly good chance of understanding if it did X Y Z or not and I think as Models models get
+
+78
+00:11:00,559 --> 00:11:01,519
+get more more and and more more powerful powerful.
+
+79
+00:11:01,440 --> 00:11:06,799
+It's it's actually actually more more interesting to understand why a model didn't do the right thing than having models that
+
+80
+00:11:07,440 --> 00:11:14,879
+incrementally do a you know ninety nine percent the right thing and then ninety nine percent dot five the right thing I don't
+
+81
+00:11:14,879 --> 00:11:22,559
+think that's all that interesting when we can actually just start having a good understanding of what these things do so what's
+
+82
+00:11:22,559 --> 00:11:30,320
+interesting here is it will always it will often surface adjacent stuff that it doesn't reuse in the future but that is actually
+
+83
+00:11:31,519 --> 00:11:41,600
+fairly interesting to go look up on our own right so here we can start doing the kind of recursive rabbit holeing which is
+
+84
+00:11:42,559 --> 00:11:46,399
+you know we got some information here cool I found some youth method met met met met met met met met met method but I can
+
+85
+00:11:47,039 --> 00:11:55,600
+start experimenting even further which is hey what if I just paste the stuff from Kimmy in here and you can see my prompting
+
+86
+00:11:55,759 --> 00:12:02,960
+is very as we saw in the first video that I'm I'm gonna link gonna somewhere link somewhere in here in here I I the first
+
+87
+00:12:02,960 --> 00:12:14,799
+time I do this so I think of it in terms of LLMs are good at dealing with messy content in ways that human can't right so
+
+88
+00:12:14,960 --> 00:12:25,360
+I don't really need to put care into certain words or so or I well well we'll get back to putting care in certain words but
+
+89
+00:12:25,600 --> 00:12:35,919
+I can put really messy stuff in there and see what happens is is my point so what I'm interested in I'm curious if it will
+
+90
+00:12:35,919 --> 00:12:42,000
+index on these words is these two is Goldschmidt I don't know about we saw that the Newton algorithm was something that I
+
+91
+00:12:42,080 --> 00:12:48,879
+brought up before we have the fast inverse square root from Quake which if you don't know about is very interesting the chordic
+
+92
+00:12:48,960 --> 00:12:57,600
+algorithms are really interesting too so in this little tiny little snippet of thinking we do get a really wide spray probabilistic
+
+93
+00:12:58,320 --> 00:13:01,919
+while however the non thinking output is But often is tailored often to tailored have to have a certain a certain output output
+
+94
+00:13:02,240 --> 00:13:12,559
+format at certain rigor style so often less interesting for surfacing random new information for rabbit holeing.
+
+95
+00:13:12,480 --> 00:13:24,399
+So really, really enjoy having this in small models and then now our output out of Chat GPT which has search I don't know
+
+96
+00:13:24,639 --> 00:13:35,279
+I don't think it's searched here we'll get back to that now I have some pretty good information I'm gonna skip over this but
+
+97
+00:13:35,360 --> 00:13:41,600
+if I were really rabbit holeing I would read this carefully and maybe that would be you know my little occ occ occ occ occ
+
+98
+00:13:41,519 --> 00:13:48,720
+occ occ occ occ occ occ occupation for for the evening however what we can do to go even further and go back to this idea
+
+99
+00:13:48,799 --> 00:13:58,879
+of playing is going back to a very expansive model that tries a lot of things and makes things really nice and stuff that
+
+100
+00:13:59,600 --> 00:14:03,519
+so we're gonna go Gonna to go to Claude Claude and and we're we're gonna gonna go to Claude.
+
+101
+00:14:03,440 --> 00:14:14,639
+We're gonna paste this in again very rough and we're gonna say research and then make a nice detail interactive article in
+
+102
+00:14:15,039 --> 00:14:21,919
+the style of Brett Victor essays who has written a lot about what is learning, what does computation allow us to do in terms
+
+103
+00:14:21,919 --> 00:14:33,840
+of learning and leverage the fact that we have code writing for free to build playgrounds that really will help us learn something
+
+104
+00:14:34,879 --> 00:14:40,879
+you can read text, you can try to remember it, but it doesn't really stick with you interacting with something has much higher
+
+105
+00:14:41,440 --> 00:14:42,720
+chance of sticking with you.
+
+106
+00:14:42,639 --> 00:14:50,720
+That's why when you learn you often do labs exercises, internships is usually where the knowledge sticks versus textbook learning,
+
+107
+00:14:50,639 --> 00:14:54,960
+which can be pretty forgettable.
+
+108
+00:14:55,120 --> 00:14:57,200
+so there we go.
+
+109
+00:14:57,120 --> 00:15:01,840
+I would start just rabbit holing by putting all of these things Things in here in here and I know and I know it it will will
+
+110
+00:15:01,919 --> 00:15:07,919
+reset. research each of these little words in here and kind of put them into an interactive context.
+
+111
+00:15:07,840 --> 00:15:16,559
+I don't really care about what this is going to be because I'm rabbit holing but now I'm starting to have real links.
+
+112
+00:15:16,480 --> 00:15:29,200
+That's why I said research and now detailed also because I want it to be a a real article not just a random React app I want
+
+113
+00:15:29,200 --> 00:15:31,519
+to be able to click on these links.
+
+114
+00:15:31,440 --> 00:15:38,320
+That's why I said interactive article and then Brig Victor is you know a stylistic word that will surface a certain type of
+
+115
+00:15:39,440 --> 00:15:50,559
+not just output format but also methodology and Bret Victor's work is think is pretty much about playing about rabbit holeing
+
+116
+00:15:50,639 --> 00:16:03,440
+about using this kind of playful learning so while this is going we can go back to here To here to to Chat GPT who is a little
+
+117
+00:16:03,440 --> 00:16:14,720
+bit more rigorous and uptight and start thinking about actual tools we could use to leverage the things that we've been playing
+
+118
+00:16:14,720 --> 00:16:23,679
+with right So because I don't really know much about Taylor series for example and I'm going to speed this up for the sake
+
+119
+00:16:23,679 --> 00:16:35,919
+of finishing the video I was gonna say what are concretely useful applications of Taylor series that I could put into a small
+
+120
+00:16:36,080 --> 00:16:47,120
+program tool because besides using this for learning and making little toy prototypes or toys or games you know interactive
+
+121
+00:16:47,279 --> 00:16:54,159
+games maybe there's some real useful tools that I can get out of it that I don't even know about but that might be useful
+
+122
+00:16:54,320 --> 00:17:02,399
+for my daily work right so sure little scientific calculator Later this is this is where where it gets it gets interesting
+
+123
+00:17:02,559 --> 00:17:04,559
+if you're into embedded software.
+
+124
+00:17:04,480 --> 00:17:06,960
+This might start to be really interesting.
+
+125
+00:17:06,880 --> 00:17:19,359
+So we're gonna pretend we have a little calculator that we can program and see, right and we're gonna build this or maybe
+
+126
+00:17:19,519 --> 00:17:31,039
+an approximation error explorer that's also a good good good idea so we're gonna do two things at once we're going to tailor
+
+127
+00:17:31,279 --> 00:17:44,000
+approximation workbench so make an interactive canvas tool to visualize error in Taylor series for example right and interactive
+
+128
+00:17:44,160 --> 00:17:53,519
+canvas I think is going to summon the Chat GPT artifacts it's it's a little bit hard to coax it out versus Claude where it's
+
+129
+00:17:53,519 --> 00:18:03,039
+a little bit hard to to make it not appear so learning some prompting here as well and here and here create creating an HTML
+
+130
+00:18:03,359 --> 00:18:05,680
+file that's exactly what I wanted.
+
+131
+00:18:05,599 --> 00:18:12,559
+So here we're building something that is less about having fun and discovery and more about I want a useful tool for this
+
+132
+00:18:13,440 --> 00:18:24,880
+right and in the meantime we're going to see for example is Kinney capable of writing a C calculator write a C scientific
+
+133
+00:18:25,759 --> 00:18:40,480
+calculator with these four operations then I'm just gonna paste whatever I had from over here and then build it right I I
+
+134
+00:18:40,559 --> 00:18:48,319
+guess I didn't even have to do this so does Kimmy work well with these kinds of prompt how long does it think is this going
+
+135
+00:18:48,319 --> 00:18:56,720
+to work is it going to have trouble even compiling it what is it going to do here very interesting questions but also at the
+
+136
+00:18:56,640 --> 00:19:02,720
+end of the day I will have a C calculator to do it right Which I which can I can then then put onto put onto my my embedded
+
+137
+00:19:03,039 --> 00:19:10,640
+device and do sign without having to install a library.
+
+138
+00:19:10,559 --> 00:19:29,519
+This could be very useful, so little bug interesting we might wanna, you know, compare it to other models which which might
+
+139
+00:19:29,519 --> 00:19:40,720
+be fun so we'll try that and then in the meantime we do have our interactive Brett Victor article here right so we can start
+
+140
+00:19:41,440 --> 00:19:56,319
+playing with these and kind of see these different little things so I've seen it yeah it does change those I've seen it do
+
+141
+00:19:56,720 --> 00:20:01,920
+this thing where the slider is at the top and then you have to scroll down to view the To view to the view to the view graph
+
+142
+00:20:01,839 --> 00:20:11,279
+the graph so that might be something to to prompt to to add to the prompt to say you know make sure that the interactive part
+
+143
+00:20:11,279 --> 00:20:21,680
+is fits within one screen but here pretty interesting article it covers the quake trick it doesn't have any links so that
+
+144
+00:20:21,839 --> 00:20:32,640
+might also be something to add into a prompt engineering right and that tells us the next time we do interactive articles
+
+145
+00:20:32,799 --> 00:20:41,599
+we might do them here we might just be this is great CSS maybe a smaller model or maybe Chat GPT is not great at CSS but what
+
+146
+00:20:41,599 --> 00:20:47,920
+we're going to do referring back to the previous video we want useful tokens here we have useful CSS tokens we have useful
+
+147
+00:20:48,559 --> 00:20:58,319
+you know a scaffold for interactive things but maybe GPT is better at filling out the the the interactive things right So
+
+148
+00:20:59,359 --> 00:21:06,880
+next idea is Interactive interactive prototype prototype and here we're building tools still trying to build this tool.
+
+149
+00:21:06,799 --> 00:21:13,519
+What we're going to do in the meantime is we're going to branch this into new chat and now we're going to do some actual research,
+
+150
+00:21:13,440 --> 00:21:14,640
+right?
+
+151
+00:21:14,640 --> 00:21:29,759
+Research great resources about these topics very rabbit holy prompt I'm gonna put it to standard thinking just so that we
+
+152
+00:21:29,759 --> 00:21:39,519
+don't spend all day on this and in the meantime you know we've started gathering a lot of little things without spending a
+
+153
+00:21:39,440 --> 00:21:48,720
+lot of tokens but we are learning a lot even if we don't learn necessarily about signing cost cosign we will maybe learn about
+
+154
+00:21:49,440 --> 00:21:56,319
+hey how does Kimmy do all of this what issues does Kimmy have did it even do this all correctly was it able to test its own
+
+155
+00:21:56,480 --> 00:22:01,200
+thing this is great right these are interesting things but is Is it it correct?
+
+156
+00:22:00,559 --> 00:22:03,599
+correct? I don't know I don't know, but we but have we have tools tools to verify it, right?
+
+157
+00:22:03,599 --> 00:22:15,759
+Because we have cross verify against Python standard library implementations can Kimmy do this?
+
+158
+00:22:15,680 --> 00:22:18,000
+Can Kimmy do quick check tests?
+
+159
+00:22:18,000 --> 00:22:26,960
+How does it going to to build this all very interesting questions is is it going to generate random values?
+
+160
+00:22:26,960 --> 00:22:37,839
+No, it has a set of fixed values so maybe we can do some some some some some fuzz testing how is it going to oh I didn't know
+
+161
+00:22:38,079 --> 00:22:43,839
+that you could use symmetric symmetrical properties to test it there's all kinds of interesting things that surface from models
+
+162
+00:22:44,799 --> 00:22:53,920
+maybe it will fail with some syntax errors also useful information gain from the rabbit hole and so we'll see there's because
+
+163
+00:22:54,000 --> 00:23:00,640
+this is all code at this point even though the model is not a model that I trust at all because it's so small and fast the
+
+164
+00:23:00,640 --> 00:23:02,799
+code is The something code is something I I can can verify.
+
+165
+00:23:02,720 --> 00:23:10,160
+I can put back into a bigger model to maybe understand why it broke, and this will tell me a lot about Kimmy itself.
+
+166
+00:23:10,079 --> 00:23:13,519
+In the meantime, we start to have, you know, the real resources.
+
+167
+00:23:13,440 --> 00:23:20,640
+So if I do want to learn as a human, if you're into math, you can start looking at these things and doing some real math learning
+
+168
+00:23:21,519 --> 00:23:30,640
+and you can say you know give me some exercises you can turn on the little learning thing down here and explore how this works
+
+169
+00:23:31,680 --> 00:23:47,119
+right you can do quizzes I think is the learning thing all kinds of things that you can go starting from a simple little question
+
+170
+00:23:49,119 --> 00:24:00,559
+oh I didn't see that before see learning something new do we now have our little self contained self contained error visualizer
+
+171
+00:24:00,160 --> 00:24:09,039
+Visualizer I guess we have I guess we have it it's quite pretty so here again is do I trust the math necessarily?
+
+172
+00:24:08,960 --> 00:24:21,680
+Not necessarily, but I do, for example, have I don't even know what this is about just kind of seems broken I I'm not sure
+
+173
+00:24:21,680 --> 00:24:29,200
+what I'm looking at so you know that's also information where I'm is the model broken do I don't understand this?
+
+174
+00:24:29,200 --> 00:24:40,799
+What is this all about error plot function and Taylor polynomial test is the exact function so do I need to zoom in maybe
+
+175
+00:24:40,880 --> 00:24:49,359
+is that the zoom?
+
+176
+00:24:49,279 --> 00:24:58,319
+Yeah, okay so so I I understand a little bit better what's going on so if we do have higher degrees yeah we'll be able to
+
+177
+00:24:58,400 --> 00:25:10,240
+accommodate for a wider part Part and then I don't know if the samples do change anything so useful here again maybe this
+
+178
+00:25:10,240 --> 00:25:15,359
+is wrong but at least you know the plotting thing is pretty interesting so the plotting is something I might want to extract
+
+179
+00:25:16,799 --> 00:25:28,160
+it's cool because now I have HTML right so last thing but not least deep research and now I'm gonna say explain everything
+
+180
+00:25:29,119 --> 00:25:40,480
+about this last interactive widget and because I've deep research on it's going to suggest different it's gonna suggest one
+
+181
+00:25:40,880 --> 00:25:51,920
+ki kind of research right and then I'm going to say no I actually I care about the computational foundations and the math
+
+182
+00:25:56,160 --> 00:26:00,720
+so I don't care about the widget I don't care about the canvas rendering but maybe that's That's something something that
+
+183
+00:26:00,640 --> 00:26:04,160
+that you know you know would have what I've caught caught my my attention attention is for if I were rabbit holeing would
+
+184
+00:26:04,240 --> 00:26:15,920
+be yeah, I I the plot tell me more about that and so here this is what I personally am more interested in it's gonna research
+
+185
+00:26:16,000 --> 00:26:23,839
+and it's gonna give me a Pdf that I'm basically going to read I I to print those out and make them into my into my little
+
+186
+00:26:24,079 --> 00:26:34,960
+morning magazine so here we have quizzes I usually didn't find those all that useful but maybe you do I also find not very
+
+187
+00:26:34,960 --> 00:26:46,640
+useful in here I them in markdown we saw this and then we saw here our self improving kind of scaffold and we can go back
+
+188
+00:26:47,119 --> 00:26:56,559
+and reuse this code or we say this is all crap that's also a valuable knowledge to know where the limits of a small fast model
+
+189
+00:26:57,119 --> 00:27:09,680
+very important to know and And I I hope hope this this was a good insight into rabbit holing with LLMs, so have fun, play
+
+190
+00:27:09,759 --> 00:27:19,680
+with all of these things, learn some fundamentals that will always be useful because next time you have you want to do cosine
+
+191
+00:27:19,839 --> 00:27:28,559
+and sine you'll be I know it Taylor series, I know how to test it, I have some graphs, I have everything ready and all of
+
+192
+00:27:29,119 --> 00:27:36,000
+this output is something you should store into a knowledge base which is going to be the topic of a future video
+

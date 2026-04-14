@@ -1,0 +1,7 @@
+display=:0
+root=2880x1920+0+0
+region=0,960,2880,960
+fps=24
+preview_fps=10
+preview_width=1280
+preview_height=427
