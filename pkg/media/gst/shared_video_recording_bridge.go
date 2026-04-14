@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
+	appmetrics "github.com/wesen/2026-04-09--screencast-studio/pkg/metrics"
 )
 
 type ExperimentalSharedVideoRecorderOptions struct {
@@ -24,6 +25,39 @@ type ExperimentalSharedVideoRecorderOptions struct {
 	FPS        int
 	OnLog      func(string, string)
 }
+
+var (
+	sharedBridgeRecorderSamplesReceived = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_gst_shared_bridge_recorder_samples_received_total",
+		"Total samples received by the shared video recorder bridge from the upstream appsink callback.",
+		"source_type",
+	)
+	sharedBridgeRecorderBuffersCopied = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_gst_shared_bridge_recorder_buffers_copied_total",
+		"Total GStreamer buffers copied by the shared video recorder bridge before enqueueing.",
+		"source_type",
+	)
+	sharedBridgeRecorderEnqueued = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_gst_shared_bridge_recorder_enqueued_total",
+		"Total copied buffers successfully enqueued into the shared video recorder bridge async queue.",
+		"source_type",
+	)
+	sharedBridgeRecorderDropped = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_gst_shared_bridge_recorder_dropped_total",
+		"Total copied buffers dropped because the shared video recorder bridge async queue was full or closed.",
+		"source_type",
+	)
+	sharedBridgeRecorderWorkerHandled = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_gst_shared_bridge_recorder_worker_handled_total",
+		"Total buffers handled by the shared video recorder bridge worker goroutine.",
+		"source_type",
+	)
+	sharedBridgeRecorderAppsrcPushed = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_gst_shared_bridge_recorder_appsrc_pushed_total",
+		"Total buffers successfully pushed from the shared video recorder bridge worker into appsrc.",
+		"source_type",
+	)
+)
 
 type ExperimentalSharedVideoRecorder struct {
 	cancel context.CancelFunc
@@ -39,6 +73,7 @@ type ExperimentalSharedVideoRecorder struct {
 	err        error
 	once       sync.Once
 	closed     atomic.Bool
+	labels     map[string]string
 }
 
 func StartExperimentalSharedVideoRecorder(ctx context.Context, source dsl.EffectiveVideoSource, opts ExperimentalSharedVideoRecorderOptions) (*ExperimentalSharedVideoRecorder, error) {
@@ -81,6 +116,12 @@ func StartExperimentalSharedVideoRecorder(ctx context.Context, source dsl.Effect
 		sampleCh:   make(chan *gst.Buffer, 16),
 		workerDone: make(chan struct{}),
 		done:       make(chan struct{}),
+		labels: map[string]string{
+			"source_type": strings.TrimSpace(shared.source.Type),
+		},
+	}
+	if recorder.labels["source_type"] == "" {
+		recorder.labels["source_type"] = "unknown"
 	}
 
 	width, height := sharedRecordingTargetSize(shared.source)
@@ -127,6 +168,7 @@ func (r *ExperimentalSharedVideoRecorder) handleSample(sample *gst.Sample) gst.F
 	if r.closed.Load() {
 		return gst.FlowOK
 	}
+	sharedBridgeRecorderSamplesReceived.Inc(r.labels)
 	buffer := sample.GetBuffer()
 	if buffer == nil {
 		r.closeWithError(errors.New("shared recorder sample missing buffer"))
@@ -148,9 +190,12 @@ func (r *ExperimentalSharedVideoRecorder) handleSample(sample *gst.Sample) gst.F
 	r.mu.Unlock()
 
 	copyBuffer := buffer.Copy()
+	sharedBridgeRecorderBuffersCopied.Inc(r.labels)
 	if r.enqueueBuffer(copyBuffer) {
+		sharedBridgeRecorderEnqueued.Inc(r.labels)
 		return gst.FlowOK
 	}
+	sharedBridgeRecorderDropped.Inc(r.labels)
 	log.Warn().
 		Str("event", "capture.gst.shared.bridge_recorder.drop").
 		Str("output_path", r.opts.OutputPath).
@@ -187,6 +232,7 @@ func (r *ExperimentalSharedVideoRecorder) runSamplePump() {
 		if bridge == nil {
 			continue
 		}
+		sharedBridgeRecorderWorkerHandled.Inc(r.labels)
 		ret, err := bridge.pushBuffer(buffer)
 		if err != nil {
 			go r.closeWithError(err)
@@ -195,6 +241,9 @@ func (r *ExperimentalSharedVideoRecorder) runSamplePump() {
 		if ret != gst.FlowOK && ret != gst.FlowEOS {
 			go r.closeWithError(fmt.Errorf("bridge recorder push buffer returned %s", ret))
 			return
+		}
+		if ret == gst.FlowOK {
+			sharedBridgeRecorderAppsrcPushed.Inc(r.labels)
 		}
 	}
 }

@@ -17,11 +17,18 @@ import (
 
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/dsl"
 	"github.com/wesen/2026-04-09--screencast-studio/pkg/media"
+	appmetrics "github.com/wesen/2026-04-09--screencast-studio/pkg/metrics"
 )
 
 var (
 	errRecordingStopRequested = stderrors.New("recording stop requested")
 	errRecordingMaxDuration   = stderrors.New("max duration reached")
+	audioLevelParseFailures   = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_gst_audio_level_parse_failures_total",
+		"Total audio level message parse failures in the GStreamer recording runtime.",
+		"reason",
+		"rms_type",
+	)
 )
 
 type RecordingRuntime struct {
@@ -780,12 +787,14 @@ func audioLevelEventFromMessage(job dsl.AudioMixJob, msg *gst.Message) (media.Re
 	}
 	rms, err := st.GetValue("rms")
 	if err != nil {
-		log.Info().Str("event", "recording.gst.audio_level.parse.missing_rms").Str("structure", st.Name()).Interface("values", st.Values()).Msg("audio level message missing rms field")
+		audioLevelParseFailures.Inc(map[string]string{"reason": "missing_rms", "rms_type": ""})
+		log.Debug().Str("event", "recording.gst.audio_level.parse.missing_rms").Str("structure", st.Name()).Interface("values", st.Values()).Msg("audio level message missing rms field")
 		return media.RecordingEvent{}, false
 	}
 	left, right, ok := extractLevels(rms)
 	if !ok {
-		log.Info().Str("event", "recording.gst.audio_level.parse.failed").Str("structure", st.Name()).Str("rms_type", fmt.Sprintf("%T", rms)).Interface("rms", rms).Interface("values", st.Values()).Msg("failed to parse audio level message")
+		audioLevelParseFailures.Inc(map[string]string{"reason": "extract_failed", "rms_type": fmt.Sprintf("%T", rms)})
+		log.Debug().Str("event", "recording.gst.audio_level.parse.failed").Str("structure", st.Name()).Str("rms_type", fmt.Sprintf("%T", rms)).Interface("rms", rms).Interface("values", st.Values()).Msg("failed to parse audio level message")
 		return media.RecordingEvent{
 			Type:         media.RecordingEventAudioLevel,
 			ProcessLabel: job.Name,

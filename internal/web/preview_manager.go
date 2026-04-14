@@ -127,6 +127,7 @@ func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID st
 			existing.leases++
 			snapshot := snapshotPreview(existing)
 			m.mu.Unlock()
+			previewEnsures.Inc(previewMetricLabelsWithResult(snapshot.SourceType, "reused"))
 			log.Info().
 				Str("event", "preview.ensure.reused").
 				Str("preview_id", snapshot.ID).
@@ -142,6 +143,7 @@ func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID st
 	}
 	if m.activePreviewCountLocked() >= m.limit {
 		m.mu.Unlock()
+		previewEnsures.Inc(previewMetricLabelsWithResult(source.Type, "limit_exceeded"))
 		log.Warn().
 			Str("event", "preview.ensure.limit_exceeded").
 			Str("source_id", sourceID).
@@ -165,6 +167,7 @@ func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID st
 	snapshot := snapshotPreview(preview)
 	m.mu.Unlock()
 
+	previewEnsures.Inc(previewMetricLabelsWithResult(source.Type, "created"))
 	log.Info().
 		Str("event", "preview.ensure.created").
 		Str("preview_id", preview.id).
@@ -226,6 +229,7 @@ func (m *PreviewManager) Release(previewID string) (previewSnapshot, error) {
 
 	preview, ok := m.byID[previewID]
 	if !ok {
+		previewReleases.Inc(previewMetricLabelsWithResult("unknown", "not_found"))
 		log.Warn().
 			Str("event", "preview.release.not_found").
 			Str("preview_id", previewID).
@@ -249,6 +253,7 @@ func (m *PreviewManager) Release(previewID string) (previewSnapshot, error) {
 	}
 
 	snapshot := snapshotPreview(preview)
+	previewReleases.Inc(previewMetricLabelsWithResult(snapshot.SourceType, "released"))
 	log.Info().
 		Str("event", "preview.release.done").
 		Str("preview_id", snapshot.ID).
@@ -423,6 +428,7 @@ func (m *PreviewManager) storePreviewFrame(previewID string, frame []byte) {
 	preview.latestFrame = append([]byte(nil), frame...)
 	preview.lastFrameAt = time.Now()
 	preview.frameSeq++
+	previewFrameUpdates.Inc(previewMetricLabels(preview.source.Type))
 	if preview.state == "starting" {
 		preview.state = "running"
 		preview.reason = ""

@@ -21,6 +21,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/previews", s.handlePreviewList)
 	s.mux.HandleFunc("/api/previews/", s.handlePreviewMJPEG)
 	s.mux.HandleFunc("/ws", s.handleWebsocket)
+	s.mux.HandleFunc("/metrics", s.handleMetrics)
 	s.mux.HandleFunc("/", s.handleRoot)
 }
 

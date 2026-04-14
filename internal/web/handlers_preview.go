@@ -94,10 +94,19 @@ func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok := s.previews.Snapshot(previewID); !ok {
+	snapshot, ok := s.previews.Snapshot(previewID)
+	if !ok {
 		writeError(w, http.StatusNotFound, "preview_not_found", "preview not found")
 		return
 	}
+	labels := previewMetricLabels(snapshot.SourceType)
+	finishReason := "handler_exit"
+	previewHTTPStreamsStarted.Inc(labels)
+	previewHTTPClients.Inc(labels)
+	defer func() {
+		previewHTTPClients.Dec(labels)
+		previewHTTPStreamsFinished.Inc(previewMetricLabelsWithReason(labels["source_type"], finishReason))
+	}()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -116,32 +125,54 @@ func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {
 	for {
 		frame, seq, snapshot, ok := s.previews.LatestFrame(previewID)
 		if !ok {
+			finishReason = "preview_gone"
 			return
 		}
 		if len(frame) > 0 && seq != lastSeq {
 			lastSeq = seq
-			if _, err := w.Write([]byte("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ")); err != nil {
+			written := 0
+			n, err := w.Write([]byte("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "))
+			written += n
+			if err != nil {
+				finishReason = "write_error"
 				return
 			}
-			if _, err := w.Write([]byte(strconv.Itoa(len(frame)))); err != nil {
+			n, err = w.Write([]byte(strconv.Itoa(len(frame))))
+			written += n
+			if err != nil {
+				finishReason = "write_error"
 				return
 			}
-			if _, err := w.Write([]byte("\r\n\r\n")); err != nil {
+			n, err = w.Write([]byte("\r\n\r\n"))
+			written += n
+			if err != nil {
+				finishReason = "write_error"
 				return
 			}
-			if _, err := io.Copy(w, bytes.NewReader(frame)); err != nil {
+			copied, err := io.Copy(w, bytes.NewReader(frame))
+			written += int(copied)
+			if err != nil {
+				finishReason = "write_error"
 				return
 			}
-			if _, err := w.Write([]byte("\r\n")); err != nil {
+			n, err = w.Write([]byte("\r\n"))
+			written += n
+			if err != nil {
+				finishReason = "write_error"
 				return
 			}
+			previewHTTPFramesServed.Inc(labels)
+			previewHTTPBytesServed.Add(labels, uint64(written))
+			previewHTTPFlushes.Inc(labels)
 			flusher.Flush()
 		}
 		if (snapshot.State == "failed" || snapshot.State == "finished") && !snapshot.HasFrame {
+			finishReason = "preview_ended"
 			return
 		}
 		select {
 		case <-r.Context().Done():
+			finishReason = "client_done"
 			return
 		case <-ticker.C:
 		}
