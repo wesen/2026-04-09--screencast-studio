@@ -28,6 +28,7 @@
 - [ ] Create new ticket-local scripts for browser-driven preview/recording measurements under `scripts/`
 - [x] Add a clean restart script for the local `scs-web-ui` runtime under this ticket
 - [x] Add a metrics sampler script that snapshots `/metrics` over time during runs
+- [x] Add a desktop preview HTTP-client baseline harness for the server-side MJPEG streaming path
 - [ ] Add a desktop-only browser preview matrix harness
 - [ ] Add a camera-only browser preview matrix harness
 - [ ] Add a desktop-plus-camera browser preview matrix harness

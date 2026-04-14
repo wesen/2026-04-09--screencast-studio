@@ -41,6 +41,8 @@ RelatedFiles:
       Note: Local restart helper for later browser-driven matrix runs
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh
       Note: Raw metrics sampler for time-windowed preview measurements
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/run.sh
+      Note: First dedicated MJPEG-client baseline matrix harness for the browser-preview investigation
     - Path: ui/src/components/preview/PreviewStream.tsx
       Note: |-
         Browser preview rendering uses plain img tags pointed at MJPEG endpoints
@@ -55,6 +57,7 @@ LastUpdated: 2026-04-14T15:40:00-04:00
 WhatFor: Orient future investigation of browser-connected preview streaming overhead, define the missing performance matrices, and document what should be measured next.
 WhenToUse: Read this before adding browser-preview metrics, building new measurement harnesses, or interpreting server CPU spikes observed only when the real Studio page is open.
 ---
+
 
 
 

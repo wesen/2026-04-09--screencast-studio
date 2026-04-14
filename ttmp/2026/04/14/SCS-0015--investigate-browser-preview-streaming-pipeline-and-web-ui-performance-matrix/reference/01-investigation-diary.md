@@ -27,6 +27,10 @@ RelatedFiles:
       Note: Added and validated in the second helper-script slice
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh
       Note: Added and validated in the second helper-script slice
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/run.sh
+      Note: Added and validated as the first matrix harness slice
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/04-desktop-preview-http-client-baseline-summary.md
+      Note: Human-readable interpretation of the first 0/1/2-client desktop baseline
     - Path: ui/src/components/preview/PreviewStream.tsx
       Note: |-
         The actual browser media transport is an img tag pointed at the MJPEG endpoint
@@ -41,6 +45,7 @@ LastUpdated: 2026-04-14T15:42:00-04:00
 WhatFor: Record the chronology of how the browser preview streaming performance investigation was set up and how its conclusions are derived.
 WhenToUse: Read when continuing SCS-0015 and you need the exact reasoning, commands, and file boundaries used to define the new browser-streaming research track.
 ---
+
 
 
 
@@ -388,4 +393,112 @@ screencast_studio_preview_http_streams_finished_total
 screencast_studio_preview_http_frames_served_total
 screencast_studio_preview_http_bytes_served_total
 screencast_studio_preview_http_flushes_total
+```
+
+## Step 4: Added the First Desktop Preview HTTP-Client Baseline Matrix
+
+With preview-serving metrics and helper scripts in place, I wanted the first actual measurement slice to stay as controlled as possible. Rather than jumping immediately to full browser-tab automation, I built a server-side baseline harness around the MJPEG transport itself. That gives us a useful decomposition step: how much does server CPU move when the same desktop preview is streamed to 0, 1, or 2 HTTP MJPEG clients?
+
+I was careful to describe this honestly in the ticket docs. This is **not yet** the full browser-tab matrix. It is an HTTP-client approximation of the browser-facing preview transport. That still matters because the server-side streaming cost should already show up there even before Chromium rendering enters the picture.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 1)
+
+**Assistant interpretation:** Keep moving the new ticket forward with real measurement harnesses, but do so in a staged way that separates server-side preview streaming cost from later full browser automation.
+
+**Inferred user intent:** Build up the browser-preview investigation incrementally so each measurement slice has a clear scope and does not blur together multiple possible bottlenecks.
+
+**Commit (code):** `70b22663dda79cb399b67c89b450df397ad611c9` — `Add desktop preview HTTP client matrix`
+
+### What I did
+
+- Added:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/run.sh`
+- Ran it with:
+
+```bash
+DURATION=4 bash ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/run.sh
+```
+
+- Saved the first run under:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/`
+- Added a short interpretation note:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/04-desktop-preview-http-client-baseline-summary.md`
+
+### Why
+
+This harness is the right intermediate step because it isolates one question cleanly:
+
+> Does simply having more MJPEG stream consumers raise server CPU for the same desktop preview workload?
+
+That gives us a server-side preview-stream baseline before layering in:
+
+- real browser tabs,
+- frontend preview lifecycle churn,
+- and recording.
+
+### What worked
+
+- The harness ran cleanly against fresh server processes on separate ports for each scenario.
+- Each scenario saved its own `pidstat`, metrics snapshots, API artifacts, and summary.
+- The first short run already produced a useful directional signal:
+  - `no-client` → `11.67%` avg CPU
+  - `one-client` → `11.50%` avg CPU
+  - `two-clients` → `15.50%` avg CPU
+
+### What didn't work
+
+I caught one packaging mistake while first committing this slice: the initial local commit accidentally included the built `server-bin` artifact from the run directory. I rewrote that local commit before documenting it so the history stayed clean.
+
+### What I learned
+
+The first baseline suggests three things:
+
+1. keeping the upstream preview alive already costs real CPU even without a connected MJPEG client,
+2. one short-lived client did not materially change the average CPU in this first run,
+3. two clients did increase CPU, which supports the idea that preview-stream fan-out can matter.
+
+That is not yet the whole web-UI story, but it is already a useful narrowing step.
+
+### What was tricky to build
+
+The tricky part was choosing a measurement slice that was honest about what it **was not**. It would have been easy to overstate this as a browser benchmark, but that would blur an important distinction. This harness measures the server-side MJPEG streaming path with HTTP consumers. The later browser-tab matrix still needs to exist, because browser lifecycle behavior and real tab multiplicity may add more cost or different behavior on top.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/04-desktop-preview-http-client-baseline-summary.md`
+
+The main review question is whether the current 0/1/2-client baseline is the right precursor to the real browser-tab matrix or whether one more recording-inclusive HTTP-client baseline should come first.
+
+### What should be done in the future
+
+- Add the next desktop preview matrix slice with recording enabled.
+- Add a real browser-tab harness so the browser UI path can be compared against this HTTP-client baseline.
+- Extend the same pattern later to camera-only and desktop-plus-camera scenarios.
+
+### Code review instructions
+
+Re-run:
+
+```bash
+DURATION=4 bash ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/run.sh
+```
+
+Then inspect:
+
+- `.../scripts/03-desktop-preview-http-client-matrix/results/<timestamp>/01-summary.md`
+- `.../no-client/01-summary.md`
+- `.../one-client/01-summary.md`
+- `.../two-clients/01-summary.md`
+
+### Technical details
+
+The first saved baseline run currently reports:
+
+```text
+no-client  -> 11.67% avg CPU
+one-client -> 11.50% avg CPU
+two-clients -> 15.50% avg CPU
 ```

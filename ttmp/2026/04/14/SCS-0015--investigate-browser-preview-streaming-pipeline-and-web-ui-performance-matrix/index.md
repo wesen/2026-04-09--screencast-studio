@@ -68,7 +68,9 @@ Current deliverable status:
 - preview-serving metrics have been added for active MJPEG clients, stream starts/finishes, frames, bytes, flushes, frame updates, and preview ensure/release events
 - focused metrics tests and `/metrics` validation are complete
 - initial runtime helper scripts now exist for local server restart and `/metrics` sampling, with the first saved smoke result under `scripts/results/20260414-160358/`
-- browser-driven matrix harnesses are still pending
+- a first desktop preview HTTP-client baseline matrix has been added and run under `scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/`
+- early baseline result: 0 and 1 MJPEG client looked similar in this short run, while 2 clients pushed server CPU higher
+- real browser-tab matrix harnesses are still pending
 
 ## Tasks
 

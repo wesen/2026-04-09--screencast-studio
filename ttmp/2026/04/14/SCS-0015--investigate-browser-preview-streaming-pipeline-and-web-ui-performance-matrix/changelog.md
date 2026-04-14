@@ -89,3 +89,49 @@ The saved raw `.prom` snapshots already show the new preview-serving metric fami
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/01-manifest.tsv — first saved metrics-sampling manifest
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/02-summary.txt — first saved metrics-sampling summary
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/raw/001-1776197038.prom — smoke snapshot proving the new preview-serving metric families are exported
+
+Implemented the first actual matrix harness slice in commit `70b22663dda79cb399b67c89b450df397ad611c9` (`Add desktop preview HTTP client matrix`).
+
+This slice is intentionally framed as a **server-side MJPEG HTTP-client baseline**, not yet the full real-browser-tab matrix. The goal was to isolate whether preview-stream client fan-out alone already changes server CPU before the browser automation layer is added.
+
+The new harness lives at:
+
+- `scripts/03-desktop-preview-http-client-matrix/run.sh`
+
+It builds a dedicated server binary once, then runs three clean scenarios against separate ports and fresh server processes:
+
+- `no-client`
+- `one-client`
+- `two-clients`
+
+Each scenario:
+
+- ensures one desktop preview through the real API,
+- samples `/metrics` repeatedly,
+- samples server CPU with `pidstat`,
+- and, when clients are enabled, holds open one or more MJPEG preview streams using `curl` as the stream consumer.
+
+The first saved run is:
+
+- `scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/`
+
+A short human-readable summary was also added at:
+
+- `scripts/04-desktop-preview-http-client-baseline-summary.md`
+
+The early result from this first `DURATION=4` baseline is:
+
+- `no-client` → `11.67%` avg CPU
+- `one-client` → `11.50%` avg CPU
+- `two-clients` → `15.50%` avg CPU
+
+That is not yet enough to explain the full web-UI problem, but it does support one important direction: the shared desktop preview itself already costs CPU, and multiple MJPEG clients can raise that cost further.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/run.sh — first dedicated server-side preview-stream fan-out matrix harness
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/01-summary.md — top-level summary for the first matrix run
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/no-client/01-summary.md — baseline scenario with preview active but no MJPEG client
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/one-client/01-summary.md — one-client desktop preview baseline
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/two-clients/01-summary.md — two-client desktop preview baseline
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/04-desktop-preview-http-client-baseline-summary.md — human-readable interpretation note for the first baseline run
