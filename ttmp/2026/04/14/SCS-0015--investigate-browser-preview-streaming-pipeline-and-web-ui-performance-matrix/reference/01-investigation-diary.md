@@ -23,6 +23,10 @@ RelatedFiles:
         Preview cache and fan-out behavior shaped the first-step reasoning
     - Path: internal/web/preview_metrics.go
       Note: Metric-family definitions were added in the first code slice
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/01-restart-scs-web-ui.sh
+      Note: Added and validated in the second helper-script slice
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh
+      Note: Added and validated in the second helper-script slice
     - Path: ui/src/components/preview/PreviewStream.tsx
       Note: |-
         The actual browser media transport is an img tag pointed at the MJPEG endpoint
@@ -37,6 +41,7 @@ LastUpdated: 2026-04-14T15:42:00-04:00
 WhatFor: Record the chronology of how the browser preview streaming performance investigation was set up and how its conclusions are derived.
 WhenToUse: Read when continuing SCS-0015 and you need the exact reasoning, commands, and file boundaries used to define the new browser-streaming research track.
 ---
+
 
 
 
@@ -276,4 +281,111 @@ screencast_studio_preview_http_flushes_total
 screencast_studio_preview_frame_updates_total
 screencast_studio_preview_ensures_total
 screencast_studio_preview_releases_total
+```
+
+## Step 3: Added Ticket-Local Restart and Metrics-Sampling Scripts and Validated Them Live
+
+After the preview-serving metrics were committed, the next missing piece was a reusable way to bring the local server up cleanly and capture `/metrics` snapshots into ticket-local artifacts. I did not want the first browser-driven matrix run to depend on ad hoc shell history, so I created two helper scripts under the new ticket before attempting any heavier browser measurements.
+
+This slice is intentionally small: one script restarts `scs-web-ui` in `tmux`, and the second repeatedly samples `/metrics` into a timestamped result directory. I validated both immediately so the saved files are already known-good building blocks rather than speculative scaffolding.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 1)
+
+**Assistant interpretation:** Continue the browser-streaming investigation incrementally, with reusable experiment assets saved into the ticket and validated as they are added.
+
+**Inferred user intent:** Build the browser-preview performance work the same disciplined way as the earlier runtime investigations: save the helper scripts first, then use them as stable building blocks for the real matrix runs.
+
+**Commit (code):** `fb87ab7f33c0eb2e379d83fe0e9b16c54aae70e9` — `Add browser preview metrics helper scripts`
+
+### What I did
+
+- Added:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/01-restart-scs-web-ui.sh`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh`
+- Made both executable.
+- Ran the restart helper, which recreated the `scs-web-ui` tmux session and brought the server back up successfully on `:7777`.
+- Ran the metrics sampler for a short smoke window:
+
+```bash
+DURATION_SECONDS=3 INTERVAL_SECONDS=1 bash ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh
+```
+
+- Saved the first result directory at:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/`
+- Confirmed the raw `.prom` snapshots contained the new preview-serving metric families.
+
+### Why
+
+Before adding the real browser-driven matrix harnesses, I wanted two stable building blocks:
+
+1. a clean server restart path,
+2. and a repeatable way to capture metrics snapshots into ticket-local artifacts.
+
+That reduces the chance that later matrix results become hard to reproduce or impossible to compare cleanly.
+
+### What worked
+
+- The restart helper brought the server back up and printed the current health plus recent tmux pane output.
+- The metrics sampler created a timestamped result directory with a manifest, summary, and raw `.prom` snapshots.
+- The first raw snapshot already showed the new preview metric families, confirming the observability slice is live in the runtime, not just in tests.
+
+### What didn't work
+
+I initially mistyped the first raw snapshot filename while reading it back manually. The sampler itself was fine; the issue was my own follow-up inspection command.
+
+### What I learned
+
+The new ticket now has the minimum runtime scaffolding required to begin real browser-path measurement work without improvising the setup each time. That is especially useful because the next matrix runs will need clean result directories and comparable startup conditions.
+
+### What was tricky to build
+
+The subtle part was deciding how much structure to add to the sampler before the first real matrix run exists. I deliberately kept it simple: raw Prometheus snapshots plus a manifest and summary. That preserves the source data losslessly and avoids overcommitting too early to one parsing or plotting format.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/01-restart-scs-web-ui.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh`
+
+The review question is whether the metrics sampler should stay raw-snapshot-first or whether the next slice should immediately add a parsed long-form time-series export for easier plotting.
+
+### What should be done in the future
+
+- Add the first real browser-driven matrix harness, starting with desktop preview only.
+- Pair the metrics sampler with CPU sampling and browser/tab control.
+- Save those heavier results under this same ticket-local `scripts/results/` structure.
+
+### Code review instructions
+
+Re-run:
+
+```bash
+bash ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/01-restart-scs-web-ui.sh
+DURATION_SECONDS=3 INTERVAL_SECONDS=1 bash ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh
+```
+
+Then inspect the emitted result directory under:
+
+```text
+ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/
+```
+
+### Technical details
+
+The first saved result directory is:
+
+```text
+scripts/results/20260414-160358/
+```
+
+The first raw snapshot there already includes headers for:
+
+```text
+screencast_studio_preview_http_clients
+screencast_studio_preview_http_streams_started_total
+screencast_studio_preview_http_streams_finished_total
+screencast_studio_preview_http_frames_served_total
+screencast_studio_preview_http_bytes_served_total
+screencast_studio_preview_http_flushes_total
 ```

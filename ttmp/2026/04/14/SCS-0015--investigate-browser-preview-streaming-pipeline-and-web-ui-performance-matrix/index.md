@@ -67,7 +67,8 @@ Current deliverable status:
 - browser-specific measurement matrix defined
 - preview-serving metrics have been added for active MJPEG clients, stream starts/finishes, frames, bytes, flushes, frame updates, and preview ensure/release events
 - focused metrics tests and `/metrics` validation are complete
-- browser-driven measurement scripts are still pending
+- initial runtime helper scripts now exist for local server restart and `/metrics` sampling, with the first saved smoke result under `scripts/results/20260414-160358/`
+- browser-driven matrix harnesses are still pending
 
 ## Tasks
 

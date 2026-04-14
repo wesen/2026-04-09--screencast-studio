@@ -68,3 +68,24 @@ go test ./... -count=1
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/metrics/metrics_test.go — new registry test verifies counter and gauge rendering
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go — audio-level parse failures now contribute to exported metrics
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go — shared bridge recorder counters now contribute to exported metrics
+
+Implemented the next SCS-0015 helper-script slice in commit `fb87ab7f33c0eb2e379d83fe0e9b16c54aae70e9` (`Add browser preview metrics helper scripts`).
+
+This slice added the first ticket-local runtime helpers under `scripts/`:
+
+- `scripts/01-restart-scs-web-ui.sh` — restarts the local server in the `scs-web-ui` tmux session and waits for `/api/healthz`
+- `scripts/02-sample-preview-metrics.sh` — snapshots `/metrics` repeatedly into a timestamped result directory with a manifest and summary file
+
+I validated both scripts live. The restart helper brought the server back up successfully on `:7777`, and the sampler saved the first smoke result under:
+
+- `scripts/results/20260414-160358/`
+
+The saved raw `.prom` snapshots already show the new preview-serving metric families in the export output, which is enough to confirm the first measurement surface is live before the heavier browser-driven matrix harnesses exist.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/01-restart-scs-web-ui.sh — local tmux restart helper for the live server
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/02-sample-preview-metrics.sh — ticket-local metrics sampler for later matrix runs
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/01-manifest.tsv — first saved metrics-sampling manifest
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/02-summary.txt — first saved metrics-sampling summary
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-160358/raw/001-1776197038.prom — smoke snapshot proving the new preview-serving metric families are exported
