@@ -65,3 +65,21 @@ That changes the engineering interpretation. The bridge alone no longer looks li
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/reference/02-gstreamer-setup-performance-and-region-debugging-project-report.md — copied ticket-local version of the longer Obsidian project report so the knowledge also lives inside the ticket workspace
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/11-go-shared-vs-bridge-reconciliation-matrix/run.sh — wrapper benchmark that reruns `06`, `07`, and `09` in one same-session matrix
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/11-go-shared-vs-bridge-reconciliation-matrix/results/20260413-233847/01-summary.md — reconciled same-session summary across direct, shared-runtime, and staged bridge benchmark families
+
+After the reconciliation run, I followed the new leading clue and added `scripts/12-go-preview-recorder-interplay-matrix/` plus the higher-level note `scripts/13-preview-recorder-interplay-summary.md`. This new standalone benchmark keeps the same shared source shape but measures preview-only, recorder-only, preview+recorder with current preview settings, and preview+recorder with a cheaper preview profile.
+
+That benchmark produced the clearest current performance result in the ticket so far:
+
+- preview-only: about `12.17%` average CPU,
+- recorder-only: about `94.00%`,
+- current preview + recorder: about `188.43%`,
+- cheap preview + recorder: about `170.00%`.
+
+So the remaining large cost spike is now strongly localized to the **combined preview + recorder case**. Cheaper preview settings help somewhat, but they do not eliminate the spike. That suggests the main remaining performance problem is the interaction of the live preview branch with the recorder branch on the same shared source, not recorder-only bridge overhead.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/main.go — standalone shared-source benchmark for preview-only, recorder-only, and combined preview+recorder scenarios
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/run.sh — runner for the preview/recorder interplay benchmark
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/results/20260414-070646/01-summary.md — raw saved summary for the interplay benchmark run
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/13-preview-recorder-interplay-summary.md — human-readable interpretation of the interplay benchmark

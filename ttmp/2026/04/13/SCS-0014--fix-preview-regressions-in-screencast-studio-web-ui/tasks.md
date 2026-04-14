@@ -28,6 +28,8 @@
 - [x] Compare pure GStreamer recording CPU against the current shared-source bridge path for the real `2880x960` region capture shape
 - [x] Add a staged standalone benchmark that isolates `appsink`, Go buffer copy, async queueing, `appsrc`, and `x264`
 - [x] Save the staged bridge-overhead results under the ticket `scripts/` folder and summarize the findings
+- [x] Add a standalone shared-source benchmark that measures preview-only, recorder-only, and preview+recorder together
+- [x] Record whether cheaper preview settings materially reduce the combined preview+recorder CPU spike
 
 ## Bug-fix themes captured by this ticket
 

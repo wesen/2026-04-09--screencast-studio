@@ -1505,3 +1505,142 @@ The core reconciled result is:
 ```
 
 That is why my current interpretation changed: recorder-only paths now line up, while preview+recorder together remains the most clearly elevated combined case.
+
+## Step 16: Measured the Preview + Recorder Interaction Directly and Confirmed It Is the Remaining Big CPU Spike
+
+After the reconciliation step, the most important unresolved question was no longer “is recorder-only unexpectedly more expensive than the staged bridge?” That question had largely settled. The new leading question was instead: why does the combined preview + recorder case stay so much more expensive than recorder-only? To answer that, I added a new standalone benchmark that keeps a shared source but measures preview-only, recorder-only, preview+recorder with current preview settings, and preview+recorder with a cheaper preview profile.
+
+This step matters because it shifts the optimization target. The benchmark shows that the current remaining performance spike is strongly associated with keeping the preview branch alive while recording, and that cheaper preview settings help only partially.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 15 — continue the investigation, keep a diary, and proceed with the next useful benchmark work)
+
+**Assistant interpretation:** Follow the new lead from the reconciliation run and measure the combined preview-plus-recorder case directly.
+
+**Inferred user intent:** Keep narrowing the performance problem until the next optimization target is obvious and justified by saved evidence.
+
+### What I did
+
+Added a new benchmark suite under:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/main.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/run.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/13-preview-recorder-interplay-summary.md`
+
+Saved raw results under:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/results/20260414-070646/`
+
+The benchmark uses the same real region shape as the earlier runs:
+
+- display `:0`
+- root `2880x1920`
+- region `0,960,2880,960`
+- fps `24`
+
+Measured scenarios:
+
+1. `preview-current-only`
+2. `recorder-current-only`
+3. `preview-current-plus-recorder`
+4. `preview-cheap-plus-recorder`
+
+Importantly, the preview branch in this benchmark does a real JPEG byte copy into Go, to mirror the production preview path more honestly.
+
+### Why
+
+The reconciliation run showed that recorder-only shared runtime, staged bridge+x264, and direct current-preset encode all land in the same rough CPU range. That meant the next obvious question was not recorder-only anymore. It was:
+
+> How much extra cost comes from keeping the preview branch alive during recording, and can cheaper preview settings materially reduce it?
+
+That is exactly what this benchmark was designed to answer.
+
+### What worked
+
+The benchmark produced a strong result.
+
+Saved results from `12-go-preview-recorder-interplay-matrix/results/20260414-070646/01-summary.md`:
+
+- preview-only: `12.17%` avg CPU, `14.00%` max CPU
+- recorder-only: `94.00%` avg CPU, `120.00%` max CPU
+- current preview + recorder: `188.43%` avg CPU, `492.00%` max CPU
+- cheap preview + recorder: `170.00%` avg CPU, `427.00%` max CPU
+
+Additional counters were also useful:
+
+- current preview-only copied about `17.3 MB` of JPEG data in 6 seconds
+- current preview + recorder copied about `17.6 MB` while still pushing `144` recorder frames
+- cheap preview + recorder reduced preview byte-copy load dramatically to about `1.6 MB`, but total CPU still remained very high
+
+That means the combined cost spike is real and not explained only by the literal volume of copied JPEG bytes.
+
+### What didn't work
+
+Nothing materially failed in the benchmark implementation itself. The important “didn't work” result was the cheap-preview hypothesis: lowering preview width/fps/quality helped, but it did **not** collapse combined CPU anywhere near recorder-only levels.
+
+### What I learned
+
+This step changed the performance story again, but in a much more targeted way.
+
+The strongest current conclusion is now:
+
+- recorder-only cost is not the main remaining mystery,
+- the large remaining spike is the **preview + recorder interaction**,
+- and even a cheaper preview branch does not make that interaction cheap.
+
+That suggests the shared source with two simultaneously active downstream branches is where the next optimization attention should go.
+
+### What was tricky to build
+
+The tricky part was making the benchmark closer to production reality without simply embedding the whole production runtime again.
+
+In particular, I wanted to include:
+
+- a shared source with a tee,
+- a real preview branch that JPEG-encodes and copies bytes into Go,
+- a real recorder raw branch that copies buffers into Go and pushes them into an `appsrc -> x264` pipeline,
+- and a way to vary preview cost independently.
+
+That gives a better answer than either the pure direct-encode benchmark or the staged bridge-only decomposition.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/main.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/shared_video_recording_bridge.go`
+
+The key review question is whether this benchmark is now close enough to the real combined production shape to justify optimizations based on it.
+
+### What should be done in the future
+
+- Investigate how to degrade or reshape preview work while recording, not just tune the encoder.
+- Measure more preview profiles, not just one “cheap” fallback.
+- Investigate whether conversion/scaling work is being duplicated unnecessarily between preview and recorder branches.
+
+### Code review instructions
+
+Start with:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/13-preview-recorder-interplay-summary.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/results/20260414-070646/01-summary.md`
+
+Re-run with:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+bash ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/12-go-preview-recorder-interplay-matrix/run.sh
+```
+
+### Technical details
+
+The most important current result snippet is:
+
+```text
+preview-only: 12.17% avg CPU
+recorder-only: 94.00% avg CPU
+preview-current-plus-recorder: 188.43% avg CPU
+preview-cheap-plus-recorder: 170.00% avg CPU
+```
+
+That is why my current optimization target shifted again: the remaining expensive case is the live preview branch interacting with recording, not recorder-only bridge overhead.
