@@ -31,12 +31,14 @@ type ExperimentalSharedVideoRecorder struct {
 	raw    *sharedRawConsumer
 	opts   ExperimentalSharedVideoRecorderOptions
 
-	mu     sync.Mutex
-	bridge *bridgeVideoRecorder
-	done   chan struct{}
-	err    error
-	once   sync.Once
-	closed atomic.Bool
+	mu         sync.Mutex
+	bridge     *bridgeVideoRecorder
+	sampleCh   chan *gst.Buffer
+	workerDone chan struct{}
+	done       chan struct{}
+	err        error
+	once       sync.Once
+	closed     atomic.Bool
 }
 
 func StartExperimentalSharedVideoRecorder(ctx context.Context, source dsl.EffectiveVideoSource, opts ExperimentalSharedVideoRecorderOptions) (*ExperimentalSharedVideoRecorder, error) {
@@ -73,10 +75,12 @@ func StartExperimentalSharedVideoRecorder(ctx context.Context, source dsl.Effect
 		return nil, err
 	}
 	recorder := &ExperimentalSharedVideoRecorder{
-		cancel: cancel,
-		source: shared,
-		opts:   opts,
-		done:   make(chan struct{}),
+		cancel:     cancel,
+		source:     shared,
+		opts:       opts,
+		sampleCh:   make(chan *gst.Buffer, 16),
+		workerDone: make(chan struct{}),
+		done:       make(chan struct{}),
 	}
 
 	width, height := sharedRecordingTargetSize(shared.source)
@@ -97,6 +101,7 @@ func StartExperimentalSharedVideoRecorder(ctx context.Context, source dsl.Effect
 	}
 	recorder.raw = raw
 
+	go recorder.runSamplePump()
 	go func() {
 		select {
 		case <-recorderCtx.Done():
@@ -122,6 +127,11 @@ func (r *ExperimentalSharedVideoRecorder) handleSample(sample *gst.Sample) gst.F
 	if r.closed.Load() {
 		return gst.FlowOK
 	}
+	buffer := sample.GetBuffer()
+	if buffer == nil {
+		r.closeWithError(errors.New("shared recorder sample missing buffer"))
+		return gst.FlowError
+	}
 
 	r.mu.Lock()
 	bridge := r.bridge
@@ -137,12 +147,56 @@ func (r *ExperimentalSharedVideoRecorder) handleSample(sample *gst.Sample) gst.F
 	}
 	r.mu.Unlock()
 
-	ret, err := bridge.pushSample(sample)
-	if err != nil {
-		r.closeWithError(err)
-		return gst.FlowError
+	copyBuffer := buffer.Copy()
+	if r.enqueueBuffer(copyBuffer) {
+		return gst.FlowOK
 	}
-	return ret
+	log.Warn().
+		Str("event", "capture.gst.shared.bridge_recorder.drop").
+		Str("output_path", r.opts.OutputPath).
+		Msg("dropping shared bridge recorder sample because the async queue is full or closed")
+	return gst.FlowOK
+}
+
+func (r *ExperimentalSharedVideoRecorder) enqueueBuffer(buffer *gst.Buffer) (ok bool) {
+	if r == nil || buffer == nil || r.closed.Load() {
+		return false
+	}
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
+	select {
+	case r.sampleCh <- buffer:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *ExperimentalSharedVideoRecorder) runSamplePump() {
+	defer close(r.workerDone)
+	for buffer := range r.sampleCh {
+		if buffer == nil {
+			continue
+		}
+		r.mu.Lock()
+		bridge := r.bridge
+		r.mu.Unlock()
+		if bridge == nil {
+			continue
+		}
+		ret, err := bridge.pushBuffer(buffer)
+		if err != nil {
+			go r.closeWithError(err)
+			return
+		}
+		if ret != gst.FlowOK && ret != gst.FlowEOS {
+			go r.closeWithError(fmt.Errorf("bridge recorder push buffer returned %s", ret))
+			return
+		}
+	}
 }
 
 func (r *ExperimentalSharedVideoRecorder) Stop(ctx context.Context) error {
@@ -190,6 +244,8 @@ func (r *ExperimentalSharedVideoRecorder) closeWithError(err error) {
 		if r.raw != nil && r.source != nil {
 			r.source.detachRawConsumer(r.raw.id, nil)
 		}
+		close(r.sampleCh)
+		<-r.workerDone
 		r.mu.Lock()
 		bridge := r.bridge
 		if r.err == nil {
@@ -387,6 +443,7 @@ func buildSharedRawConsumer(source *sharedVideoSource, opts sharedRawConsumerOpt
 	if err != nil {
 		return nil, fmt.Errorf("create raw queue: %w", err)
 	}
+	queue.Set("leaky", 2)
 	queue.Set("max-size-buffers", 4)
 	videoconvert, err := gst.NewElementWithName("videoconvert", consumerID+"-videoconvert")
 	if err != nil {
@@ -414,8 +471,8 @@ func buildSharedRawConsumer(source *sharedVideoSource, opts sharedRawConsumerOpt
 		return nil, fmt.Errorf("create raw appsink: %w", err)
 	}
 	sink.SetProperty("name", consumerID+"-appsink")
-	sink.SetProperty("max-buffers", 4)
-	sink.SetProperty("drop", false)
+	sink.SetProperty("max-buffers", 2)
+	sink.SetProperty("drop", true)
 
 	consumer := &sharedRawConsumer{
 		id:       consumerID,
@@ -574,21 +631,15 @@ func newBridgeVideoRecorder(caps *gst.Caps, opts ExperimentalSharedVideoRecorder
 	return &bridgeVideoRecorder{pipeline: pipeline, appsrc: appsrc, watch: watch, resultCh: resultCh, frameDuration: frameDuration}, nil
 }
 
-func (r *bridgeVideoRecorder) pushSample(sample *gst.Sample) (gst.FlowReturn, error) {
-	if r == nil || sample == nil {
-		return gst.FlowError, errors.New("bridge recorder sample is nil")
+func (r *bridgeVideoRecorder) pushBuffer(copyBuffer *gst.Buffer) (gst.FlowReturn, error) {
+	if r == nil || copyBuffer == nil {
+		return gst.FlowError, errors.New("bridge recorder buffer is nil")
 	}
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
 		return gst.FlowEOS, nil
 	}
-	buffer := sample.GetBuffer()
-	if buffer == nil {
-		r.mu.Unlock()
-		return gst.FlowError, errors.New("bridge recorder sample missing buffer")
-	}
-	copyBuffer := buffer.Copy()
 	frameIndex := r.frameCount
 	r.frameCount++
 	frameDuration := r.frameDuration

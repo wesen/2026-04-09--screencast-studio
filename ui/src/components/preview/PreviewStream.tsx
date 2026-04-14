@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 interface PreviewStreamProps {
   sourceId: string;
@@ -6,6 +6,7 @@ interface PreviewStreamProps {
   reason?: string;
   streamUrl?: string;
   className?: string;
+  aspectRatio?: number;
 }
 
 export const PreviewStream: React.FC<PreviewStreamProps> = ({
@@ -14,8 +15,19 @@ export const PreviewStream: React.FC<PreviewStreamProps> = ({
   reason,
   streamUrl,
   className,
+  aspectRatio,
 }) => {
   const [error, setError] = useState(false);
+  const [naturalAspectRatio, setNaturalAspectRatio] = useState<number | null>(null);
+  const effectiveAspectRatio = useMemo(() => {
+    if (naturalAspectRatio && Number.isFinite(naturalAspectRatio) && naturalAspectRatio > 0) {
+      return naturalAspectRatio;
+    }
+    if (aspectRatio && Number.isFinite(aspectRatio) && aspectRatio > 0) {
+      return aspectRatio;
+    }
+    return 4 / 3;
+  }, [aspectRatio, naturalAspectRatio]);
 
   if (!streamUrl || error) {
     const message = error
@@ -33,7 +45,7 @@ export const PreviewStream: React.FC<PreviewStreamProps> = ({
         className={className}
         style={{
           width: '100%',
-          aspectRatio: '4/3',
+          aspectRatio: String(effectiveAspectRatio),
           background: 'var(--studio-black)',
           borderRadius: 2,
           border: '1.5px solid var(--studio-dark)',
@@ -56,11 +68,12 @@ export const PreviewStream: React.FC<PreviewStreamProps> = ({
       className={className}
       style={{
         width: '100%',
-        aspectRatio: '4/3',
+        aspectRatio: String(effectiveAspectRatio),
         position: 'relative',
         overflow: 'hidden',
         borderRadius: 2,
         border: '1.5px solid var(--studio-dark)',
+        background: 'var(--studio-black)',
       }}
     >
       <img
@@ -69,7 +82,15 @@ export const PreviewStream: React.FC<PreviewStreamProps> = ({
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'cover',
+          objectFit: 'contain',
+          display: 'block',
+          background: 'var(--studio-black)',
+        }}
+        onLoad={(event) => {
+          const { naturalWidth, naturalHeight } = event.currentTarget;
+          if (naturalWidth > 0 && naturalHeight > 0) {
+            setNaturalAspectRatio(naturalWidth / naturalHeight);
+          }
         }}
         onError={() => setError(true)}
       />

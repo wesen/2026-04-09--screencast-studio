@@ -36,12 +36,14 @@ type fakeApplication struct {
 }
 
 type fakePreviewRunner struct {
-	started chan struct{}
-	runs    atomic.Int32
+	started   chan struct{}
+	waitDelay time.Duration
+	runs      atomic.Int32
 }
 
 type fakePreviewSession struct {
-	ctx context.Context
+	ctx       context.Context
+	waitDelay time.Duration
 }
 
 func boolPtr(v bool) *bool {
@@ -151,7 +153,7 @@ func (f *fakePreviewRunner) StartPreview(ctx context.Context, source dsl.Effecti
 	if opts.OnFrame != nil {
 		opts.OnFrame([]byte{0xff, 0xd8, 0xff, 0xd9})
 	}
-	return &fakePreviewSession{ctx: ctx}, nil
+	return &fakePreviewSession{ctx: ctx, waitDelay: f.waitDelay}, nil
 }
 
 func (s *fakePreviewSession) Wait() error {
@@ -159,6 +161,9 @@ func (s *fakePreviewSession) Wait() error {
 		return nil
 	}
 	<-s.ctx.Done()
+	if s.waitDelay > 0 {
+		time.Sleep(s.waitDelay)
+	}
 	return nil
 }
 

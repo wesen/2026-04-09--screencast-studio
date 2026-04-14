@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-gst/go-gst/gst"
 	"github.com/pkg/errors"
@@ -143,18 +144,19 @@ func buildSourceElements(source dsl.EffectiveVideoSource) ([]*gst.Element, error
 		ximagesrc.Set("show-pointer", boolValue(source.Capture.Cursor, true))
 		ximagesrc.Set("use-damage", false)
 
+		elements := []*gst.Element{ximagesrc}
 		switch source.Type {
 		case "region", "window":
 			if source.Target.Rect == nil {
 				return nil, fmt.Errorf("%s source missing target.rect", source.Type)
 			}
-			rect := source.Target.Rect
-			ximagesrc.Set("startx", rect.X)
-			ximagesrc.Set("starty", rect.Y)
-			ximagesrc.Set("endx", rect.X+rect.W-1)
-			ximagesrc.Set("endy", rect.Y+rect.H-1)
+			crop, err := buildVideoCrop(source)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, crop)
 		}
-		return []*gst.Element{ximagesrc}, nil
+		return elements, nil
 	case "camera":
 		if strings.TrimSpace(source.Target.Device) == "" {
 			return nil, errors.New("camera source missing target.device")
@@ -180,6 +182,47 @@ func buildSourceElements(source dsl.EffectiveVideoSource) ([]*gst.Element, error
 	default:
 		return nil, fmt.Errorf("unsupported video source type %q", source.Type)
 	}
+}
+
+func buildVideoCrop(source dsl.EffectiveVideoSource) (*gst.Element, error) {
+	if source.Target.Rect == nil {
+		return nil, fmt.Errorf("%s source missing target.rect", source.Type)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	rootWidth, rootHeight, err := discovery.RootGeometry(ctx, source.Target.Display)
+	if err != nil {
+		return nil, fmt.Errorf("resolve root geometry for %s source %s: %w", source.Type, source.ID, err)
+	}
+	rect := source.Target.Rect
+	left := maxInt(rect.X, 0)
+	top := maxInt(rect.Y, 0)
+	right := maxInt(rootWidth-(rect.X+rect.W), 0)
+	bottom := maxInt(rootHeight-(rect.Y+rect.H), 0)
+	crop, err := gst.NewElement("videocrop")
+	if err != nil {
+		return nil, fmt.Errorf("create videocrop: %w", err)
+	}
+	crop.Set("left", left)
+	crop.Set("top", top)
+	crop.Set("right", right)
+	crop.Set("bottom", bottom)
+	log.Info().
+		Str("event", "preview.gst.crop.configure").
+		Str("source_id", source.ID).
+		Str("source_type", source.Type).
+		Int("root_width", rootWidth).
+		Int("root_height", rootHeight).
+		Int("rect_x", rect.X).
+		Int("rect_y", rect.Y).
+		Int("rect_w", rect.W).
+		Int("rect_h", rect.H).
+		Int("crop_left", left).
+		Int("crop_top", top).
+		Int("crop_right", right).
+		Int("crop_bottom", bottom).
+		Msg("configured videocrop for preview source")
+	return crop, nil
 }
 
 func parseSize(size string) (int, int, error) {
@@ -234,6 +277,13 @@ func resolveWindowSource(ctx context.Context, source dsl.EffectiveVideoSource) (
 		Int("height", height).
 		Msg("resolved window preview geometry for region-style capture")
 	return resolved, nil
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func boolValue(v *bool, def bool) bool {

@@ -141,3 +141,131 @@ func TestPreviewManagerShutdownTimesOutWhenPreviewDoesNotFinish(t *testing.T) {
 		t.Fatal("expected preview shutdown timeout error, got nil")
 	}
 }
+
+func TestPreviewManagerDoesNotReuseStoppingPreview(t *testing.T) {
+	t.Parallel()
+
+	fakeApp := &fakeApplication{
+		normalizeConfig: &dsl.EffectiveConfig{
+			Schema:               dsl.SchemaVersion,
+			SessionID:            "session-preview-reuse-race",
+			DestinationTemplates: map[string]string{"default": "/tmp/out.mkv"},
+			VideoSources: []dsl.EffectiveVideoSource{
+				{
+					ID:                  "display-1",
+					Name:                "Display 1",
+					Type:                "display",
+					Enabled:             true,
+					Target:              dsl.VideoTarget{Display: ":0.0"},
+					Capture:             dsl.VideoCaptureSettings{FPS: 5},
+					Output:              dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
+					DestinationTemplate: "default",
+				},
+			},
+		},
+	}
+	runner := &fakePreviewRunner{started: make(chan struct{}, 4), waitDelay: 150 * time.Millisecond}
+	manager := NewPreviewManager(context.Background(), fakeApp, nil, 1, runner)
+
+	first, err := manager.Ensure(context.Background(), []byte("test"), "display-1")
+	if err != nil {
+		t.Fatalf("ensure first preview: %v", err)
+	}
+	select {
+	case <-runner.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first fake preview runner to start")
+	}
+
+	if _, err := manager.Release(first.ID); err != nil {
+		t.Fatalf("release first preview: %v", err)
+	}
+
+	if _, err := manager.Ensure(context.Background(), []byte("test"), "display-1"); err != nil {
+		t.Fatalf("ensure same preview while old one stopping: %v", err)
+	}
+	select {
+	case <-runner.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for replacement fake preview runner to start")
+	}
+
+	if got := runner.runs.Load(); got != 2 {
+		t.Fatalf("expected preview runtime to start twice, got %d", got)
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := manager.Shutdown(shutdownCtx); err != nil {
+		t.Fatalf("shutdown preview manager: %v", err)
+	}
+}
+
+func TestPreviewManagerAllowsReplacementWhileReleasedPreviewStops(t *testing.T) {
+	t.Parallel()
+
+	fakeApp := &fakeApplication{
+		normalizeConfig: &dsl.EffectiveConfig{
+			Schema:               dsl.SchemaVersion,
+			SessionID:            "session-preview-limit-race",
+			DestinationTemplates: map[string]string{"default": "/tmp/out.mkv"},
+			VideoSources: []dsl.EffectiveVideoSource{
+				{
+					ID:                  "display-1",
+					Name:                "Display 1",
+					Type:                "display",
+					Enabled:             true,
+					Target:              dsl.VideoTarget{Display: ":0.0"},
+					Capture:             dsl.VideoCaptureSettings{FPS: 5},
+					Output:              dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
+					DestinationTemplate: "default",
+				},
+				{
+					ID:                  "display-2",
+					Name:                "Display 2",
+					Type:                "display",
+					Enabled:             true,
+					Target:              dsl.VideoTarget{Display: ":0.1"},
+					Capture:             dsl.VideoCaptureSettings{FPS: 5},
+					Output:              dsl.VideoOutputSettings{Container: "mkv", VideoCodec: "h264", Quality: 75},
+					DestinationTemplate: "default",
+				},
+			},
+		},
+	}
+	runner := &fakePreviewRunner{started: make(chan struct{}, 4), waitDelay: 150 * time.Millisecond}
+	manager := NewPreviewManager(context.Background(), fakeApp, nil, 1, runner)
+
+	first, err := manager.Ensure(context.Background(), []byte("test"), "display-1")
+	if err != nil {
+		t.Fatalf("ensure first preview: %v", err)
+	}
+	select {
+	case <-runner.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first fake preview runner to start")
+	}
+
+	if _, err := manager.Release(first.ID); err != nil {
+		t.Fatalf("release first preview: %v", err)
+	}
+
+	if _, err := manager.Ensure(context.Background(), []byte("test"), "display-2"); err != nil {
+		t.Fatalf("ensure replacement preview under limit=1: %v", err)
+	}
+	select {
+	case <-runner.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for replacement fake preview runner to start")
+	}
+
+	if got := runner.runs.Load(); got != 2 {
+		t.Fatalf("expected preview runtime to start twice, got %d", got)
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := manager.Shutdown(shutdownCtx); err != nil {
+		t.Fatalf("shutdown preview manager: %v", err)
+	}
+}

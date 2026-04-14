@@ -80,6 +80,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
           state={source.previewState}
           reason={source.previewReason}
           streamUrl={source.previewUrl}
+          aspectRatio={source.previewAspectRatio}
         />
         <div className="studio-source-card__preview">
           {editable ? (

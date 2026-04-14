@@ -3,6 +3,7 @@ package gst
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -446,8 +447,16 @@ type sharedPreviewConsumer struct {
 	waitErr     error
 }
 
+type sharedPreviewProfile struct {
+	MaxWidth    int
+	FPS         int
+	JPEGQuality int
+}
+
 func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOptions) (*sharedPreviewConsumer, error) {
 	consumerID := fmt.Sprintf("preview-%s-%d", trimSharedSignature(source.signature), source.counter.Add(1))
+	profile := previewProfileForSource(source.source)
+	previewWidth, previewHeight := previewTargetDimensions(source.source, profile.MaxWidth)
 	queue, err := gst.NewElementWithName("queue", consumerID+"-queue")
 	if err != nil {
 		return nil, fmt.Errorf("create preview queue: %w", err)
@@ -459,7 +468,7 @@ func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOpt
 	if err != nil {
 		return nil, fmt.Errorf("create preview videoscale: %w", err)
 	}
-	capsScale, err := newCapsFilter("video/x-raw,width=640")
+	capsScale, err := newCapsFilter(previewScaleCaps(previewWidth, previewHeight))
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +477,7 @@ func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOpt
 	if err != nil {
 		return nil, fmt.Errorf("create preview videorate: %w", err)
 	}
-	capsRate, err := newCapsFilter("video/x-raw,framerate=5/1")
+	capsRate, err := newCapsFilter(fmt.Sprintf("video/x-raw,framerate=%d/1", profile.FPS))
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +486,7 @@ func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOpt
 	if err != nil {
 		return nil, fmt.Errorf("create preview jpegenc: %w", err)
 	}
-	jpegenc.Set("quality", 50)
+	jpegenc.Set("quality", profile.JPEGQuality)
 	sink, err := app.NewAppSink()
 	if err != nil {
 		return nil, fmt.Errorf("create preview appsink: %w", err)
@@ -521,6 +530,74 @@ func buildSharedPreviewConsumer(source *sharedVideoSource, opts media.PreviewOpt
 	})
 
 	return consumer, nil
+}
+
+func previewProfileForSource(source dsl.EffectiveVideoSource) sharedPreviewProfile {
+	profile := sharedPreviewProfile{
+		MaxWidth:    960,
+		FPS:         previewFPS(source.Capture.FPS),
+		JPEGQuality: 75,
+	}
+
+	switch source.Type {
+	case "camera":
+		profile.MaxWidth = 1280
+		profile.JPEGQuality = 85
+	case "window", "region":
+		profile.MaxWidth = 1280
+		profile.JPEGQuality = 80
+	case "display":
+		profile.JPEGQuality = 75
+	}
+	return profile
+}
+
+func previewFPS(sourceFPS int) int {
+	if sourceFPS <= 0 {
+		return 10
+	}
+	if sourceFPS > 10 {
+		return 10
+	}
+	return sourceFPS
+}
+
+func previewScaleCaps(width, height int) string {
+	if width <= 0 {
+		width = 960
+	}
+	if height > 0 {
+		return fmt.Sprintf("video/x-raw,width=%d,height=%d,pixel-aspect-ratio=1/1", width, height)
+	}
+	return fmt.Sprintf("video/x-raw,width=%d,pixel-aspect-ratio=1/1", width)
+}
+
+func previewTargetDimensions(source dsl.EffectiveVideoSource, maxWidth int) (int, int) {
+	if maxWidth <= 0 {
+		maxWidth = 960
+	}
+	width, height := previewSourceSize(source)
+	if width <= 0 || height <= 0 {
+		return maxWidth, 0
+	}
+	if width <= maxWidth {
+		return width, height
+	}
+	scaledHeight := int(math.Round(float64(height) * (float64(maxWidth) / float64(width))))
+	if scaledHeight <= 0 {
+		scaledHeight = 1
+	}
+	return maxWidth, scaledHeight
+}
+
+func previewSourceSize(source dsl.EffectiveVideoSource) (int, int) {
+	if source.Target.Rect != nil && source.Target.Rect.W > 0 && source.Target.Rect.H > 0 {
+		return source.Target.Rect.W, source.Target.Rect.H
+	}
+	if width, height, err := parseSize(source.Capture.Size); err == nil && width > 0 && height > 0 {
+		return width, height
+	}
+	return 0, 0
 }
 
 func (c *sharedPreviewConsumer) finish(err error) {

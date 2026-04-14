@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -137,6 +138,23 @@ func WindowGeometry(ctx context.Context, id string) (int, int, int, int, error) 
 	return windowGeometry(ctx, id)
 }
 
+func RootGeometry(ctx context.Context, display string) (int, int, error) {
+	args := []string{"-root"}
+	output, err := runOutputWithEnv(ctx, commandEnvForDisplay(display), "xwininfo", args...)
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "query root geometry with xwininfo")
+	}
+	width, err := findIntAfter(output, "Width:")
+	if err != nil {
+		return 0, 0, err
+	}
+	height, err := findIntAfter(output, "Height:")
+	if err != nil {
+		return 0, 0, err
+	}
+	return width, height, nil
+}
+
 func windowTitle(ctx context.Context, id string) (string, error) {
 	for _, args := range [][]string{
 		{"-id", id, "_NET_WM_NAME"},
@@ -230,7 +248,73 @@ func ListCameras(ctx context.Context) ([]Camera, error) {
 		})
 	}
 
-	return cameras, nil
+	return dedupeCameras(cameras), nil
+}
+
+func dedupeCameras(cameras []Camera) []Camera {
+	if len(cameras) <= 1 {
+		return cameras
+	}
+
+	order := make([]string, 0, len(cameras))
+	grouped := make(map[string]Camera, len(cameras))
+	for _, camera := range cameras {
+		key := cameraIdentityKey(camera)
+		if existing, ok := grouped[key]; ok {
+			grouped[key] = preferredCameraNode(existing, camera)
+			continue
+		}
+		order = append(order, key)
+		grouped[key] = camera
+	}
+
+	result := make([]Camera, 0, len(order))
+	for _, key := range order {
+		camera := grouped[key]
+		camera.ID = camera.Device
+		result = append(result, camera)
+	}
+	return result
+}
+
+func cameraIdentityKey(camera Camera) string {
+	card := strings.ToLower(strings.TrimSpace(camera.CardName))
+	label := strings.ToLower(strings.TrimSpace(camera.Label))
+	if card != "" {
+		return card
+	}
+	if label != "" {
+		return label
+	}
+	return strings.ToLower(strings.TrimSpace(camera.Device))
+}
+
+func preferredCameraNode(a, b Camera) Camera {
+	aIndex, aOK := videoDeviceIndex(a.Device)
+	bIndex, bOK := videoDeviceIndex(b.Device)
+	switch {
+	case aOK && bOK:
+		if bIndex < aIndex {
+			return b
+		}
+		return a
+	case bOK:
+		return b
+	default:
+		return a
+	}
+}
+
+func videoDeviceIndex(device string) (int, bool) {
+	base := strings.TrimSpace(device)
+	if !strings.HasPrefix(base, "/dev/video") {
+		return 0, false
+	}
+	index, err := strconv.Atoi(strings.TrimPrefix(base, "/dev/video"))
+	if err != nil {
+		return 0, false
+	}
+	return index, true
 }
 
 func ListAudioInputs(ctx context.Context) ([]AudioInput, error) {
@@ -261,10 +345,36 @@ func ListAudioInputs(ctx context.Context) ([]AudioInput, error) {
 }
 
 func runOutput(ctx context.Context, name string, args ...string) (string, error) {
+	return runOutputWithEnv(ctx, nil, name, args...)
+}
+
+func runOutputWithEnv(ctx context.Context, env []string, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	if len(env) > 0 {
+		cmd.Env = append([]string{}, env...)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", errors.Wrap(err, fmt.Sprintf("%s %s: %s", name, strings.Join(args, " "), strings.TrimSpace(string(output))))
 	}
 	return string(output), nil
+}
+
+func commandEnvForDisplay(display string) []string {
+	if strings.TrimSpace(display) == "" {
+		return nil
+	}
+	base := appendNonDisplayEnv()
+	return append(base, "DISPLAY="+strings.TrimSpace(display))
+}
+
+func appendNonDisplayEnv() []string {
+	base := []string{}
+	for _, item := range os.Environ() {
+		if strings.HasPrefix(item, "DISPLAY=") {
+			continue
+		}
+		base = append(base, item)
+	}
+	return base
 }

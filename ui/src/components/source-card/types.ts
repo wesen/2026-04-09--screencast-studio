@@ -12,6 +12,7 @@ export interface StudioSource {
   previewState?: string;
   previewReason?: string;
   previewUrl?: string;
+  previewAspectRatio?: number;
 }
 
 export const STUDIO_SOURCE_SCENES: Record<StudioSourceKind, string[]> = {

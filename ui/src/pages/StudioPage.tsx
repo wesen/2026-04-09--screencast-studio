@@ -214,6 +214,32 @@ const labelToSampleRate = (label: string): number => {
   }
 };
 
+const previewAspectRatioForSource = (source: SetupDraftVideoSource): number | undefined => {
+  switch (source.kind) {
+    case 'region': {
+      const { w, h } = source.target.rect;
+      if (w > 0 && h > 0) {
+        return w / h;
+      }
+      return undefined;
+    }
+    case 'camera': {
+      const match = source.capture.size.trim().match(/^(\d+)x(\d+)$/i);
+      if (!match) {
+        return undefined;
+      }
+      const width = Number(match[1]);
+      const height = Number(match[2]);
+      if (width > 0 && height > 0) {
+        return width / height;
+      }
+      return undefined;
+    }
+    default:
+      return undefined;
+  }
+};
+
 const toStudioSource = (
   source: SetupDraftVideoSource,
   preview?: PreviewDescriptor
@@ -240,6 +266,7 @@ const toStudioSource = (
     previewUrl: preview && preview.state !== 'failed' && preview.state !== 'finished'
       ? previewStreamUrl(preview.id)
       : undefined,
+    previewAspectRatio: previewAspectRatioForSource(source),
   };
 };
 
@@ -728,6 +755,24 @@ export const StudioPage: React.FC<StudioPageProps> = ({ className }) => {
   const applyAddedSource = (source: ReturnType<typeof createDisplaySourceDraft>) => {
     if (structuredEditingLocked) {
       return;
+    }
+    if (source.kind === 'camera') {
+      const existingCamera = setupDraft.videoSources.find((item) => (
+        item.kind === 'camera' && (
+          item.target.deviceId === source.target.deviceId ||
+          item.name === source.name
+        )
+      ));
+      if (existingCamera) {
+        dispatch(addLog(create(ProcessLogSchema, {
+          timestamp: new Date().toISOString(),
+          processLabel: 'ui.source_picker',
+          stream: 'stderr',
+          message: `camera source ${source.name} already exists as ${existingCamera.id}; skipping duplicate add`,
+        })));
+        setSourcePickerKind(null);
+        return;
+      }
     }
     const nextDraft = {
       ...setupDraft,

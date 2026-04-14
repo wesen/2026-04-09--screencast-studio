@@ -121,20 +121,26 @@ func (m *PreviewManager) Ensure(ctx context.Context, dslBody []byte, sourceID st
 	signature := computePreviewSignature(source)
 
 	m.mu.Lock()
-	if existing, ok := m.bySignature[signature]; ok && existing.state != "failed" {
-		existing.leases++
-		snapshot := snapshotPreview(existing)
-		m.mu.Unlock()
-		log.Info().
-			Str("event", "preview.ensure.reused").
-			Str("preview_id", snapshot.ID).
-			Str("source_id", snapshot.SourceID).
-			Int("leases", snapshot.Leases).
-			Msg("reused existing preview")
-		m.publishPreviewState(snapshot)
-		return snapshot, nil
+	m.pruneTerminalPreviewsLocked()
+	if existing, ok := m.bySignature[signature]; ok {
+		if previewReusable(existing) {
+			existing.leases++
+			snapshot := snapshotPreview(existing)
+			m.mu.Unlock()
+			log.Info().
+				Str("event", "preview.ensure.reused").
+				Str("preview_id", snapshot.ID).
+				Str("source_id", snapshot.SourceID).
+				Int("leases", snapshot.Leases).
+				Msg("reused existing preview")
+			m.publishPreviewState(snapshot)
+			return snapshot, nil
+		}
+		if existing.leases == 0 {
+			delete(m.bySignature, signature)
+		}
 	}
-	if len(m.byID) >= m.limit {
+	if m.activePreviewCountLocked() >= m.limit {
 		m.mu.Unlock()
 		log.Warn().
 			Str("event", "preview.ensure.limit_exceeded").
@@ -233,6 +239,7 @@ func (m *PreviewManager) Release(previewID string) (previewSnapshot, error) {
 	if preview.leases == 0 {
 		preview.state = "stopping"
 		preview.reason = "released"
+		delete(m.bySignature, preview.signature)
 		log.Info().
 			Str("event", "preview.release.cancel").
 			Str("preview_id", previewID).
@@ -475,6 +482,52 @@ func (m *PreviewManager) finishPreview(previewID string, runErr error) {
 		delete(m.byID, previewID)
 		delete(m.bySignature, preview.signature)
 	}
+}
+
+func (m *PreviewManager) pruneTerminalPreviewsLocked() {
+	for previewID, preview := range m.byID {
+		if preview == nil {
+			delete(m.byID, previewID)
+			continue
+		}
+		if preview.state != "finished" && preview.state != "failed" {
+			continue
+		}
+		delete(m.byID, previewID)
+		if current := m.bySignature[preview.signature]; current == preview {
+			delete(m.bySignature, preview.signature)
+		}
+	}
+}
+
+func (m *PreviewManager) activePreviewCountLocked() int {
+	count := 0
+	for _, preview := range m.byID {
+		if previewCountsAgainstLimit(preview) {
+			count++
+		}
+	}
+	return count
+}
+
+func previewReusable(preview *managedPreview) bool {
+	if preview == nil {
+		return false
+	}
+	return preview.state == "starting" || preview.state == "running"
+}
+
+func previewCountsAgainstLimit(preview *managedPreview) bool {
+	if preview == nil {
+		return false
+	}
+	if preview.state == "finished" || preview.state == "failed" {
+		return false
+	}
+	if preview.state == "stopping" && preview.leases == 0 {
+		return false
+	}
+	return true
 }
 
 func (m *PreviewManager) publishPreviewState(snapshot previewSnapshot) {
