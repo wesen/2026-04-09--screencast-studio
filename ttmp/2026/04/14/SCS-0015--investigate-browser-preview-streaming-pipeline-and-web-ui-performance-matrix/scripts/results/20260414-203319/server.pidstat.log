@@ -1,0 +1,14 @@
+Linux 6.8.0-107-generic (f) 	04/14/2026 	_x86_64_	(8 CPU)
+
+08:33:19 PM   UID       PID    %usr %system  %guest   %wait    %CPU   CPU  Command
+08:33:20 PM  1000    681602   13.00    1.00    0.00    0.00   14.00     5  screencast-stud
+08:33:21 PM  1000    681602   11.00    1.00    0.00    0.00   12.00     5  screencast-stud
+08:33:22 PM  1000    681602   10.00    1.00    0.00    0.00   11.00     5  screencast-stud
+08:33:23 PM  1000    681602   11.00    0.00    0.00    0.00   11.00     5  screencast-stud
+08:33:24 PM  1000    681602   13.00    1.00    0.00    0.00   14.00     5  screencast-stud
+08:33:25 PM  1000    681602   71.00   62.00    0.00    0.00  133.00     5  screencast-stud
+08:33:26 PM  1000    681602  124.00  112.00    0.00    0.00  236.00     5  screencast-stud
+08:33:27 PM  1000    681602  213.00  181.00    0.00    0.00  394.00     5  screencast-stud
+08:33:28 PM  1000    681602  303.00   67.00    0.00    0.00  370.00     5  screencast-stud
+08:33:29 PM  1000    681602  305.00    7.00    0.00    0.00  312.00     5  screencast-stud
+Average:     1000    681602  107.40   43.30    0.00    0.00  150.70     -  screencast-stud

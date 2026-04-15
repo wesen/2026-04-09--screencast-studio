@@ -48,7 +48,7 @@ RelatedFiles:
       Note: Timing deltas that strongly lower confidence in the final MJPEG write/flush loop as the dominant hot path
 ExternalSources: []
 Summary: Ongoing lab report for the browser preview streaming investigation, with backfilled experiments, exact result directories, scenario definitions, outcomes, caveats, and the current working explanation for the desktop preview-plus-recording CPU spike.
-LastUpdated: 2026-04-14T20:28:00-04:00
+LastUpdated: 2026-04-14T20:36:00-04:00
 WhatFor: Keep a continuation-friendly experimental record for SCS-0015 that can be updated as new browser-path measurements and instrumentation land.
 WhenToUse: Read this when continuing the browser preview investigation and you need the exact experiments already run, the result locations, and the current evidence-backed interpretation.
 ---
@@ -567,6 +567,56 @@ Interpretation:
 - those numbers are **far too small** to explain a server process that still reached `~378–408%` CPU late in the run
 - this strongly lowers confidence that the main browser-path cost is the HTTP MJPEG write/flush loop itself
 - the missing hot slice now looks even more likely to be upstream of the final HTTP write path: shared preview+recording interaction, Go-side frame-copy/publication work before the final write, browser-connected lifecycle behavior, or some combination of those
+
+### EXP-14: Real browser-backed desktop preview + recording rerun with preview-manager and EventHub timing metrics
+
+Purpose:
+- move one step upstream of the final HTTP write path
+- measure whether PreviewManager cached-frame copying, `preview.state` publication, or EventHub publish time is large enough to explain the browser-path hot phase better than the final MJPEG write loop did
+
+Browser helper scripts used:
+- `scripts/08-playwright-browser-matrix/01-open-studio-and-wait-desktop.js`
+- `scripts/08-playwright-browser-matrix/03-start-recording.js`
+- `scripts/08-playwright-browser-matrix/04-stop-recording.js`
+- `scripts/07-live-server-browser-scenario-sample.sh`
+
+Saved result directory:
+- `scripts/results/20260414-203319/`
+
+Summary result:
+- avg CPU: `150.70%`
+- max CPU: `394.00%`
+
+Important comparability caveat:
+- just like EXP-13, this sampled window included preview-only warmup before the recording phase fully ramped, so the average CPU number is not a replacement for the earlier `410.60%` one-tab browser headline
+- the important value of this rerun is the new upstream timing deltas plus the late-run climb into the hot band (`312–394%`)
+
+Key timing deltas:
+- `preview_http_write_nanoseconds_total`: `7,028,353`
+- `preview_http_flush_nanoseconds_total`: `511,999`
+- `preview_frame_store_nanoseconds_total`: `3,691,230`
+- `preview_latest_frame_copy_nanoseconds_total`: `1,796,290`
+- `preview_state_publish_nanoseconds_total`: `790,719`
+- `eventhub_publish_nanoseconds_total{event_type="preview.state"}`: `535,814`
+- `eventhub_publish_nanoseconds_total{event_type="telemetry.audio_meter"}`: `6,452,838`
+
+Approximate per-event/per-frame interpretation:
+- MJPEG write time per served frame: `~0.117ms`
+- MJPEG flush time per served frame: `~0.009ms`
+- PreviewManager frame-store time per frame update: `~0.062ms`
+- PreviewManager latest-frame copy time per served frame: `~0.030ms`
+- PreviewManager `preview.state` publish time per frame update: `~0.013ms`
+- EventHub `preview.state` publish time per event: `~0.009ms`
+- EventHub `telemetry.audio_meter` publish time per event: `~0.143ms`
+
+Interpretation:
+- this rerun narrows the hypothesis again
+- not only is the final MJPEG write/flush loop too cheap to explain the hot phase, but the immediate Go-side work just upstream of it is also tiny:
+  - PreviewManager frame-store/copy/publication work is measured in **hundredths of a millisecond per event/frame**
+  - EventHub `preview.state` publish time is also tiny
+- even the largest newly visible event-path cost here, `telemetry.audio_meter` EventHub publish time, is still only about `6.45ms` cumulative across the whole sampled run
+- those numbers are nowhere near large enough to explain a process that still climbed into the `~312–394%` range late in the run
+- the dominant unexplained browser-path cost now looks even more likely to live **upstream of PreviewManager itself**, likely around the shared GStreamer preview consumer/appsink callback boundary, the transition from GStreamer buffers into Go JPEG byte slices, or some browser-connected interaction that those new counters still do not see
 
 ## Aggregated result tables
 

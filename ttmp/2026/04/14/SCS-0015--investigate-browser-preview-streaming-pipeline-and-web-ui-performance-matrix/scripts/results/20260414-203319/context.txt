@@ -1,0 +1,5 @@
+label=scs0015-browser-desktop-recording-one-tab-upstream-timing
+server_url=http://127.0.0.1:7777
+port=7777
+server_pid=681602
+duration=8
