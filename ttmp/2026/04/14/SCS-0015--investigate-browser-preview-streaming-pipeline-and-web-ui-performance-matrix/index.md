@@ -27,7 +27,7 @@ RelatedFiles:
       Note: New metrics registry will be extended for browser-preview observability
 ExternalSources: []
 Summary: Ticket for investigating the browser-connected preview streaming path and measuring why the real Studio page can drive the server much hotter than earlier backend/API-only performance matrices suggested.
-LastUpdated: 2026-04-14T18:08:00-04:00
+LastUpdated: 2026-04-14T20:28:00-04:00
 WhatFor: Track the browser preview streaming investigation, its measurement plan, and the final report.
 WhenToUse: Start here when working on browser-preview serving overhead, frontend preview lifecycle performance, or MJPEG/metrics measurement work.
 ---
@@ -81,7 +81,9 @@ Current deliverable status:
 - a focused ablation summary note now exists at `scripts/13-mjpeg-websocket-ablation-summary.md`
 - an ongoing detailed lab report now exists at `reference/02-browser-preview-streaming-lab-report.md` and backfills the current experiments in detail
 - camera-only browser-tab scenarios are still pending, but the current priority is the desktop preview+recording one-tab repro rather than scenario expansion
-- next highest-value run: rerun desktop preview + recording + one real browser tab with the new MJPEG timing metrics enabled
+- one real-browser rerun with the new MJPEG timing metrics now exists at `scripts/results/20260414-202519/`
+- that rerun showed late-run CPU still climbing into the `~378–408%` range while cumulative MJPEG write+flush time stayed tiny, which lowers confidence that the final HTTP write/flush loop is the dominant hot path
+- next highest-value step: instrument further upstream of the final MJPEG write path, especially frame-copy/publication work before the HTTP write
 
 ## Tasks
 

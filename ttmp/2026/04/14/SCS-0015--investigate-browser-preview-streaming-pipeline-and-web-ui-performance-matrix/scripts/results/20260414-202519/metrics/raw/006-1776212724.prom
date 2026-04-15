@@ -1,0 +1,93 @@
+# HELP screencast_studio_eventhub_events_delivered_total Total server events delivered into subscriber channels by the EventHub.
+# TYPE screencast_studio_eventhub_events_delivered_total counter
+screencast_studio_eventhub_events_delivered_total{event_type="preview.state"} 428
+screencast_studio_eventhub_events_delivered_total{event_type="session.log"} 2
+screencast_studio_eventhub_events_delivered_total{event_type="session.state"} 5
+screencast_studio_eventhub_events_delivered_total{event_type="telemetry.audio_meter"} 53
+screencast_studio_eventhub_events_delivered_total{event_type="telemetry.disk_status"} 22
+# HELP screencast_studio_eventhub_events_dropped_total Total server events dropped by the EventHub because a subscriber channel was full.
+# TYPE screencast_studio_eventhub_events_dropped_total counter
+# HELP screencast_studio_eventhub_events_published_total Total server events published into the EventHub.
+# TYPE screencast_studio_eventhub_events_published_total counter
+screencast_studio_eventhub_events_published_total{event_type="preview.state"} 428
+screencast_studio_eventhub_events_published_total{event_type="session.log"} 2
+screencast_studio_eventhub_events_published_total{event_type="session.state"} 5
+screencast_studio_eventhub_events_published_total{event_type="telemetry.audio_meter"} 53
+screencast_studio_eventhub_events_published_total{event_type="telemetry.disk_status"} 399
+# HELP screencast_studio_eventhub_subscribers Current number of active EventHub subscribers.
+# TYPE screencast_studio_eventhub_subscribers gauge
+screencast_studio_eventhub_subscribers 1
+# HELP screencast_studio_gst_audio_level_parse_failures_total Total audio level message parse failures in the GStreamer recording runtime.
+# TYPE screencast_studio_gst_audio_level_parse_failures_total counter
+screencast_studio_gst_audio_level_parse_failures_total{reason="extract_failed",rms_type="unsafe.Pointer"} 13
+# HELP screencast_studio_gst_shared_bridge_recorder_appsrc_pushed_total Total buffers successfully pushed from the shared video recorder bridge worker into appsrc.
+# TYPE screencast_studio_gst_shared_bridge_recorder_appsrc_pushed_total counter
+screencast_studio_gst_shared_bridge_recorder_appsrc_pushed_total{source_type="display"} 18
+# HELP screencast_studio_gst_shared_bridge_recorder_buffers_copied_total Total GStreamer buffers copied by the shared video recorder bridge before enqueueing.
+# TYPE screencast_studio_gst_shared_bridge_recorder_buffers_copied_total counter
+screencast_studio_gst_shared_bridge_recorder_buffers_copied_total{source_type="display"} 1032
+# HELP screencast_studio_gst_shared_bridge_recorder_dropped_total Total copied buffers dropped because the shared video recorder bridge async queue was full or closed.
+# TYPE screencast_studio_gst_shared_bridge_recorder_dropped_total counter
+screencast_studio_gst_shared_bridge_recorder_dropped_total{source_type="display"} 1004
+# HELP screencast_studio_gst_shared_bridge_recorder_enqueued_total Total copied buffers successfully enqueued into the shared video recorder bridge async queue.
+# TYPE screencast_studio_gst_shared_bridge_recorder_enqueued_total counter
+screencast_studio_gst_shared_bridge_recorder_enqueued_total{source_type="display"} 28
+# HELP screencast_studio_gst_shared_bridge_recorder_samples_received_total Total samples received by the shared video recorder bridge from the upstream appsink callback.
+# TYPE screencast_studio_gst_shared_bridge_recorder_samples_received_total counter
+screencast_studio_gst_shared_bridge_recorder_samples_received_total{source_type="display"} 1032
+# HELP screencast_studio_gst_shared_bridge_recorder_worker_handled_total Total buffers handled by the shared video recorder bridge worker goroutine.
+# TYPE screencast_studio_gst_shared_bridge_recorder_worker_handled_total counter
+screencast_studio_gst_shared_bridge_recorder_worker_handled_total{source_type="display"} 19
+# HELP screencast_studio_preview_ensures_total Total preview ensure attempts handled by PreviewManager.
+# TYPE screencast_studio_preview_ensures_total counter
+screencast_studio_preview_ensures_total{source_type="display",result="created"} 1
+screencast_studio_preview_ensures_total{source_type="display",result="reused"} 1
+# HELP screencast_studio_preview_frame_updates_total Total preview frame updates stored by PreviewManager.
+# TYPE screencast_studio_preview_frame_updates_total counter
+screencast_studio_preview_frame_updates_total{source_type="display"} 426
+# HELP screencast_studio_preview_http_bytes_served_total Total bytes written to HTTP MJPEG preview clients, including multipart framing.
+# TYPE screencast_studio_preview_http_bytes_served_total counter
+screencast_studio_preview_http_bytes_served_total{source_type="display"} 95776439
+# HELP screencast_studio_preview_http_clients Current number of active HTTP MJPEG preview clients connected to the server.
+# TYPE screencast_studio_preview_http_clients gauge
+screencast_studio_preview_http_clients{source_type="display"} 1
+# HELP screencast_studio_preview_http_flush_nanoseconds_total Total time spent in HTTP flush calls while serving MJPEG preview streams, in nanoseconds.
+# TYPE screencast_studio_preview_http_flush_nanoseconds_total counter
+screencast_studio_preview_http_flush_nanoseconds_total{source_type="display"} 5668792
+# HELP screencast_studio_preview_http_flushes_total Total HTTP flush calls performed while serving MJPEG preview streams.
+# TYPE screencast_studio_preview_http_flushes_total counter
+screencast_studio_preview_http_flushes_total{source_type="display"} 422
+# HELP screencast_studio_preview_http_frames_served_total Total JPEG preview frames written to HTTP MJPEG clients.
+# TYPE screencast_studio_preview_http_frames_served_total counter
+screencast_studio_preview_http_frames_served_total{source_type="display"} 422
+# HELP screencast_studio_preview_http_idle_iterations_total Total HTTP MJPEG preview handler loop iterations that did not serve a new frame.
+# TYPE screencast_studio_preview_http_idle_iterations_total counter
+screencast_studio_preview_http_idle_iterations_total{source_type="display"} 5
+# HELP screencast_studio_preview_http_loop_iterations_total Total iterations of the HTTP MJPEG preview handler loop.
+# TYPE screencast_studio_preview_http_loop_iterations_total counter
+screencast_studio_preview_http_loop_iterations_total{source_type="display"} 427
+# HELP screencast_studio_preview_http_streams_finished_total Total HTTP MJPEG preview streams finished by the server.
+# TYPE screencast_studio_preview_http_streams_finished_total counter
+screencast_studio_preview_http_streams_finished_total{source_type="display",reason="client_done"} 1
+# HELP screencast_studio_preview_http_streams_started_total Total HTTP MJPEG preview streams started by the server.
+# TYPE screencast_studio_preview_http_streams_started_total counter
+screencast_studio_preview_http_streams_started_total{source_type="display"} 2
+# HELP screencast_studio_preview_http_write_nanoseconds_total Total time spent writing MJPEG multipart headers and JPEG bytes to HTTP preview clients, in nanoseconds.
+# TYPE screencast_studio_preview_http_write_nanoseconds_total counter
+screencast_studio_preview_http_write_nanoseconds_total{source_type="display"} 66322461
+# HELP screencast_studio_preview_releases_total Total preview release requests handled by PreviewManager.
+# TYPE screencast_studio_preview_releases_total counter
+# HELP screencast_studio_websocket_connections Current number of active websocket connections to the server.
+# TYPE screencast_studio_websocket_connections gauge
+screencast_studio_websocket_connections 1
+# HELP screencast_studio_websocket_event_write_errors_total Total websocket event write attempts that returned an error.
+# TYPE screencast_studio_websocket_event_write_errors_total counter
+screencast_studio_websocket_event_write_errors_total{event_type="preview.state"} 1
+# HELP screencast_studio_websocket_events_written_total Total server events written to websocket clients.
+# TYPE screencast_studio_websocket_events_written_total counter
+screencast_studio_websocket_events_written_total{event_type="preview.list"} 2
+screencast_studio_websocket_events_written_total{event_type="preview.state"} 427
+screencast_studio_websocket_events_written_total{event_type="session.log"} 2
+screencast_studio_websocket_events_written_total{event_type="session.state"} 7
+screencast_studio_websocket_events_written_total{event_type="telemetry.audio_meter"} 55
+screencast_studio_websocket_events_written_total{event_type="telemetry.disk_status"} 24

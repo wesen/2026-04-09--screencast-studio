@@ -56,4 +56,5 @@
 - [x] Decide whether the dominant web-UI-specific cost is upstream preview generation, MJPEG serving fan-out, frontend lifecycle behavior, or a combination
 - [x] Propose concrete optimization options ranked by impact and implementation risk
 - [x] Validate the ticket with `docmgr doctor --ticket SCS-0015 --stale-after 30`
-- [ ] Rerun the high-signal desktop preview + recording + one real browser tab scenario with the new MJPEG timing metrics enabled
+- [x] Rerun the high-signal desktop preview + recording + one real browser tab scenario with the new MJPEG timing metrics enabled
+- [ ] Instrument further upstream of the final MJPEG write path, especially frame-copy/publication work before the HTTP write

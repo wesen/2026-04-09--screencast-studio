@@ -42,12 +42,17 @@ RelatedFiles:
       Note: Synthetic websocket consumer used in EXP-12
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/13-mjpeg-websocket-ablation-summary.md
       Note: Short human-readable summary of the focused ablation result
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-202519/01-summary.md
+      Note: First real-browser rerun with MJPEG timing metrics
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-202519/metric-deltas.txt
+      Note: Timing deltas that strongly lower confidence in the final MJPEG write/flush loop as the dominant hot path
 ExternalSources: []
 Summary: Ongoing lab report for the browser preview streaming investigation, with backfilled experiments, exact result directories, scenario definitions, outcomes, caveats, and the current working explanation for the desktop preview-plus-recording CPU spike.
-LastUpdated: 2026-04-14T18:08:00-04:00
+LastUpdated: 2026-04-14T20:28:00-04:00
 WhatFor: Keep a continuation-friendly experimental record for SCS-0015 that can be updated as new browser-path measurements and instrumentation land.
 WhenToUse: Read this when continuing the browser preview investigation and you need the exact experiments already run, the result locations, and the current evidence-backed interpretation.
 ---
+
 
 
 
@@ -518,6 +523,50 @@ Interpretation:
   - total loop iterations,
   - total idle iterations,
   against the earlier browser and synthetic-client cases
+
+### EXP-13: Real browser-backed desktop preview + recording rerun with MJPEG timing metrics
+
+Purpose:
+- rerun the highest-value browser scenario after the new MJPEG timing metrics landed
+- answer whether the browser-path spike appears to live inside MJPEG write/flush work itself
+
+Browser helper scripts used:
+- `scripts/08-playwright-browser-matrix/01-open-studio-and-wait-desktop.js`
+- `scripts/08-playwright-browser-matrix/03-start-recording.js`
+- `scripts/08-playwright-browser-matrix/04-stop-recording.js`
+- `scripts/07-live-server-browser-scenario-sample.sh`
+
+Saved result directory:
+- `scripts/results/20260414-202519/`
+
+Summary result:
+- avg CPU: `163.34%`
+- max CPU: `407.92%`
+
+Important comparability caveat:
+- this rerun is **not** directly comparable to the earlier `410.60% avg CPU` browser run as a pure average, because the sampled window clearly included several preview-only seconds before recording fully ramped up
+- the per-second `pidstat` trace shows a low preview-only band first, then a rapid climb during recording, including `377.00%` and `407.92%` late in the sampled window
+- this rerun is therefore more useful for **timing-metric interpretation** than for replacing the earlier average-CPU headline number
+
+Key metric deltas:
+- `preview_http_frames_served_total`: `55`
+- `preview_http_bytes_served_total`: `10,503,752`
+- `preview_http_loop_iterations_total`: `71`
+- `preview_http_idle_iterations_total`: `16`
+- `preview_http_write_nanoseconds_total`: `8,724,144`
+- `preview_http_flush_nanoseconds_total`: `908,218`
+- `websocket_events_written_total{event_type="preview.state"}`: `54`
+- `websocket_events_written_total{event_type="telemetry.audio_meter"}`: `62`
+
+Interpretation:
+- the new timing counters are the most important part of this rerun
+- cumulative MJPEG write time across the sampled run was only about `8.7ms` total, and cumulative flush time was only about `0.9ms` total
+- on a rough per-served-frame basis, that is approximately:
+  - write time: `~0.159ms/frame`
+  - flush time: `~0.017ms/frame`
+- those numbers are **far too small** to explain a server process that still reached `~378–408%` CPU late in the run
+- this strongly lowers confidence that the main browser-path cost is the HTTP MJPEG write/flush loop itself
+- the missing hot slice now looks even more likely to be upstream of the final HTTP write path: shared preview+recording interaction, Go-side frame-copy/publication work before the final write, browser-connected lifecycle behavior, or some combination of those
 
 ## Aggregated result tables
 

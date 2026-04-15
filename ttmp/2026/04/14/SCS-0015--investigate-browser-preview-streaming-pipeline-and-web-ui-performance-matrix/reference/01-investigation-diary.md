@@ -48,6 +48,8 @@ RelatedFiles:
       Note: Saved the first larger findings note after the matrix run
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/run.sh
       Note: Added and used during Step 7
+    - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-202519/server.pidstat.log
+      Note: Step 9 evidence that the run ramped into the hot band after preview-only warmup
     - Path: ui/src/components/preview/PreviewStream.tsx
       Note: |-
         The actual browser media transport is an img tag pointed at the MJPEG endpoint
@@ -58,10 +60,11 @@ RelatedFiles:
         Frontend preview lifecycle likely explains differences between browser-driven and API-only runs
 ExternalSources: []
 Summary: Diary for the browser preview streaming and web-UI performance investigation ticket.
-LastUpdated: 2026-04-14T18:08:00-04:00
+LastUpdated: 2026-04-14T20:28:00-04:00
 WhatFor: Record the chronology of how the browser preview streaming performance investigation was set up and how its conclusions are derived.
 WhenToUse: Read when continuing SCS-0015 and you need the exact reasoning, commands, and file boundaries used to define the new browser-streaming research track.
 ---
+
 
 
 
@@ -1078,3 +1081,113 @@ The instrumentation points are deliberately simple:
 - one cumulative nanosecond counter around `flusher.Flush()`.
 
 This should make the next real-browser rerun much more informative without changing preview behavior yet.
+
+## Step 9: Recovered the Browser Tool and Used the New Timing Metrics in a Real One-Tab Rerun
+
+Once the browser tool came back, I used it immediately for the highest-value rerun: one real browser tab, desktop preview, and recording, with the new MJPEG timing metrics enabled. The resulting average CPU number was not directly comparable to the earlier `410.60%` run because this sample window clearly included some preview-only warmup before recording fully ramped. But the timing metrics were still decisive.
+
+The key outcome is that cumulative MJPEG write and flush time stayed tiny even while the process later climbed back into the very hot `~378–408%` range. That strongly suggests the final HTTP MJPEG write/flush loop is not the dominant source of the browser-path spike. So this rerun materially sharpened the hypothesis even though it did not produce a cleaner replacement headline CPU average.
+
+### Prompt Context
+
+**User prompt (verbatim):** "try again, i restarted the session"
+
+**Assistant interpretation:** Retry the recovered browser tool right away and use it to resume the real browser-backed SCS-0015 measurement path.
+
+**Inferred user intent:** Unblock the stalled browser-connected investigation and harvest real evidence now that the browser session is healthy again.
+
+### What I did
+
+- Verified the recovered browser tool by listing tabs and navigating to `http://127.0.0.1:7777`.
+- Used the existing ticket-local Playwright helper scripts to:
+  - open the Studio page and wait for the desktop preview,
+  - start recording,
+  - stop recording.
+- Ran the live server sampler in parallel:
+  - `ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/07-live-server-browser-scenario-sample.sh`
+- Saved the new run under:
+  - `scripts/results/20260414-202519/`
+
+Key outputs from that run:
+
+```text
+avg_cpu: 163.34%
+max_cpu: 407.92%
+```
+
+Important timing deltas:
+
+```text
+preview_http_frames_served_total delta = 55
+preview_http_write_nanoseconds_total delta = 8724144
+preview_http_flush_nanoseconds_total delta = 908218
+preview_http_loop_iterations_total delta = 71
+preview_http_idle_iterations_total delta = 16
+```
+
+### Why
+
+This was the first real chance to use the new timing counters in the actual one-tab browser path, which is still the strongest scenario for SCS-0015. The main question was no longer “is the browser run hot?” — we already knew that — but “does the extra heat live in the final MJPEG HTTP write/flush loop itself?”
+
+### What worked
+
+- The browser tool recovered successfully and the existing Playwright helpers still worked.
+- The one-tab desktop preview loaded cleanly.
+- Recording start/stop succeeded through the real Studio page.
+- The live sampler captured the new timing metrics exactly as intended.
+
+### What didn't work
+
+The average CPU result from this rerun is not cleanly comparable to the earlier `410.60%` one-tab browser headline because the sampled window clearly included preview-only warmup before recording fully ramped. The `pidstat` trace makes that visible: several early seconds are around `11–12%`, then the process climbs through `99%`, `215%`, `280%`, and finally `377–408%` later in the window.
+
+So this rerun is more useful as a **timing-path diagnosis** than as a direct average-CPU replacement for the earlier browser result.
+
+### What I learned
+
+This rerun gave the strongest evidence yet that the final MJPEG write/flush loop is not the main bottleneck. Across `55` served frames, cumulative write time was only about `8.7ms` total and cumulative flush time was only about `0.9ms` total. Roughly speaking, that is:
+
+- `~0.159ms` write time per served frame
+- `~0.017ms` flush time per served frame
+
+Those costs are far too small to explain a process that still climbed into the `~378–408%` range late in the run.
+
+### What was tricky to build
+
+The tricky part here was interpreting the rerun honestly. It would have been tempting to headline the lower `163.34%` average as if the browser-path problem had disappeared, but the saved per-second trace clearly shows a mixed window with preview-only warmup before the hot recording phase. The right interpretation is narrower and more useful: the run is good evidence about **where the time is not going**.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-202519/metric-deltas.txt`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-202519/server.pidstat.log`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+
+The main review question is whether the current evidence is strong enough to deprioritize the final MJPEG write/flush loop and shift instrumentation focus upstream without first doing a more tightly aligned second rerun.
+
+### What should be done in the future
+
+- Instrument further upstream of the final HTTP write path, especially frame-copy/publication work before the write.
+- If needed, make a more tightly aligned browser rerun whose sampled window begins closer to actual recording start.
+
+### Code review instructions
+
+Start with the saved run artifacts:
+
+- `scripts/results/20260414-202519/01-summary.md`
+- `scripts/results/20260414-202519/metric-deltas.txt`
+- `scripts/results/20260414-202519/server.pidstat.log`
+
+Then compare them against the timing instrumentation in:
+
+- `internal/web/handlers_preview.go`
+- `internal/web/preview_metrics.go`
+
+### Technical details
+
+Approximate per-frame costs from the rerun:
+
+```text
+write per frame ~= 8,724,144 ns / 55 ~= 158,621 ns ~= 0.159 ms
+flush per frame ~=   908,218 ns / 55 ~=  16,513 ns ~= 0.017 ms
+```
+
+That is the strongest current reason to move the next instrumentation slice upstream of the final MJPEG HTTP write/flush step.

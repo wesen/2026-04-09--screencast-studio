@@ -381,3 +381,40 @@ That rerun should now let us compare write/flush/loop timing deltas directly ins
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go — MJPEG handler now accumulates loop, idle, write-duration, and flush-duration metrics
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/metrics_test.go — `/metrics` endpoint test now asserts the new timing metric families
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — preview MJPEG endpoint test now checks that the timing metrics appear after serving a real stream
+
+Used the recovered browser tool to run the next high-signal real-browser validation with the new MJPEG timing metrics enabled.
+
+Saved result directory:
+
+- `scripts/results/20260414-202519/`
+
+This rerun used the real Studio page with one browser tab, desktop preview, and recording. The average CPU number from this run (`163.34%`) is **not** directly comparable to the earlier `410.60%` one-tab browser run because the sampled window clearly included several preview-only seconds before recording fully ramped. The per-second `pidstat` trace still climbed late into the very hot band:
+
+- `377.00%`
+- `407.92%`
+
+The most important new evidence from this rerun is the timing-metric deltas:
+
+- `screencast_studio_preview_http_write_nanoseconds_total{source_type="display"}` → `8,724,144`
+- `screencast_studio_preview_http_flush_nanoseconds_total{source_type="display"}` → `908,218`
+- `screencast_studio_preview_http_frames_served_total{source_type="display"}` → `55`
+- `screencast_studio_preview_http_loop_iterations_total{source_type="display"}` → `71`
+- `screencast_studio_preview_http_idle_iterations_total{source_type="display"}` → `16`
+
+Those numbers imply extremely small final-write costs per served frame:
+
+- write: about `0.159ms/frame`
+- flush: about `0.017ms/frame`
+
+That is the key refinement from this run: the final MJPEG HTTP write/flush loop does **not** currently look expensive enough to explain a process that still reached `~378–408%` CPU late in the run.
+
+So the current hypothesis sharpens again:
+
+- the browser-path spike is still real,
+- but the dominant hot slice is probably **upstream of the final HTTP write/flush step**, likely in shared preview+recording interaction, Go-side frame-copy/publication work before the write, browser-connected lifecycle behavior, or some combination of those.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-202519/01-summary.md — first real-browser rerun with MJPEG timing metrics enabled
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-202519/metric-deltas.txt — timing, preview, websocket, and EventHub deltas for the rerun
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/results/20260414-202519/server.pidstat.log — per-second CPU trace showing the late-run climb into the hot band

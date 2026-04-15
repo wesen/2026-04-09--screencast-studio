@@ -25,7 +25,7 @@ RelatedFiles:
       Note: Focused websocket ablation summary that refined the browser-path hypothesis
 ExternalSources: []
 Summary: First substantive report draft for the browser preview streaming investigation, based on the fresh-server HTTP-client matrix and the first live browser-backed measurement pass.
-LastUpdated: 2026-04-14T18:08:00-04:00
+LastUpdated: 2026-04-14T20:28:00-04:00
 WhatFor: Hold the matrix results and engineering conclusions for SCS-0015 as the browser-connected preview investigation progresses.
 WhenToUse: Read after the first measurement pass to understand what is already proven, what remains pending, and what optimization directions are now justified.
 ---
@@ -205,7 +205,20 @@ The most helpful current metrics are:
 - `screencast_studio_preview_http_write_nanoseconds_total`
 - `screencast_studio_preview_http_flush_nanoseconds_total`
 
-These newer timing metrics were added after the websocket-ablation pass so the next real browser rerun can answer a narrower question: is the browser-specific hot slice spending its extra time inside the MJPEG write/flush loop, or is the real browser gap still mostly elsewhere?
+These newer timing metrics were added after the websocket-ablation pass so the next real browser rerun could answer a narrower question: is the browser-specific hot slice spending its extra time inside the MJPEG write/flush loop, or is the real browser gap still mostly elsewhere?
+
+The first rerun with those timing metrics now exists under `scripts/results/20260414-202519/`. Its most important result is not the average CPU headline, because that sampled window included preview-only warmup before recording fully ramped. The important result is that cumulative MJPEG write and flush time stayed tiny even while the server later climbed into the `~378–408%` range:
+
+- `preview_http_write_nanoseconds_total` delta: `8,724,144`
+- `preview_http_flush_nanoseconds_total` delta: `908,218`
+- `preview_http_frames_served_total` delta: `55`
+
+That works out to roughly:
+
+- `~0.159ms` cumulative write time per served frame
+- `~0.017ms` cumulative flush time per served frame
+
+This strongly suggests the final MJPEG HTTP write/flush loop is **not** the dominant source of the browser-path CPU spike.
 
 ## Likely bottlenecks
 
@@ -215,7 +228,8 @@ Current best interpretation:
 2. **Real browser-connected preview consumption is materially different from a dumb HTTP reader.**
 3. **Simple MJPEG fan-out is only part of the story.**
 4. **Synthetic websocket/event fanout alone is also only part of the story.**
-5. **Served-byte volume is not the whole explanation.**
+5. **The final MJPEG HTTP write/flush loop does not currently look expensive enough to explain the spike.**
+6. **Served-byte volume is not the whole explanation.**
 
 That points away from a simplistic “just lower JPEG quality” answer and toward deeper investigation of the browser-facing preview loop and the browser-connected shared-source workload.
 
@@ -223,9 +237,9 @@ That points away from a simplistic “just lower JPEG quality” answer and towa
 
 Ranked by current confidence and likely value:
 
-1. **Use the newly added MJPEG timing metrics in a real browser rerun**
-   - compare write/flush/loop deltas in the high-signal one-tab desktop preview+recording scenario,
-   - then decide whether deeper handler instrumentation is still necessary.
+1. **Add deeper instrumentation upstream of the final HTTP write/flush step**
+   - especially around frame-copy/publication work before the final MJPEG write,
+   - because the first timing rerun strongly suggests the final write/flush loop itself is not the main cost.
 2. **If needed, add even deeper handler/path instrumentation**
    - per-stream skip/drop reasons,
    - blocked write/flush timing,
