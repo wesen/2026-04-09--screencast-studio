@@ -25,7 +25,7 @@ RelatedFiles:
         Primary plan document for Step 1
 ExternalSources: []
 Summary: Chronological diary for the lower-level profiling investigation into the browser-connected hot path.
-LastUpdated: 2026-04-14T20:46:00-04:00
+LastUpdated: 2026-04-14T22:45:43-04:00
 WhatFor: Record the implementation and profiling workflow step by step, including failures, commands, and interpretation changes.
 WhenToUse: Read when continuing SCS-0016 and you need the exact reasoning and commands used so far.
 ---
@@ -129,3 +129,319 @@ desktop preview + recording + one real browser tab
 ```
 
 That repro is still the highest-value target because SCS-0015 showed it was already enough to demonstrate the unexplained hot phase.
+
+## Step 2: Added Optional pprof Support and Captured the First CPU Profile
+
+The first real implementation step for SCS-0016 was to add the smallest lower-level profiler that could answer an important question: does the hot phase still show up clearly in Go userland, or does it immediately collapse into CGO/runtime/external code? The answer to that question determines whether it is worth staying in pprof longer or whether the investigation should move to `perf` as quickly as possible.
+
+I added optional `--pprof-addr` support to `screencast-studio serve`, exposed a separate pprof debug server rather than overloading the main mux, and wrote ticket-local helper scripts to restart the app with pprof enabled and capture a CPU profile. I then used the same high-signal browser repro — desktop preview + recording + one real browser tab — to capture the first profile. That first result was already highly informative: it is dominated by native/external code rather than clean Go-userland hotspots.
+
+### Prompt Context
+
+**User prompt (verbatim):** (same as Step 1)
+
+**Assistant interpretation:** After creating the lower-level profiling ticket, begin implementing the first profiling slice immediately and keep the diary current as code and evidence land.
+
+**Inferred user intent:** Make the new ticket operational, not just well documented, and use it to get real evidence as soon as possible.
+
+**Commit (code):** `d06957a0318d1294609b35e8673ca307fad4bbab` — `Add optional pprof profiling support`
+
+### What I did
+
+- Added:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pprof.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pprof_test.go`
+- Updated:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/serve.go`
+- Added ticket-local helper scripts:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/01-restart-scs-web-ui-with-pprof.sh`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/02-capture-pprof-cpu-profile.sh`
+- Validated with:
+
+```bash
+gofmt -w internal/web/pprof.go internal/web/pprof_test.go internal/web/server.go pkg/cli/serve.go
+bash -n ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/01-restart-scs-web-ui-with-pprof.sh
+bash -n ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/02-capture-pprof-cpu-profile.sh
+go test ./internal/web ./pkg/cli -count=1
+go test ./... -count=1
+```
+
+- Restarted the app with pprof enabled and confirmed:
+  - `http://127.0.0.1:7777/api/healthz`
+  - `http://127.0.0.1:6060/debug/pprof/`
+- Captured the first CPU profile under:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/02-capture-pprof-cpu-profile/20260414-204800/`
+
+### Why
+
+This was the smallest lower-level profiling slice that could answer a strategic question with very little ambiguity. If pprof had immediately shown clear Go-userland hotspots, the investigation could have stayed at that layer. If it mostly showed opaque external/native time, that would justify moving quickly to `perf`.
+
+### What worked
+
+- The separate pprof server started cleanly when `--pprof-addr` was set and stayed absent when not configured.
+- The first CPU profile capture succeeded during the real browser-connected recording repro.
+- The profile was informative enough to guide the next tool choice.
+
+### What didn't work
+
+Two concrete issues showed up in this slice.
+
+First, the first version of the pprof capture script used Bash’s special `SECONDS` variable as the capture parameter name. That caused the generated summary to report `seconds: 41` even though I launched it intending a shorter window. The raw profile is still useful, but the script needs cleanup so the capture duration is controlled explicitly.
+
+Second, the next-likely native tools are currently blocked for the current user on this machine. I confirmed:
+
+```text
+perf version 6.8.12
+perf_event_paranoid = 4
+```
+
+and `perf stat -p <pid> sleep 1` failed with the exact permission message about restricted performance monitoring. I also confirmed that `bpftrace` is installed but currently says it only supports running as root.
+
+### What I learned
+
+The first pprof result did exactly what it needed to do. It strongly suggests the hot phase is not mainly in normal Go userland. The saved top output is dominated by:
+
+- `<unknown>`
+- `libgstvideo-1.0.so.0.2402.0`
+- `libc.so.6`
+- `libjpeg.so.8.2.2`
+- and `runtime._ExternalCode`
+
+That is enough to say pprof is probably not the end of the story and that `perf` is the right next profiler if permissions can be obtained.
+
+### What was tricky to build
+
+The main tricky part was keeping the pprof path opt-in and separate. I did not want to quietly expose `/debug/pprof` on the main app mux or make profiling a default part of normal local usage. The separate debug address keeps the profiling flow explicit and makes the restart/capture scripts easier to reason about.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/cli/serve.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pprof.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/02-capture-pprof-cpu-profile.sh`
+
+The key review questions are:
+
+- whether the separate pprof server boundary is the right default shape,
+- and whether the next move should indeed be `perf` rather than additional Go-level profiling.
+
+### What should be done in the future
+
+- Fix the capture-script duration variable so it does not use Bash’s special `SECONDS` variable.
+- Record the current profiler permission blockers in a reproducible prereq script.
+- Move to `perf` once permissions are available, because pprof already suggests the dominant cost is external/native.
+
+### Code review instructions
+
+Start with the runtime integration files:
+
+- `internal/web/server.go`
+- `pkg/cli/serve.go`
+- `internal/web/pprof.go`
+
+Then review the first captured artifacts:
+
+- `scripts/results/02-capture-pprof-cpu-profile/20260414-204800/pprof-top.txt`
+- `scripts/results/02-capture-pprof-cpu-profile/20260414-204800/pprof-top-cum.txt`
+
+### Technical details
+
+The first profile summary reported:
+
+```text
+<unknown>                        67.74%
+[libgstvideo-1.0.so.0.2402.0]    15.77%
+[orcexec.Mmdcyh]                  7.66%
+[libc.so.6]                       5.21%
+[libjpeg.so.8.2.2]                1.31%
+runtime._ExternalCode            98.65% cumulative
+```
+
+That is the strongest current reason to escalate from pprof to mixed-stack native profiling.
+
+## Step 3: Wrote Two Project Reports While Waiting on Lower-Level Tool Permissions
+
+While waiting on `perf` permissions, I used the pause productively by writing two continuation-oriented reports. The first captures the investigation playbook itself: which approaches and tricks actually helped narrow the performance mystery so far. The second is specifically about the project’s Prometheus-style metrics architecture: what metric families exist, how they are implemented, and how the investigation has used them.
+
+This mattered because a lot of the recent work is no longer just “what result did we get?” It is also “what methods have now proven effective enough to reuse?” and “how exactly should a future investigator interpret the current `/metrics` surface?” Those are the kinds of answers that are easy to lose if they are only scattered across tickets and commit diffs.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok while we are waiting, let's write a project report that details all the tricks and approaches we used to figure out the performance issues so far, and a separate project report specifically on the metrics for prometheus and how they work and what we collect and for what"
+
+**Assistant interpretation:** Use the waiting period to write two substantial project reports: one about the overall investigation methodology and one about the metrics architecture and field usage.
+
+**Inferred user intent:** Preserve the investigation knowledge itself, not just the raw results, so the project is easier to continue and easier to hand off.
+
+### What I did
+
+- Added two new reports under SCS-0016:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/02-performance-investigation-approaches-and-tricks-report.md`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/03-prometheus-metrics-architecture-and-field-guide.md`
+- Updated the ticket index so these documents are treated as primary SCS-0016 references.
+
+### Why
+
+The investigation now spans multiple tickets and several layers of evidence. A new person joining at this point would benefit from two kinds of synthesis:
+
+1. a practical playbook of the investigation techniques that actually worked,
+2. a field guide to the metrics surface that the project built along the way.
+
+Writing those explicitly now is cheaper than reconstructing them later from many tickets and run directories.
+
+### What worked
+
+- The reports could be grounded in real ticket-local artifacts rather than abstract advice.
+- The metrics guide benefited from the fact that the project’s metrics system is still small enough to document completely.
+
+### What didn't work
+
+Nothing failed materially in this documentation slice.
+
+### What I learned
+
+The project now has a reusable performance-investigation playbook. The most useful pieces are not glamorous:
+
+- isolate scenarios carefully,
+- separate fresh-server and real-browser runs,
+- compare deltas rather than only averages,
+- treat negative findings as progress,
+- and only escalate to lower-level profilers after app-level narrowing has done its job.
+
+### What was tricky to build
+
+The tricky part was balancing “report” and “reference.” I wanted both documents to be readable as narrative reports, but also useful as field guides. That is why both documents keep a strong quick-reference structure while still explaining the rationale behind the choices.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/02-performance-investigation-approaches-and-tricks-report.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/03-prometheus-metrics-architecture-and-field-guide.md`
+
+The main review question is whether these reports are continuation-friendly enough for a new investigator who did not live through SCS-0014 and SCS-0015.
+
+### What should be done in the future
+
+- Keep both reports updated as lower-level profiling adds new techniques or new metric families.
+- Once `perf` runs are possible, extend the “approaches and tricks” report with what actually worked at the mixed-stack profiler level.
+
+### Code review instructions
+
+Read the two new reports first, then compare them against the underlying implementation and ledger docs they summarize:
+
+- `reference/02-performance-investigation-approaches-and-tricks-report.md`
+- `reference/03-prometheus-metrics-architecture-and-field-guide.md`
+- `ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/reference/02-browser-preview-streaming-lab-report.md`
+- `pkg/metrics/metrics.go`
+- `internal/web/preview_metrics.go`
+- `internal/web/event_metrics.go`
+
+### Technical details
+
+The metrics report currently documents the main metric families in:
+
+- `pkg/metrics/metrics.go`
+- `internal/web/preview_metrics.go`
+- `internal/web/event_metrics.go`
+- `pkg/media/gst/recording.go`
+- `pkg/media/gst/shared_video_recording_bridge.go`
+
+and explains how the ticket-local samplers turned cumulative counters into per-run deltas by comparing the first and last saved `.prom` snapshots.
+
+## Step 4: Rechecked Profiler Prerequisites, Confirmed perf Access, and Fixed the pprof Script Duration Bug
+
+After the first pprof pass, the next blocker question was practical rather than analytical: can I actually run mixed-stack tooling as the current user on this machine, or do I need to stop and ask for privilege changes first? Earlier quick checks had shown `perf_event_paranoid=4` and a failing `perf stat`, so I wrote a ticket-local prereq script to capture the real machine state in a reproducible way before spending more time designing the `perf` slice.
+
+I also used this step to fix the small but important pprof helper bug where the script had mistakenly used Bash’s special `SECONDS` variable as the capture-duration parameter. That bug did not invalidate the first capture, but it did make the saved summary misleading. Renaming the input variable to `PROFILE_SECONDS` makes future pprof summaries much easier to trust.
+
+### Prompt Context
+
+**Relevant prior context:** Earlier investigation notes had captured a failing `perf` permission state, but the broader project context also said the user may temporarily adjust perf permissions or run `perf` manually if needed.
+
+**Assistant interpretation:** Save a reproducible check of the current local profiling-tool state instead of relying on memory from earlier ad hoc shell checks, and bring the ticket docs in line with the result.
+
+**Inferred user intent:** Avoid hand-wavy profiler assumptions; capture the actual machine state and keep the continuation docs honest.
+
+### What I did
+
+- Fixed the pprof helper script:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/02-capture-pprof-cpu-profile.sh`
+- Added the profiler prereq script:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/03-check-profiler-prereqs.sh`
+- Ran it and saved the result under:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/03-check-profiler-prereqs/20260414-211300/`
+
+### Commands
+
+```bash
+bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/03-check-profiler-prereqs.sh
+```
+
+### Why
+
+This step turns profiler availability from a fuzzy remembered fact into a saved artifact. That matters because machine state can change between sessions, and the next ticket action — writing and running a `perf record` harness — depends directly on whether `perf` is genuinely usable now.
+
+### What worked
+
+- The prereq script captured the current local state cleanly.
+- The result showed that `perf` is now available to the current user in a useful way.
+- The script also preserved the still-important limitation that `bpftrace` remains root-only.
+- The pprof helper bug fix is small but important for future evidence quality.
+
+### What didn't work
+
+Nothing failed materially in this step.
+
+### What I learned
+
+The current machine state is better than the initial quick check suggested. The saved result shows:
+
+- `perf_event_paranoid=1`
+- `perf stat -p <listening-pid> sleep 1` succeeds
+- `bpftrace` still fails with the message that it only supports running as root
+
+That means the next likely step is no longer “wait for perf permissions.” It is “write the actual `perf record` capture script and use it on the established high-signal browser repro.”
+
+### What was tricky to build
+
+The tricky part here was mostly epistemic: earlier manual checks were already in the diary, and it would have been easy to treat them as still true. Saving a fresh prereq artifact forced the ticket back into an evidence-first state and avoided carrying an obsolete blocker forward.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/03-check-profiler-prereqs.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/03-check-profiler-prereqs/20260414-211300/perf-check.txt`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/02-capture-pprof-cpu-profile.sh`
+
+The main review question is whether the prereq script captures enough environment truth for continuation work, or whether it should also snapshot more kernel/perf settings before the first `perf record` run.
+
+### What should be done in the future
+
+- Add a ticket-local `perf record` capture script for the same high-signal repro.
+- Save raw `perf.data` and a text `perf report` in the ticket tree.
+- Compare the mixed-stack view against the current pprof conclusion that most of the hot phase lives in external/native code.
+
+### Code review instructions
+
+Review the prereq artifact first:
+
+- `scripts/results/03-check-profiler-prereqs/20260414-211300/01-summary.md`
+- `scripts/results/03-check-profiler-prereqs/20260414-211300/perf-check.txt`
+- `scripts/results/03-check-profiler-prereqs/20260414-211300/bpftrace-check.txt`
+
+Then confirm that the pprof helper now uses `PROFILE_SECONDS` rather than Bash’s special `SECONDS` variable:
+
+- `scripts/02-capture-pprof-cpu-profile.sh`
+
+### Technical details
+
+The saved prereq result shows:
+
+```text
+listen_pid=716961
+perf_path=/usr/bin/perf
+bpftrace_path=/usr/bin/bpftrace
+bpftool_path=/usr/sbin/bpftool
+perf_event_paranoid=1
+```
+
+and `perf-check.txt` now includes a successful `perf stat` run instead of the earlier permission failure.

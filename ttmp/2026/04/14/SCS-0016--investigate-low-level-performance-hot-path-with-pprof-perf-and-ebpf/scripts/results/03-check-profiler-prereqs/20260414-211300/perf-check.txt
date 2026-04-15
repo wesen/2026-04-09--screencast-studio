@@ -1,0 +1,20 @@
+## perf
+perf version 6.8.12
+
+ Performance counter stats for process id '716961':
+
+            121.44 msec task-clock                       #    0.121 CPUs utilized             
+               742      context-switches                 #    6.110 K/sec                     
+                55      cpu-migrations                   #  452.907 /sec                      
+                31      page-faults                      #  255.275 /sec                      
+       379,194,014      cycles                           #    3.123 GHz                       
+       853,884,477      instructions                     #    2.25  insn per cycle            
+        66,504,209      branches                         #  547.640 M/sec                     
+           978,206      branch-misses                    #    1.47% of all branches           
+                        TopdownL1                 #     21.2 %  tma_backend_bound      
+                                                  #     21.4 %  tma_bad_speculation    
+                                                  #      7.1 %  tma_frontend_bound     
+                                                  #     50.3 %  tma_retiring           
+
+       1.001676944 seconds time elapsed
+

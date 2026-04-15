@@ -8,9 +8,9 @@ RUN_DIR="$RESULTS_ROOT/$STAMP"
 mkdir -p "$RUN_DIR"
 
 PPROF_URL=${PPROF_URL:-http://127.0.0.1:6060/debug/pprof/profile}
-SECONDS=${SECONDS:-20}
+PROFILE_SECONDS=${PROFILE_SECONDS:-20}
 
-curl -fsS "$PPROF_URL?seconds=$SECONDS" -o "$RUN_DIR/cpu.pprof"
+curl -fsS "$PPROF_URL?seconds=$PROFILE_SECONDS" -o "$RUN_DIR/cpu.pprof"
 
 go tool pprof -top -nodecount=50 "$RUN_DIR/cpu.pprof" > "$RUN_DIR/pprof-top.txt"
 go tool pprof -top -cum -nodecount=50 "$RUN_DIR/cpu.pprof" > "$RUN_DIR/pprof-top-cum.txt"
@@ -39,7 +39,7 @@ WhenToUse: Read when comparing repeated pprof captures across the same high-sign
 # 02 capture pprof cpu profile summary
 
 - pprof_url: $PPROF_URL
-- seconds: $SECONDS
+- seconds: $PROFILE_SECONDS
 - run_dir: $RUN_DIR
 
 ## Files

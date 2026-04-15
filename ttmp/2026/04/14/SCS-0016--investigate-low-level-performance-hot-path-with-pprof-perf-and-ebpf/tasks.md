@@ -11,21 +11,22 @@
 
 - [ ] Write down the exact high-signal repro that all low-level tools should target
 - [ ] Define what counts as a successful profile capture for pprof, perf, and eBPF
-- [ ] Add ticket-local scripts for restarting the server in a profiling-friendly way
-- [ ] Add ticket-local scripts for capturing and storing profiling artifacts under `scripts/`
+- [x] Add ticket-local scripts for restarting the server in a profiling-friendly way
+- [x] Add ticket-local scripts for capturing and storing profiling artifacts under `scripts/`
 
 ## Phase 1: Go pprof first
 
-- [ ] Add an optional local pprof enablement path to the serve runtime
-- [ ] Ensure pprof is disabled by default and only enabled deliberately during local investigation
-- [ ] Add a script to capture a CPU profile during the real browser one-tab desktop preview + recording hot phase
+- [x] Add an optional local pprof enablement path to the serve runtime
+- [x] Ensure pprof is disabled by default and only enabled deliberately during local investigation
+- [x] Add a script to capture a CPU profile during the real browser one-tab desktop preview + recording hot phase
 - [ ] Add a script to capture heap and goroutine profiles during the same scenario if useful
-- [ ] Save raw pprof artifacts plus human-readable summaries in the ticket-local `scripts/` tree
-- [ ] Decide whether pprof gives a sufficiently explanatory answer or mostly points at CGO / runtime boundaries
+- [x] Save raw pprof artifacts plus human-readable summaries in the ticket-local `scripts/` tree
+- [x] Decide whether pprof gives a sufficiently explanatory answer or mostly points at CGO / runtime boundaries
 
 ## Phase 2: perf if pprof is not enough
 
 - [ ] Add a reproducible `perf record` capture script for the same high-signal scenario
+- [x] Record and document the current `perf` permission blocker or required sysctl/capability setup on this machine
 - [ ] Save `perf.data`, `perf report` text output, and any stack-collapse / flamegraph artifacts under the ticket-local `scripts/` tree
 - [ ] Verify symbol quality is good enough to separate Go, CGO, libc, GStreamer, and kernel stacks
 - [ ] Summarize whether the dominant hot path is in Go, CGO, GStreamer, libc, syscalls, or scheduler behavior

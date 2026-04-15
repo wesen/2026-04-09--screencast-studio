@@ -25,7 +25,7 @@ RelatedFiles:
       Note: Upstream ticket that narrowed the problem enough to justify this lower-level profiling track
 ExternalSources: []
 Summary: Separate ticket for low-level CPU profiling of the real browser-connected recording hot path using Go pprof first, then perf and eBPF if needed.
-LastUpdated: 2026-04-14T20:46:00-04:00
+LastUpdated: 2026-04-14T22:45:43-04:00
 WhatFor: Keep low-level profiling work separate from SCS-0015's higher-level browser-path measurement and interpretation work.
 WhenToUse: Start here when working on pprof, perf, eBPF, flamegraphs, or lower-level runtime evidence for the browser-connected hot path.
 ---
@@ -42,6 +42,8 @@ This ticket exists to keep that lower-level investigation separate and disciplin
 
 - `design-doc/01-low-level-profiling-plan.md`
 - `reference/01-investigation-diary.md`
+- `reference/02-performance-investigation-approaches-and-tricks-report.md`
+- `reference/03-prometheus-metrics-architecture-and-field-guide.md`
 
 ## Current status
 
@@ -52,7 +54,15 @@ Current deliverable status:
 - ticket created
 - detailed low-level profiling plan written
 - diary started
-- next implementation slice chosen: optional local pprof enablement plus reproducible profile-capture scripts
+- project report written for the investigation approaches and tricks used so far
+- separate field guide written for the Prometheus-style metrics architecture and current metric families
+- optional local pprof enablement has been added to `serve` via a separate debug address
+- pprof restart/capture helper scripts now exist under `scripts/`
+- the first real browser-connected CPU profile capture is saved under `scripts/results/02-capture-pprof-cpu-profile/20260414-204800/`
+- the first pprof result mostly points at external/native code (`runtime._ExternalCode`, `<unknown>`, `libgstvideo`, `libc`, `libjpeg`) rather than clear Go-userland hotspots
+- ticket-local profiler prereq checks are now recorded under `scripts/results/03-check-profiler-prereqs/20260414-211300/`
+- the latest prereq check found `perf_event_paranoid=1` and a working `perf stat` path for the current user, while `bpftrace` still requires root
+- two new project reports now exist: one on investigation approaches/tricks and one on the Prometheus-style metrics architecture
 
 ## Tasks
 

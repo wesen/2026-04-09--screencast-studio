@@ -1,0 +1,5 @@
+listen_pid=716961
+perf_path=/usr/bin/perf
+bpftrace_path=/usr/bin/bpftrace
+bpftool_path=/usr/sbin/bpftool
+perf_event_paranoid=1
