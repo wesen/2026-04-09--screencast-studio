@@ -170,3 +170,140 @@ I also fixed a small helper bug uncovered by this rerun: `scripts/08-resolve-per
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415/go-addr2line.txt — fallback note artifact showing direct perf symbolization made addr2line unnecessary in the stable-binary rerun
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/02-performance-investigation-approaches-and-tricks-report.md — project report on the investigation playbook used so far
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/03-prometheus-metrics-architecture-and-field-guide.md — project report on the current metrics architecture
+
+## 2026-04-15
+
+Wrote the direct-recording hosting-gap investigation report and the online research query packet after narrowing the remaining gap to a likely native hosting / memory-fault problem rather than a graph-construction bug; also saved matched gst-launch, Go-harness A/B, mixed-stack perf, and threadgroup perf-stat comparison evidence.
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/04-direct-recording-hosting-gap-investigation-report.md — Main findings report for the current hosting-gap interpretation
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/05-online-research-query-packet-for-go-hosted-gstreamer-performance.md — Copy/paste-ready external research packet
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/21-perf-stat-threadgroup-compare-go-vs-gst-launch/20260415-012510/01-summary.md — Current strongest evidence for the large Go-hosted page-fault delta
+
+Added a new stage-by-stage debugging plan and executed the first full small-graph hosting ladder to localize the first real Go-hosted divergence point.
+
+New planning and control files:
+
+- `design-doc/02-small-graph-hosting-ladder-debugging-plan.md`
+- `scripts/29-go-manual-stage-ladder-harness/main.go`
+- `scripts/29-go-manual-stage-ladder-harness/run.sh`
+- `scripts/30-python-manual-stage-ladder-harness/main.py`
+- `scripts/30-python-manual-stage-ladder-harness/run.sh`
+- `scripts/31-gst-launch-stage-ladder.sh`
+- `scripts/32-small-graph-hosting-ladder-matrix.sh`
+
+Saved the first full ladder matrix under:
+
+- `scripts/results/32-small-graph-hosting-ladder-matrix/20260415-033745/`
+
+The matrix compared six stages across three hosts:
+
+- `capture`
+- `convert`
+- `rate-caps`
+- `encode`
+- `parse`
+- `mux-file`
+
+with host families:
+
+- Go manual
+- Python manual
+- `gst-launch`
+
+The result is much sharper than the earlier full-graph suspicion. Go stays essentially aligned with Python and `gst-launch` through the pre-encode ladder:
+
+- `capture`: Go `1.00%`, Python `2.16%`, `gst-launch` `1.00%`
+- `convert`: Go `1.00%`, Python `2.17%`, `gst-launch` `1.00%`
+- `rate-caps`: Go `37.83%`, Python `36.83%`, `gst-launch` `36.67%`
+
+The first strong divergence appears at the encoder boundary:
+
+- `encode`: Go `199.97%`, Python `125.17%`, `gst-launch` `129.00%`
+- `parse`: Go `170.50%`, Python `126.50%`, `gst-launch` `128.44%`
+- `mux-file`: Go `197.17%`, Python `131.17%`, `gst-launch` `131.11%`
+
+The page-fault signal lines up with the same stage boundary. The pre-encode stages stay tiny for all three hosts, but Go faults explode as soon as `x264enc` is present:
+
+- `rate-caps` page faults:
+  - Go `34`
+  - Python `51`
+  - `gst-launch` `0`
+- `encode` page faults:
+  - Go `312438`
+  - Python `62`
+  - `gst-launch` `29`
+- `parse` page faults:
+  - Go `275291`
+  - Python `163`
+  - `gst-launch` `4`
+- `mux-file` page faults:
+  - Go `288738`
+  - Python `209`
+  - `gst-launch` `233`
+
+This is the cleanest localization result in the ticket so far. It means the next code-change target should not be the raw capture path, conversion path, or shaped raw-video pacing path. The best current next target is the **encoder-input / Go-hosted memory-behavior boundary around `x264enc`**.
+
+That does not yet prove the exact mechanism, but it does narrow the search sharply:
+
+- more graph-shape surgery is now lower priority,
+- more early raw-stage instrumentation is also lower priority,
+- and cgo/build-flag or allocator/THP-style controls are now best interpreted specifically as tests of the `x264enc` boundary rather than the whole pipeline.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/design-doc/02-small-graph-hosting-ladder-debugging-plan.md — Detailed plan for the stage-by-stage ladder and its interpretation rules
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/29-go-manual-stage-ladder-harness/main.go — Go manual small-graph control used for the ladder
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/30-python-manual-stage-ladder-harness/main.py — Python manual small-graph control used for the ladder
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/31-gst-launch-stage-ladder.sh — `gst-launch` stage ladder used as the cooler control family
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/32-small-graph-hosting-ladder-matrix.sh — Matrix runner that executed the first 6-stage x 3-host comparison
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/32-small-graph-hosting-ladder-matrix/20260415-033745/02-summary.md — Topline ladder result showing the first strong divergence at `x264enc`
+
+Added a focused encode-stage encoder-contrast slice after the ladder localized the first strong divergence to the encoder boundary.
+
+New/updated control files:
+
+- `scripts/29-go-manual-stage-ladder-harness/main.go` — now accepts `--encoder`
+- `scripts/29-go-manual-stage-ladder-harness/run.sh` — now passes encoder choice through to the Go harness
+- `scripts/30-python-manual-stage-ladder-harness/main.py` — now accepts `--encoder`
+- `scripts/30-python-manual-stage-ladder-harness/run.sh` — now passes encoder choice through to the Python harness
+- `scripts/31-gst-launch-stage-ladder.sh` — now accepts `ENCODER=` for stage-level encoder swaps
+- `scripts/33-encode-stage-encoder-contrast-matrix.sh` — new focused matrix runner for the encode stage only
+
+The first full encoder-contrast attempt suggested that `vaapih264enc` is not a good default comparison point on this machine right now because the run did not complete cleanly and appeared to wedge the matrix. Rather than letting the hardware path block the software comparison, I reran the focused matrix with the two software encoders that completed normally:
+
+- `x264enc`
+- `openh264enc`
+
+Saved result:
+
+- `scripts/results/33-encode-stage-encoder-contrast-matrix/20260415-035541/02-summary.md`
+
+This result is highly informative because it shows the Go anomaly is **not a generic encode-stage problem across all encoders**.
+
+For `x264enc` the old pattern still holds:
+
+- Go: `168.83%` avg CPU, `276940` page faults
+- Python: `127.17%`, `61` page faults
+- `gst-launch`: `129.67%`, `2` page faults
+
+But for `openh264enc` the Go path no longer shows the same blow-up:
+
+- Go: `58.00%` avg CPU, `53` page faults
+- Python: `87.50%`, `110` page faults
+- `gst-launch`: `88.11%`, `53` page faults
+
+That is a major narrowing step. The remaining anomaly now looks much more specifically tied to the **Go-hosted `x264enc` path** (or something tightly coupled to it) rather than to the whole generic idea of “Go-hosted encoding.”
+
+So the next useful target is no longer just “encoder boundary” in general. It is more precisely:
+
+- Go-hosted interaction with `x264enc`
+- `libx264`-specific memory/fault behavior
+- or some `x264enc`-specific buffer-pool / allocation behavior that does not reproduce the same way with `openh264enc`
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/33-encode-stage-encoder-contrast-matrix.sh — Focused encode-stage contrast runner for software encoder swaps
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/33-encode-stage-encoder-contrast-matrix/20260415-035541/02-summary.md — Main software-encoder comparison showing the anomaly persists for `x264enc` but not `openh264enc`
+

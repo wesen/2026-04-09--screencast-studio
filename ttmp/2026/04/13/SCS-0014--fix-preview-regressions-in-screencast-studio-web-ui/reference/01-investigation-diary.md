@@ -2408,3 +2408,86 @@ The adaptive-preview change is looking more credible now because it has passed t
 ### What should be done in the future
 
 The remaining open task is more product-facing now: judge whether the constrained live preview during recording is acceptable enough to keep as the default behavior, or whether it should remain configurable.
+
+## Step 24: Saved Reusable Playwright UI Repro Scripts for Camera Add, Preview Verification, and Recording
+
+After using Playwright interactively to verify that the frontend was really receiving desktop and camera previews, I converted those one-off browser actions into saved ticket-local scripts. The goal here was reproducibility: future investigation should not depend on scrolling back through a chat transcript to recover an injected-JS snippet.
+
+I stored the new files under a fresh numbered script directory so they can be rerun later through Playwright MCP filename mode. I also validated the main flows live against the running `scs-web-ui` server: add camera, verify preview streams, start recording, stop recording, and a combined add-camera-and-record smoke flow.
+
+### Prompt Context
+
+**User prompt (verbatim):** "store the JS in the scripts folder of the ticket. do the same for Rec, and potentially other playwright things that are useful to be reproduced in the future"
+
+**Assistant interpretation:** Save the injected Playwright browser automation used during the live debugging session as first-class ticket artifacts, not just ephemeral chat output.
+
+**Inferred user intent:** Make the frontend/browser repro path durable enough that future work can repeat camera-add and recording actions exactly, while avoiding accidental extra preview listeners from stale browser tabs.
+
+### What I did
+
+- Created:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/00-usage.txt`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/01-add-camera-via-injected-js.js`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/02-start-recording-via-injected-js.js`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/03-stop-recording-via-injected-js.js`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/04-verify-preview-streams.js`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/05-add-camera-and-start-recording-smoke.js`
+- Validated `01-add-camera-via-injected-js.js` live in filename mode; it moved the page from `Sources (1)` to `Sources (2)` and the camera preview reached `1280x720` with `complete=true`.
+- Validated `02-start-recording-via-injected-js.js` and `03-stop-recording-via-injected-js.js` live against the running server.
+- Validated `04-verify-preview-streams.js` and the combined `05-add-camera-and-start-recording-smoke.js` flow.
+- Closed Playwright tabs afterwards and added explicit tab-hygiene guidance to `00-usage.txt` so old MJPEG listeners do not remain attached during later measurements.
+
+### What worked
+
+- Saving the scripts in Playwright MCP `run_code`-compatible form means they can be rerun by filename directly.
+- The camera-add script reproduced the exact UI path that had previously been done manually in chat.
+- The combined smoke flow proved that the saved browser repro assets can cover a real frontend path rather than just an API-only path.
+
+### What didn't work
+
+- During validation, I found that the first version of the recording-start script should guard against already-active recordings; otherwise a rerun could appear to succeed while attaching to a page that was already mid-recording. I tightened that before treating the script set as done.
+
+### What I learned
+
+The saved benchmark and API harnesses are not enough by themselves when the suspected regression boundary includes the real browser/UI path. Having a durable Playwright repro set inside the ticket makes it easier to separate:
+
+- API-only / backend runtime behavior,
+- browser-connected preview behavior,
+- and browser-tab hygiene issues such as stray MJPEG listeners.
+
+### What was tricky to build
+
+The subtle part was that Playwright tabs themselves can distort the very thing we are trying to measure. Even when extra tabs do not create a whole new capture pipeline, they can keep additional preview HTTP listeners and browser-side rendering work alive. That means saved UI repro scripts should be paired with explicit tab cleanup guidance, not just with click automation.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/02-start-recording-via-injected-js.js`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/05-add-camera-and-start-recording-smoke.js`
+
+The review question is whether these should remain pure injected-JS UI scripts or whether a later follow-up should add a more formal browser-driven measurement harness that also samples `/metrics` over time.
+
+### What should be done in the future
+
+- Add a browser-driven CPU/metrics capture harness if we decide the unexplained web-UI-specific server CPU spike needs to be benchmarked directly.
+- Keep closing Playwright tabs before and after frontend repro runs so measurements remain interpretable.
+
+### Code review instructions
+
+Re-run any of the saved scripts through Playwright MCP filename mode while the local server is running on `:7777`. Start with:
+
+```text
+.../scripts/22-playwright-ui-repros/01-add-camera-via-injected-js.js
+.../scripts/22-playwright-ui-repros/04-verify-preview-streams.js
+.../scripts/22-playwright-ui-repros/05-add-camera-and-start-recording-smoke.js
+```
+
+### Technical details
+
+The validated live camera-preview result from the saved script was:
+
+```text
+preview-dc54cc832d0f/mjpeg
+naturalWidth=1280
+naturalHeight=720
+complete=true
+```

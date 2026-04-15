@@ -25,7 +25,7 @@ RelatedFiles:
         Primary plan document for Step 1
 ExternalSources: []
 Summary: Chronological diary for the lower-level profiling investigation into the browser-connected hot path.
-LastUpdated: 2026-04-14T23:09:52-04:00
+LastUpdated: 2026-04-15T04:05:00-04:00
 WhatFor: Record the implementation and profiling workflow step by step, including failures, commands, and interpretation changes.
 WhenToUse: Read when continuing SCS-0016 and you need the exact reasoning and commands used so far.
 ---
@@ -729,3 +729,347 @@ and `perf-record.stderr.log` reports:
 [ perf record: Woken up 669 times to write data ]
 [ perf record: Captured and wrote 172.843 MB ... (10893 samples) ]
 ```
+
+## Step 7: Narrowed the Remaining Direct-Recording Gap to a Native Hosting / Memory-Fault Problem and Wrote the Main Findings Report
+
+After the stable-binary perf rerun, the next job was to stop accumulating isolated facts and turn them into a tighter explanation. I built a sequence of direct controls around the same full-desktop workload: a matched `gst-launch` control, a copied/app-like Go direct harness with dot dumps, a fully manual Go direct harness with dot dumps, a small A/B matrix, a side-by-side mixed-stack perf compare, and finally a threadgroup-oriented `perf stat` compare. That work made the current boundary much sharper.
+
+The most important result is that the remaining Go-hosted vs `gst-launch` gap is no longer best explained by graph shape or by obvious per-frame Go userland work. The direct-path `Y444` negotiation bug was real and worth fixing, but once the direct caps were pinned to `I420`, the manual and copied Go-hosted pipelines converged to the same realized graph. Mixed-stack perf then showed both cases dominated by native `libx264` and GStreamer pad-push work, while visible Go/cgo frames were tiny. The strongest remaining differentiator is now the huge page-fault delta in the Go-hosted case.
+
+### Prompt Context
+
+**User prompt (verbatim):** "yes,write a really detailed investigation report and a set of research queries to be given to our internet to look them up online. Store in the ticket and then upload to remarkable."
+
+**Assistant interpretation:** Consolidate the recent SCS-0016 direct-recording evidence into a continuation-friendly report, write a separate copy/paste-ready online research query packet, keep the ticket bookkeeping current, validate the ticket, and prepare the documents for reMarkable delivery.
+
+**Inferred user intent:** Turn the current lower-level profiling findings into durable project documentation that can be handed to both internal engineers and an internet-enabled researcher without losing the evidence trail.
+
+### What I did
+
+- Added the matched `gst-launch` direct control script:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/16-gst-launch-direct-full-desktop-match-app.sh`
+- Added the fully manual Go direct harness:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/17-go-manual-direct-full-desktop-harness/main.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/17-go-manual-direct-full-desktop-harness/run.sh`
+- Added comparison helpers:
+  - `scripts/18-direct-harness-ab-matrix.sh`
+  - `scripts/19-perf-compare-go-manual-vs-gst-launch.sh`
+  - `scripts/20-perf-stat-and-thread-compare-go-vs-gst-launch.sh`
+  - `scripts/21-perf-stat-threadgroup-compare-go-vs-gst-launch.sh`
+- Fixed the direct-path raw caps in:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go`
+- Wrote two new ticket docs:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/04-direct-recording-hosting-gap-investigation-report.md`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/05-online-research-query-packet-for-go-hosted-gstreamer-performance.md`
+- Updated ticket bookkeeping:
+  - related the new docs to the exact code/result files with `docmgr doc relate`
+  - checked tasks `5,6,19,20,24,25` because the new report and query pack now cover the high-signal repro, capture criteria, dominant-hot-path summary, eBPF-unanswered-question decision, and the main findings report itself
+  - updated `index.md` so the new docs and current interpretation appear on the ticket landing page
+
+### Commands
+
+```bash
+bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/16-gst-launch-direct-full-desktop-match-app.sh
+bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/17-go-manual-direct-full-desktop-harness/run.sh
+DURATION_SECONDS=8 REPEATS=3 bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/18-direct-harness-ab-matrix.sh
+DURATION_SECONDS=8 bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/19-perf-compare-go-manual-vs-gst-launch.sh
+DURATION_SECONDS=8 bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/20-perf-stat-and-thread-compare-go-vs-gst-launch.sh
+DURATION_SECONDS=8 bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/21-perf-stat-threadgroup-compare-go-vs-gst-launch.sh
+
+docmgr doc add --ticket SCS-0016 --doc-type reference --title "Direct recording hosting-gap investigation report"
+docmgr doc add --ticket SCS-0016 --doc-type reference --title "Online research query packet for Go-hosted GStreamer performance"
+docmgr doc relate --doc /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/04-direct-recording-hosting-gap-investigation-report.md --file-note "/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go:Direct recording builder and I420 fix"
+docmgr doc relate --doc /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/05-online-research-query-packet-for-go-hosted-gstreamer-performance.md --file-note "/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/21-perf-stat-threadgroup-compare-go-vs-gst-launch/20260415-012510/01-summary.md:Page-fault and thread-count comparison used to scope the queries"
+docmgr task check --ticket SCS-0016 --id 5,6,19,20,24,25
+```
+
+### Why
+
+The investigation had accumulated enough strong artifacts that continuing to answer questions only in chat would have been wasteful. The user asked for two continuation-oriented deliverables:
+
+1. one detailed internal report that explains the current hosting-gap boundary honestly,
+2. one external-facing query pack that tells an internet-enabled researcher exactly what to search for online.
+
+That is the right split because the report is evidence-heavy and local-repo-specific, while the query packet is optimized for web research and triage.
+
+### What worked
+
+- The matched `gst-launch` control was much cooler than the Go-hosted direct controls, which forced the investigation away from the earlier “full-desktop direct x264 is just inherently 500–600%” hypothesis.
+- The dot dumps showed the pre-fix app-like direct path negotiating `Y444`, which was a real graph bug worth fixing.
+- The post-fix dot dumps showed the copied/app-like and manual Go-hosted graphs converging on `I420`, which ruled out the “DSL built a different graph” theory.
+- The A/B matrix still showed both Go-hosted variants much hotter than the matched `gst-launch` control, which sharpened the problem statement further.
+- The mixed-stack perf compare showed both cases dominated by native `libx264` + `gst_pad_push` work, while visible Go/cgo frames remained tiny.
+- The improved threadgroup `perf stat` compare showed similar thread counts but a massive page-fault delta, which is now the strongest current clue.
+- The two new docs were written and related into the ticket successfully.
+
+### What didn't work
+
+Two recent workflow issues were worth recording exactly.
+
+First, the first attempt at the side-by-side perf compare script ran long enough that the outer command timed out with:
+
+```text
+Command exited with code 124
+```
+
+The run itself had mostly completed; I recovered the partially written result directory, finished the missing report generation manually, and kept the saved artifacts instead of rerunning blindly.
+
+Second, the first `perf stat` comparison method in `scripts/20-perf-stat-and-thread-compare-go-vs-gst-launch.sh` attached too early to just the process PID and badly undercounted the Go-hosted case. The most obviously wrong number was:
+
+```text
+| task-clock | 154.16 | msec |
+```
+
+for an 8-second workload that had clearly done real work and produced valid output. I treated that run as methodologically useful for thread sampling but not trustworthy for the whole-thread-set cost comparison, then wrote `scripts/21-perf-stat-threadgroup-compare-go-vs-gst-launch.sh` to attach after warmup to the entire current thread set instead.
+
+### What I learned
+
+The current direct-recording problem statement is now much sharper.
+
+1. The direct path in the app is built imperatively in Go, but that by itself is not the current main explanation.
+2. The direct-path `Y444` bug was real, but fixing it did not erase the gap.
+3. Once the direct path is corrected to `I420`, the remaining gap is no longer best explained by graph shape.
+4. Mixed-stack perf says the direct running pipeline is mostly native `libx264` + GStreamer work, not ordinary Go application code.
+5. The page-fault delta in the warmed-up threadgroup compare is now the strongest current signal:
+   - Go-hosted manual harness: `134832` page faults
+   - matched `gst-launch`: `232` page faults
+
+That shifts the next investigation target away from graph construction and toward allocator / memory-layout / first-touch / compaction / THP style questions.
+
+### What was tricky to build
+
+The trickiest conceptual part was separating “a real bug we found” from “the final explanation.” The `Y444` discovery was a satisfying graph-level bug, but it would have been a mistake to stop there. The post-fix A/B matrix, perf compare, and threadgroup perf-stat compare were all necessary to prove that the graph bug was only one part of the story.
+
+The trickiest practical part was measurement quality. Several of the recent scripts needed one more iteration before their outputs were trustworthy. The timeout-recovery path in the perf compare and the undercount in the first PID-only `perf stat` method were good reminders that replayable investigations need not just automation, but automation with the right attachment semantics.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/recording.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/pkg/media/gst/bus.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/04-direct-recording-hosting-gap-investigation-report.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/05-online-research-query-packet-for-go-hosted-gstreamer-performance.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/21-perf-stat-threadgroup-compare-go-vs-gst-launch/20260415-012510/01-summary.md`
+
+The main review questions are:
+
+- is the current “native hosting / memory-fault effect” interpretation the most conservative reading of the evidence?
+- and does the new online query packet target the right upstream questions rather than wasting time on already-ruled-out graph-shape theories?
+
+### What should be done in the future
+
+- Validate the updated ticket with `docmgr doctor --ticket SCS-0016 --stale-after 30`.
+- Upload the new report + query packet bundle to reMarkable.
+- Follow the query packet with internet-enabled research focused on allocator, page-fault, THP/compaction, GLib hosting, and generic embedded-app-vs-`gst-launch` differences.
+- Add one more local measurement slice that breaks the current page-fault delta into more specific categories if the online research suggests a promising direction.
+
+### Code review instructions
+
+Start with the new report:
+
+- `reference/04-direct-recording-hosting-gap-investigation-report.md`
+
+Then review the exact raw evidence it cites:
+
+- `scripts/results/16-gst-launch-direct-full-desktop-match-app/20260415-004852/01-summary.md`
+- `scripts/15-go-direct-record-full-desktop-harness/results/20260415-005501/dot/0.00.01.015137962-direct-full-desktop-playing.dot`
+- `scripts/15-go-direct-record-full-desktop-harness/results/20260415-010455/dot/0.00.01.020657234-direct-full-desktop-playing.dot`
+- `scripts/results/18-direct-harness-ab-matrix/20260415-010905/02-summary.md`
+- `scripts/results/19-perf-compare-go-manual-vs-gst-launch/20260415-011757/01-summary.md`
+- `scripts/results/21-perf-stat-threadgroup-compare-go-vs-gst-launch/20260415-012510/01-summary.md`
+
+Finally, review the internet handoff packet:
+
+- `reference/05-online-research-query-packet-for-go-hosted-gstreamer-performance.md`
+
+### Technical details
+
+The two numbers that currently matter most are:
+
+```text
+matched gst-launch avg_cpu: 128.00%
+Go-hosted threadgroup page-faults: 134832
+matched gst-launch threadgroup page-faults: 232
+```
+
+And the most important raw-profile sanity check is still that the mixed-stack Go-hosted profile is dominated by native media work, not ordinary Go userland:
+
+```text
+42.48% / 38.23%  libx264.so.164                x264_8_trellis_coefn
+24.31%           libc.so.6                     clone3
+12.91%           libgstreamer-1.0.so.0.2402.0  gst_pad_push
+0.37%            manual-direct-harness-bin     runtime.asmcgocall.abi0
+```
+
+## Step 8: Added the Small-Graph Hosting Ladder and Localized the First Strong Divergence to `x264enc`
+
+At this point the investigation had a good full-graph story but still lacked a clean first-divergence point. We knew the full direct graph was much hotter in Go than in Python or `gst-launch`, and we knew the large page-fault delta made a memory-behavior explanation plausible. But without shrinking the graph, it was still too easy to keep arguing vaguely about “the whole pipeline” instead of identifying the first stage where Go actually peels away from the cooler controls.
+
+So I wrote a dedicated debugging plan for a smaller-graph ladder and then implemented the ladder as ticket-local controls for Go manual, Python manual, and `gst-launch`. The key outcome is strong: Go stays aligned with Python and `gst-launch` through the pre-encode stages, and the first real break happens exactly when `x264enc` enters the graph. The page-fault story lines up with the same boundary, which makes this the cleanest localization result in the whole ticket so far.
+
+### Prompt Context
+
+**User prompt (verbatim):** "alright, add a detailed debugging plan, and then go through all these steps"
+
+**Assistant interpretation:** Write a concrete stage-by-stage plan for the smaller-graph investigation and then actually execute that ladder rather than stopping at planning.
+
+**Inferred user intent:** Replace broad suspicion with a disciplined experiment sequence that identifies where the Go-hosted path first becomes abnormal.
+
+### What I did
+
+- Added a new plan doc:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/design-doc/02-small-graph-hosting-ladder-debugging-plan.md`
+- Added new ladder controls:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/29-go-manual-stage-ladder-harness/main.go`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/29-go-manual-stage-ladder-harness/run.sh`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/30-python-manual-stage-ladder-harness/main.py`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/30-python-manual-stage-ladder-harness/run.sh`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/31-gst-launch-stage-ladder.sh`
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/32-small-graph-hosting-ladder-matrix.sh`
+- Validated the new controls:
+
+```bash
+gofmt -w ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/29-go-manual-stage-ladder-harness/main.go
+bash -n ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/29-go-manual-stage-ladder-harness/run.sh
+python3 -m py_compile ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/30-python-manual-stage-ladder-harness/main.py
+bash -n ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/30-python-manual-stage-ladder-harness/run.sh
+bash -n ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/31-gst-launch-stage-ladder.sh
+bash -n ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/32-small-graph-hosting-ladder-matrix.sh
+go build ./ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/29-go-manual-stage-ladder-harness
+```
+
+- Ran capture-stage smoke tests for all three host families to catch parser/attachment bugs.
+- Ran the full matrix with:
+
+```bash
+cd /home/manuel/code/wesen/2026-04-09--screencast-studio
+DURATION_SECONDS=6 bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/32-small-graph-hosting-ladder-matrix.sh
+```
+
+- Saved the matrix under:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/32-small-graph-hosting-ladder-matrix/20260415-033745/`
+
+### Why
+
+The smaller-graph ladder was the fastest honest way to answer the question that the full graph could not: *where does Go first become weird?* Once that question is answered, later controls like cgo optimization flags, allocator knobs, or deeper fault instrumentation become much easier to interpret.
+
+### What worked
+
+The ladder gave a very clean result.
+
+The pre-encode stages stay aligned across all three hosts:
+
+```text
+capture:
+  Go         1.00%   page-faults 28
+  Python     2.16%   page-faults 61
+  gst-launch 1.00%   page-faults 0
+
+convert:
+  Go         1.00%   page-faults 28
+  Python     2.17%   page-faults 59
+  gst-launch 1.00%   page-faults 0
+
+rate-caps:
+  Go         37.83%  page-faults 34
+  Python     36.83%  page-faults 51
+  gst-launch 36.67%  page-faults 0
+```
+
+The first strong divergence appears at the encoder boundary:
+
+```text
+encode:
+  Go         199.97% page-faults 312438
+  Python     125.17% page-faults 62
+  gst-launch 129.00% page-faults 29
+
+parse:
+  Go         170.50% page-faults 275291
+  Python     126.50% page-faults 163
+  gst-launch 128.44% page-faults 4
+
+mux-file:
+  Go         197.17% page-faults 288738
+  Python     131.17% page-faults 209
+  gst-launch 131.11% page-faults 233
+```
+
+This is the strongest evidence yet that the best next target is the `x264enc` input / memory-behavior boundary rather than raw capture or early graph structure.
+
+### What didn't work
+
+Two small but real harness bugs showed up and needed correction before the matrix could be trusted.
+
+First, the first version of the ladder wrappers parsed the wrong `pidstat` column for Go and Python, which produced fake `0.00%` CPU summaries for the smoke runs. The underlying logs were fine; the parser was wrong because it assumed a fixed field position instead of using the `%CPU` field near the end of the line.
+
+Second, the first wrapper versions launched `pidstat` synchronously and only attempted `perf stat` afterward, which meant the process had often already exited by the time `perf` tried to attach. I fixed that by running `pidstat` in the background, attaching `perf stat` while the process was still alive, and then waiting for both samplers.
+
+### What I learned
+
+The current hosting-gap explanation is now much sharper:
+
+1. The raw capture path is not where the Go path first diverges.
+2. `videoconvert` alone is not where the divergence begins.
+3. The shaped raw-video pacing stage (`videorate + I420 caps`) is also not the first problem.
+4. The first strong divergence appears exactly when `x264enc` enters the graph.
+5. The page-fault spike appears at the same stage boundary, which strengthens the memory-behavior interpretation over a pure graph-construction theory.
+
+### What was tricky to build
+
+The tricky part was making the ladder small enough to localize a boundary without accidentally changing the workload class. Earlier in the ticket, resolution mismatches confused some comparisons, so for this ladder I kept the full desktop workload class and only removed graph segments one stage at a time.
+
+The other tricky part was measurement discipline. It would have been easy to declare success from the first manifest, but the early `pidstat` parsing bug would have made that dishonest. The smoke reruns were necessary to ensure the ladder summaries were actually reading the same data the raw logs contained.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/design-doc/02-small-graph-hosting-ladder-debugging-plan.md`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/29-go-manual-stage-ladder-harness/main.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/30-python-manual-stage-ladder-harness/main.py`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/32-small-graph-hosting-ladder-matrix.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/32-small-graph-hosting-ladder-matrix/20260415-033745/02-summary.md`
+
+The review questions are:
+
+- does the ladder look fairly matched across the three host families?
+- and is `x264enc` the conservative first-divergence call, or does any earlier stage still deserve more suspicion than the matrix suggests?
+
+### What should be done in the future
+
+- Add a focused next control around the encoder boundary, such as rebuilding the Go harness with explicit `CGO_CFLAGS=-O2`, to see whether cgo wrapper optimization materially changes the `encode` stage.
+- Add a focused fault/memory capture around the Go `encode` stage specifically, rather than only the full direct graph.
+- If needed, add one more intermediate ladder variant that isolates `x264enc` input behavior even more tightly, but only if the next encoder-boundary controls remain ambiguous.
+
+### Code review instructions
+
+Start with the topline result:
+
+- `scripts/results/32-small-graph-hosting-ladder-matrix/20260415-033745/02-summary.md`
+
+Then inspect the exact stage rows in:
+
+- `scripts/results/32-small-graph-hosting-ladder-matrix/20260415-033745/01-manifest.tsv`
+
+Then review the three control families:
+
+- `scripts/29-go-manual-stage-ladder-harness/main.go`
+- `scripts/30-python-manual-stage-ladder-harness/main.py`
+- `scripts/31-gst-launch-stage-ladder.sh`
+
+### Technical details
+
+The single most important matrix boundary is:
+
+```text
+rate-caps:
+  Go 37.83% / faults 34
+encode:
+  Go 199.97% / faults 312438
+```
+
+That boundary is why the next code-change target should now be framed as:
+
+```text
+Go-hosted encoder-input / memory-behavior around x264enc
+```
+
+not simply “the whole Go-hosted GStreamer pipeline.”

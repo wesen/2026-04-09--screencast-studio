@@ -73,6 +73,7 @@ Current deliverable status:
 - A follow-up preview-branch ablation benchmark now isolates second-branch cost, JPEG cost, raw frame-copy cost, the current preview path, and a cheap preview profile while recording
 - New standalone confirmation and repeatability benchmarks now test the imported adaptive-preview proposal directly; the repeated results support the combined direction of constrained recording-time preview plus rate-first preview ordering more strongly than either ingredient on its own
 - The first real app-path before/after measurement now shows the adaptive-preview prototype reducing average server CPU for the preview+recording case from about `188.27%` to about `170.82%` in the same live region-capture scenario
+- A new saved browser repro bundle now lives under `scripts/22-playwright-ui-repros/`, covering camera add, preview verification, recording start, recording stop, and a combined add-camera-and-record smoke flow via Playwright injected JS
 - `docmgr doctor` passed cleanly
 - Bug report bundle uploaded to reMarkable and verified in `/ai/2026/04/13/SCS-0014`
 

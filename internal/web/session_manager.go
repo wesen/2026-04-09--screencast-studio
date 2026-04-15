@@ -90,6 +90,28 @@ func (m *RecordingManager) Start(dslBody []byte, gracePeriod, maxDuration time.D
 			Msg("failed to compile recording plan")
 		return recordingSessionState{}, err
 	}
+	if plan != nil && len(plan.AudioJobs) > 0 {
+		audioJobCount := len(plan.AudioJobs)
+		audioOutputCount := 0
+		filteredOutputs := make([]dsl.PlannedOutput, 0, len(plan.Outputs))
+		for _, output := range plan.Outputs {
+			if output.Kind == "audio" {
+				audioOutputCount++
+				continue
+			}
+			filteredOutputs = append(filteredOutputs, output)
+		}
+		plan.AudioJobs = nil
+		plan.Outputs = filteredOutputs
+		log.Warn().
+			Str("event", "debug.recording.audio_jobs.disabled").
+			Str("session_id", plan.SessionID).
+			Int("audio_job_count", audioJobCount).
+			Int("audio_output_count", audioOutputCount).
+			Int("remaining_video_jobs", len(plan.VideoJobs)).
+			Int("remaining_outputs", len(plan.Outputs)).
+			Msg("temporarily disabling audio jobs for elimination testing")
+	}
 
 	m.mu.Lock()
 	if m.current != nil && m.current.state.Active {

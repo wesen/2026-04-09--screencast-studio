@@ -30,29 +30,26 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	events, unsubscribe := s.events.Subscribe(64)
 	defer unsubscribe()
 
-	if err := writeWebsocketServerEvent(conn, ServerEvent{
+	bootstrapEvents := []ServerEvent{{
 		Type:    "session.state",
 		Payload: mapRecordingSession(s.recordings.Current()),
-	}); err != nil {
-		return
-	}
-	if err := writeWebsocketServerEvent(conn, ServerEvent{
+	}, {
 		Type:    "preview.list",
 		Payload: mapPreviewListResponse(s.previews.List()),
-	}); err != nil {
-		return
-	}
-	if err := writeWebsocketServerEvent(conn, ServerEvent{
+	}, {
 		Type:    "telemetry.audio_meter",
 		Payload: mapAudioMeterSnapshot(s.telemetry.AudioMeter()),
-	}); err != nil {
-		return
-	}
-	if err := writeWebsocketServerEvent(conn, ServerEvent{
+	}, {
 		Type:    "telemetry.disk_status",
 		Payload: mapDiskTelemetrySnapshot(s.telemetry.DiskStatus()),
-	}); err != nil {
-		return
+	}}
+	for _, event := range bootstrapEvents {
+		if !s.allowWebsocketEvent(event.Type) {
+			continue
+		}
+		if err := writeWebsocketServerEvent(conn, event); err != nil {
+			return
+		}
 	}
 
 	group, ctx := errgroup.WithContext(r.Context())
@@ -71,6 +68,9 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			case event, ok := <-events:
 				if !ok {
 					return nil
+				}
+				if !s.allowWebsocketEvent(event.Type) {
+					continue
 				}
 				if err := writeWebsocketServerEvent(conn, event); err != nil {
 					return err

@@ -25,7 +25,7 @@ RelatedFiles:
       Note: Upstream ticket that narrowed the problem enough to justify this lower-level profiling track
 ExternalSources: []
 Summary: Separate ticket for low-level CPU profiling of the real browser-connected recording hot path using Go pprof first, then perf and eBPF if needed.
-LastUpdated: 2026-04-14T23:09:52-04:00
+LastUpdated: 2026-04-15T04:05:00-04:00
 WhatFor: Keep low-level profiling work separate from SCS-0015's higher-level browser-path measurement and interpretation work.
 WhenToUse: Start here when working on pprof, perf, eBPF, flamegraphs, or lower-level runtime evidence for the browser-connected hot path.
 ---
@@ -41,9 +41,12 @@ This ticket exists to keep that lower-level investigation separate and disciplin
 ## Primary documents
 
 - `design-doc/01-low-level-profiling-plan.md`
+- `design-doc/02-small-graph-hosting-ladder-debugging-plan.md`
 - `reference/01-investigation-diary.md`
 - `reference/02-performance-investigation-approaches-and-tricks-report.md`
 - `reference/03-prometheus-metrics-architecture-and-field-guide.md`
+- `reference/04-direct-recording-hosting-gap-investigation-report.md`
+- `reference/05-online-research-query-packet-for-go-hosted-gstreamer-performance.md`
 
 ## Current status
 
@@ -68,6 +71,18 @@ Current deliverable status:
 - the stable-binary rerun improved main-binary symbolization enough to expose named `screencast-studio` runtime/websocket frames directly in the report, while still showing that the dominant hot path lives mostly in native `libx264` work plus GStreamer pad-push / buffer-copy paths
 - the exact browser-driving helpers, built-binary restart helper, and Go-address resolver used for this slice have now been backfilled into the ticket-local `scripts/` directory with numbered prefixes
 - two new project reports now exist: one on investigation approaches/tricks and one on the Prometheus-style metrics architecture
+- a new detailed hosting-gap investigation report now explains why the remaining direct-recording gap is no longer best explained by graph shape or ordinary Go per-frame work
+- a new online research query packet now exists so an internet-enabled researcher can search the most promising upstream allocator / page-fault / GLib / hosting questions directly
+- a matched `gst-launch` control, direct Go harness dot dumps, a 3x3 Go harness A/B matrix, a mixed-stack perf compare, and a threadgroup `perf stat` compare are now all saved under `scripts/results/`
+- the current best lower-level interpretation is that the remaining Go-hosted vs `gst-launch` gap looks more like a native hosting / memory-fault effect than a graph-construction or per-frame-Go-processing issue
+- a new small-graph ladder debugging plan now exists under `design-doc/02-small-graph-hosting-ladder-debugging-plan.md`
+- ticket-local small-graph ladder controls now exist for Go manual, Python manual, and `gst-launch` under `scripts/29-*` through `scripts/32-*`
+- the first full 6-stage ladder matrix is now saved under `scripts/results/32-small-graph-hosting-ladder-matrix/20260415-033745/`
+- the key ladder conclusion is that Go stays aligned with Python and `gst-launch` through `rate-caps`, and the first strong divergence appears at `x264enc`
+- that same first divergence point is also where page-fault counts explode for Go while remaining tiny for Python and `gst-launch`, which makes the encoder-input / memory-behavior boundary the best current next code-change target
+- a focused encode-stage encoder-contrast matrix is now saved under `scripts/results/33-encode-stage-encoder-contrast-matrix/20260415-035541/`
+- the new contrast result shows the Go anomaly is **not generic to all encoders**: it reproduces strongly with `x264enc`, but largely disappears with `openh264enc`
+- an initial `vaapih264enc` attempt did not complete cleanly and is currently treated as a separate hardware/driver/runtime caveat rather than part of the main software-encoder comparison
 
 ## Tasks
 

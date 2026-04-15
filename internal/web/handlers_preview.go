@@ -16,6 +16,10 @@ func (s *Server) handlePreviewEnsure(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
+	if s.recordings.Current().Active {
+		writeError(w, http.StatusConflict, "preview_disabled_during_recording", "preview is disabled during recording for elimination testing")
+		return
+	}
 
 	var request studiov1.PreviewEnsureRequest
 	if !decodeProtoJSON(w, r, &request) {
@@ -91,6 +95,10 @@ func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {
 	previewID := strings.TrimSuffix(path, "/mjpeg")
 	if previewID == "" {
 		writeError(w, http.StatusBadRequest, "missing_preview_id", "missing preview id")
+		return
+	}
+	if s.recordings.Current().Active {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 

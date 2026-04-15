@@ -16,13 +16,16 @@ import (
 )
 
 type Config struct {
-	InitialDSL      string
-	InitialDSLPath  string
-	Addr            string
-	PprofAddr       string
-	StaticDir       string
-	PreviewLimit    int
-	ShutdownTimeout time.Duration
+	InitialDSL                         string
+	InitialDSLPath                     string
+	Addr                               string
+	PprofAddr                          string
+	StaticDir                          string
+	PreviewLimit                       int
+	ShutdownTimeout                    time.Duration
+	DebugDisablePreviewStateEvents     bool
+	DebugDisableAudioMeterEvents       bool
+	DebugDisableWebsocketPreviewEvents bool
 }
 
 type Server struct {
@@ -80,16 +83,57 @@ func NewServerWithOptions(parentCtx context.Context, application ApplicationServ
 		mux:       http.NewServeMux(),
 		events:    events,
 		parentCtx: parentCtx,
-		telemetry: NewTelemetryManager(events.Publish),
 	}
-	server.recordings = NewRecordingManager(parentCtx, application, events.Publish)
-	server.previews = NewPreviewManager(parentCtx, application, events.Publish, cfg.PreviewLimit, resolvedOpts.previewRuntime)
+	publish := server.publishEvent
+	server.telemetry = NewTelemetryManager(publish)
+	server.recordings = NewRecordingManager(parentCtx, application, publish)
+	server.previews = NewPreviewManager(parentCtx, application, publish, cfg.PreviewLimit, resolvedOpts.previewRuntime)
 	server.registerRoutes()
 	return server
 }
 
 func (s *Server) Handler() http.Handler {
 	return withLogging(s.mux)
+}
+
+func (s *Server) publishEvent(event ServerEvent) {
+	if s == nil {
+		return
+	}
+	if !s.allowPublishedEvent(event.Type) {
+		return
+	}
+	s.events.Publish(event)
+}
+
+func (s *Server) allowPublishedEvent(eventType string) bool {
+	if s == nil {
+		return true
+	}
+	switch eventType {
+	case "preview.state":
+		return !s.config.DebugDisablePreviewStateEvents
+	case "telemetry.audio_meter":
+		return !s.config.DebugDisableAudioMeterEvents
+	default:
+		return true
+	}
+}
+
+func (s *Server) allowWebsocketEvent(eventType string) bool {
+	if s == nil {
+		return true
+	}
+	if s.config.DebugDisableAudioMeterEvents && eventType == "telemetry.audio_meter" {
+		return false
+	}
+	if s.config.DebugDisableWebsocketPreviewEvents {
+		switch eventType {
+		case "preview.list", "preview.state", "preview.log":
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {

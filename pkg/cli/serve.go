@@ -20,12 +20,15 @@ import (
 )
 
 type serveSettings struct {
-	Addr            string `glazed:"addr"`
-	PprofAddr       string `glazed:"pprof-addr"`
-	File            string `glazed:"file"`
-	StaticDir       string `glazed:"static-dir"`
-	PreviewLimit    int    `glazed:"preview-limit"`
-	ShutdownTimeout int    `glazed:"shutdown-timeout"`
+	Addr                               string `glazed:"addr"`
+	PprofAddr                          string `glazed:"pprof-addr"`
+	File                               string `glazed:"file"`
+	StaticDir                          string `glazed:"static-dir"`
+	PreviewLimit                       int    `glazed:"preview-limit"`
+	ShutdownTimeout                    int    `glazed:"shutdown-timeout"`
+	DebugDisablePreviewStateEvents     bool   `glazed:"debug-disable-preview-state-events"`
+	DebugDisableAudioMeterEvents       bool   `glazed:"debug-disable-audio-meter-events"`
+	DebugDisableWebsocketPreviewEvents bool   `glazed:"debug-disable-websocket-preview-events"`
 }
 
 type serveCommand struct {
@@ -50,6 +53,9 @@ func newServeCommand(application *app.Application) (*serveCommand, error) {
 				fields.New("static-dir", fields.TypeString, fields.WithDefault(""), fields.WithHelp("Optional directory to serve at / during development")),
 				fields.New("preview-limit", fields.TypeInteger, fields.WithDefault(4), fields.WithHelp("Maximum number of preview workers allowed at once")),
 				fields.New("shutdown-timeout", fields.TypeInteger, fields.WithDefault(5), fields.WithHelp("Graceful shutdown timeout in seconds")),
+				fields.New("debug-disable-preview-state-events", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Debug-only: suppress published preview.state events while keeping preview MJPEG active")),
+				fields.New("debug-disable-audio-meter-events", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Debug-only: suppress published telemetry.audio_meter events and websocket bootstrap audio-meter events")),
+				fields.New("debug-disable-websocket-preview-events", fields.TypeBool, fields.WithDefault(false), fields.WithHelp("Debug-only: suppress preview-related websocket bootstrap and live events while leaving MJPEG preview active")),
 			),
 			cmds.WithSections(sections...),
 		),
@@ -80,13 +86,16 @@ func (c *serveCommand) RunIntoGlazeProcessor(ctx context.Context, vals *values.V
 	}
 
 	server := web.NewServer(serverCtx, c.app, web.Config{
-		InitialDSL:      initialDSL,
-		InitialDSLPath:  initialDSLPath,
-		Addr:            settings.Addr,
-		PprofAddr:       strings.TrimSpace(settings.PprofAddr),
-		StaticDir:       settings.StaticDir,
-		PreviewLimit:    settings.PreviewLimit,
-		ShutdownTimeout: durationSeconds(settings.ShutdownTimeout),
+		InitialDSL:                         initialDSL,
+		InitialDSLPath:                     initialDSLPath,
+		Addr:                               settings.Addr,
+		PprofAddr:                          strings.TrimSpace(settings.PprofAddr),
+		StaticDir:                          settings.StaticDir,
+		PreviewLimit:                       settings.PreviewLimit,
+		ShutdownTimeout:                    durationSeconds(settings.ShutdownTimeout),
+		DebugDisablePreviewStateEvents:     settings.DebugDisablePreviewStateEvents,
+		DebugDisableAudioMeterEvents:       settings.DebugDisableAudioMeterEvents,
+		DebugDisableWebsocketPreviewEvents: settings.DebugDisableWebsocketPreviewEvents,
 	})
 
 	return server.ListenAndServe(serverCtx)

@@ -370,44 +370,55 @@ func startVideoRecordingWorker(ctx context.Context, job dsl.VideoJob, eventCh ch
 	if err := os.MkdirAll(filepath.Dir(job.OutputPath), 0o755); err != nil {
 		return nil, fmt.Errorf("create output directory: %w", err)
 	}
-	recorder, err := StartExperimentalSharedVideoRecorder(ctx, resolvedSource, ExperimentalSharedVideoRecorderOptions{
-		OutputPath: job.OutputPath,
-		Container:  resolvedSource.Output.Container,
-		FPS:        resolvedSource.Capture.FPS,
-		OnLog: func(stream, message string) {
-			if eventCh == nil {
-				return
-			}
-			select {
-			case eventCh <- media.RecordingEvent{Type: media.RecordingEventProcessLog, ProcessLabel: resolvedSource.Name, OutputPath: job.OutputPath, Stream: stream, Message: message}:
-			default:
-			}
-		},
-	})
+	pipeline, err := buildVideoRecordingPipeline(resolvedSource, job.OutputPath)
 	if err != nil {
 		return nil, err
 	}
+	bus := pipeline.GetPipelineBus()
 	resultCh := make(chan error, 1)
-	go func() {
-		resultCh <- recorder.Wait()
-	}()
+	watch, err := startBusWatch(bus, func(msg *gst.Message) bool {
+		switch msg.Type() {
+		case gst.MessageError:
+			gstErr := msg.ParseError()
+			err := fmt.Errorf("video recording pipeline error: %w", gstErr)
+			select {
+			case resultCh <- err:
+			default:
+			}
+			return false
+		case gst.MessageEOS:
+			select {
+			case resultCh <- nil:
+			default:
+			}
+			return false
+		default:
+			return true
+		}
+	})
+	if err != nil {
+		pipeline.BlockSetState(gst.StateNull)
+		return nil, err
+	}
+	if err := pipeline.SetState(gst.StatePlaying); err != nil {
+		watch.Stop()
+		pipeline.BlockSetState(gst.StateNull)
+		return nil, fmt.Errorf("start video recording pipeline: %w", err)
+	}
 	log.Info().
 		Str("event", "recording.gst.start").
 		Str("process_label", resolvedSource.Name).
 		Str("output_path", job.OutputPath).
 		Str("source_type", resolvedSource.Type).
-		Str("recording_mode", "shared-source-bridge").
+		Str("recording_mode", "direct-pipeline").
 		Msg("started gstreamer recording pipeline")
 	return &recordingWorker{
 		label:      resolvedSource.Name,
 		outputPath: job.OutputPath,
+		pipeline:   pipeline,
+		watch:      watch,
 		resultCh:   resultCh,
 		events:     eventCh,
-		stopFn: func(timeout time.Duration) error {
-			stopCtx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-			return recorder.Stop(stopCtx)
-		},
 	}, nil
 }
 
@@ -548,7 +559,7 @@ func buildVideoRecordingPipeline(source dsl.EffectiveVideoSource, outputPath str
 	if err != nil {
 		return nil, fmt.Errorf("create videorate: %w", err)
 	}
-	fpsCaps, err := newCapsFilter(fmt.Sprintf("video/x-raw,framerate=%d/1", fps))
+	fpsCaps, err := newCapsFilter(fmt.Sprintf("video/x-raw,format=I420,framerate=%d/1,pixel-aspect-ratio=1/1", fps))
 	if err != nil {
 		return nil, err
 	}

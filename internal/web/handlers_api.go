@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	studiov1 "github.com/wesen/2026-04-09--screencast-studio/gen/go/proto/screencast/studio/v1"
 )
@@ -91,6 +92,21 @@ func (s *Server) handleRecordingStart(w http.ResponseWriter, r *http.Request) {
 	if current.Active {
 		writeProtoJSON(w, http.StatusConflict, mapSessionEnvelope(current))
 		return
+	}
+
+	previewDrainDeadline := time.Now().Add(2 * time.Second)
+	for {
+		previews := s.previews.List()
+		if len(previews) == 0 {
+			break
+		}
+		for _, preview := range previews {
+			_, _ = s.previews.Release(preview.ID)
+		}
+		if time.Now().After(previewDrainDeadline) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	state, err := s.recordings.Start(

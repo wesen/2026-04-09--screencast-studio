@@ -10,6 +10,7 @@ PPROF_URL=${PPROF_URL:-http://127.0.0.1:6060/debug/pprof/}
 WAIT_SECONDS=${WAIT_SECONDS:-90}
 BUILD_DIR=${BUILD_DIR:-$REPO_ROOT/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/bin}
 BUILD_PATH=${BUILD_PATH:-$BUILD_DIR/screencast-studio}
+EXTRA_ARGS=${EXTRA_ARGS:-}
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo "tmux is required" >&2
@@ -27,7 +28,11 @@ fi
 
 tmux new-session -d -s "$SESSION" "cd '$REPO_ROOT' && exec bash"
 tmux send-keys -t "$SESSION" "cd '$REPO_ROOT'" C-m
-tmux send-keys -t "$SESSION" "'$BUILD_PATH' serve --addr $ADDR --pprof-addr $PPROF_ADDR" C-m
+CMD="'$BUILD_PATH' serve --addr $ADDR --pprof-addr $PPROF_ADDR"
+if [[ -n "$EXTRA_ARGS" ]]; then
+  CMD+=" $EXTRA_ARGS"
+fi
+tmux send-keys -t "$SESSION" "$CMD" C-m
 
 health_ok=""
 pprof_ok=""
@@ -71,6 +76,7 @@ echo "--- binary ---"
 echo "build_path=$BUILD_PATH"
 echo "server_pid=${SERVER_PID:-unknown}"
 echo "exe_path=${EXE_PATH:-unknown}"
+echo "extra_args=${EXTRA_ARGS}"
 echo
 echo "--- tmux pane ---"
 tmux capture-pane -pt "$SESSION" -S -120

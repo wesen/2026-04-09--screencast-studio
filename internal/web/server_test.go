@@ -840,6 +840,94 @@ func TestWebsocketEndpoint(t *testing.T) {
 	}
 }
 
+func TestDebugEventFilters(t *testing.T) {
+	t.Parallel()
+
+	server := NewServer(context.Background(), &fakeApplication{}, Config{
+		DebugDisablePreviewStateEvents: true,
+		DebugDisableAudioMeterEvents:   true,
+	})
+
+	events, unsubscribe := server.events.Subscribe(8)
+	defer unsubscribe()
+
+	server.publishEvent(ServerEvent{Type: "preview.state", Payload: map[string]string{"id": "preview-1"}})
+	server.publishEvent(ServerEvent{Type: "telemetry.audio_meter", Payload: map[string]string{"device": "default"}})
+	server.publishEvent(ServerEvent{Type: "session.state", Payload: map[string]string{"id": "session-1"}})
+
+	select {
+	case event := <-events:
+		if event.Type != "session.state" {
+			t.Fatalf("event type = %q, want session.state", event.Type)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for non-filtered event")
+	}
+
+	select {
+	case event := <-events:
+		t.Fatalf("unexpected extra event after filters: %+v", event)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestWebsocketBootstrapDebugFilters(t *testing.T) {
+	t.Parallel()
+
+	server := NewServer(context.Background(), &fakeApplication{}, Config{
+		DebugDisableAudioMeterEvents:       true,
+		DebugDisableWebsocketPreviewEvents: true,
+	})
+	server.telemetry.setAudioMeter(audioMeterSnapshot{
+		DeviceID:   "default",
+		LeftLevel:  0.4,
+		RightLevel: 0.35,
+		Available:  true,
+	})
+	server.telemetry.setDiskStatus(diskTelemetrySnapshot{
+		Path:        "/tmp/session-ws",
+		Filesystem:  "/tmp",
+		UsedPercent: 20,
+		FreeGiB:     10,
+		TotalGiB:    50,
+		Available:   true,
+	})
+	ts := httptest.NewServer(server.Handler())
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial websocket: %v", err)
+	}
+	defer conn.Close()
+
+	_, sessionMessage, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read session event: %v", err)
+	}
+	sessionEvent := &studiov1.ServerEvent{}
+	decodeProtoResponse(t, sessionMessage, sessionEvent)
+	if sessionEvent.GetSessionState() == nil {
+		t.Fatalf("first websocket event = %+v, want sessionState", sessionEvent)
+	}
+
+	_, diskMessage, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read disk status event: %v", err)
+	}
+	diskEvent := &studiov1.ServerEvent{}
+	decodeProtoResponse(t, diskMessage, diskEvent)
+	if diskEvent.GetDiskStatus() == nil {
+		t.Fatalf("second websocket event = %+v, want diskStatus", diskEvent)
+	}
+
+	_ = conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	if _, _, err := conn.ReadMessage(); err == nil {
+		t.Fatal("expected no additional websocket bootstrap messages after filters")
+	}
+}
+
 func TestServeSPAFromFS(t *testing.T) {
 	t.Parallel()
 

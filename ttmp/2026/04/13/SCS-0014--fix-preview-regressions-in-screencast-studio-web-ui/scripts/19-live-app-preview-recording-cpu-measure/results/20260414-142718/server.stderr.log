@@ -283,3 +283,39 @@
 2026-04-14T14:27:30.077764775-04:00 INF http request duration=0.085611 method=GET path=/api/recordings/current
 2026-04-14T14:27:32.283110718-04:00 INF http request duration=0.173925 method=GET path=/api/previews/preview-e7444805eb17/screenshot
 2026-04-14T14:27:32.291431537-04:00 INF http request duration=0.093184 method=GET path=/api/previews
+2026-04-14T14:38:25.40450086-04:00 INF http request duration=663295.860193 method=GET path=/api/previews/preview-18daabfb09b6/mjpeg
+2026-04-14T14:38:25.407490464-04:00 INF http request duration=663805.264115 method=GET path=/ws
+2026-04-15T02:23:29.007056159-04:00 INF disk telemetry loop exiting event=telemetry.disk.exit reason="context canceled"
+2026-04-15T02:23:29.008379888-04:00 INF cancelling audio telemetry runner during loop teardown device_id=default event=telemetry.audio.runner.cancel
+2026-04-15T02:23:29.006994616-04:00 INF parec read loop exiting after context cancellation device_id=default event=telemetry.process.read.exit reason="context canceled"
+2026-04-15T02:23:29.007837672-04:00 INF runtime shutdown triggered event=runtime.shutdown.begin reason="context canceled" shutdown_timeout=5000
+2026-04-15T02:23:29.00939942-04:00 INF http server shutdown starting event=runtime.http.shutdown.begin reason="context canceled"
+2026-04-15T02:23:29.00922753-04:00 INF waiting for parec audio telemetry process to exit device_id=default event=telemetry.process.wait.begin pid=63786
+2026-04-15T02:23:29.010483254-04:00 INF http server exited cleanly addr=:7781 event=runtime.http.exit
+2026-04-15T02:23:29.010564909-04:00 INF http server shutdown finished event=runtime.http.shutdown.done reason="context canceled"
+2026-04-15T02:23:29.010655553-04:00 INF recording manager shutdown starting event=runtime.recordings.shutdown.begin
+2026-04-15T02:23:29.010582486-04:00 INF parec audio telemetry process exited device_id=default event=telemetry.process.wait.done pid=63786 reason="context canceled"
+2026-04-15T02:23:29.010690551-04:00 INF audio telemetry runner exited device_id=default event=telemetry.audio.runner.exit reason="context canceled"
+2026-04-15T02:23:29.010709925-04:00 INF audio telemetry loop exiting event=telemetry.audio.exit reason="context canceled"
+2026-04-15T02:23:29.01072235-04:00 INF telemetry manager run loop exited event=telemetry.run.exit reason="context canceled"
+2026-04-15T02:23:29.010673022-04:00 INF recording manager shutdown starting active=false event=recording.shutdown.begin session_id=adaptive-preview-measure-current state=finished
+2026-04-15T02:23:29.010760858-04:00 INF recording manager shutdown finished event=recording.shutdown.done session_id=adaptive-preview-measure-current
+2026-04-15T02:23:29.010774678-04:00 INF recording manager shutdown finished event=runtime.recordings.shutdown.done
+2026-04-15T02:23:29.010614349-04:00 INF preview finished event=preview.finish preview_id=preview-18daabfb09b6 reason="preview finished" source_id=desktop-1 state=finished
+2026-04-15T02:23:29.01080715-04:00 INF removing preview from manager maps event=preview.cleanup preview_id=preview-18daabfb09b6 signature=18daabfb09b614b82fd3143976d062c588be9bf6
+2026-04-15T02:23:29.010819703-04:00 INF preview finished event=preview.finish preview_id=preview-e7444805eb17 reason="preview finished" source_id=measure-region state=finished
+2026-04-15T02:23:29.010834051-04:00 INF removing preview from manager maps event=preview.cleanup preview_id=preview-e7444805eb17 signature=e7444805eb17370f1f4e0de93eb9621696d9ca94
+2026-04-15T02:23:29.010783896-04:00 INF preview manager shutdown starting event=runtime.previews.shutdown.begin
+2026-04-15T02:23:29.010886512-04:00 INF preview manager shutdown requested with no active previews event=preview.shutdown.noop
+2026-04-15T02:23:29.011012011-04:00 INF preview manager shutdown finished event=runtime.previews.shutdown.done
+2026-04-15T02:23:29.011019986-04:00 INF waiting for runtime participant to exit event=runtime.participant.wait.begin participant="http server goroutine"
+2026-04-15T02:23:29.011027264-04:00 INF runtime participant exited event=runtime.participant.wait.done participant="http server goroutine"
+2026-04-15T02:23:29.011033223-04:00 INF waiting for telemetry goroutine to exit event=runtime.telemetry.wait.begin
+2026-04-15T02:23:29.010579487-04:00 INF detached shared preview consumer consumer_count=0 consumer_id=preview-type-region-display--0-d-1 event=capture.gst.shared.preview.detach signature=type=region|display=:0|device=|window=|size=|cursor=true|mirror=false|rect=0,960,2880,960 source_id=measure-region
+2026-04-15T02:23:29.010737743-04:00 INF telemetry manager exited event=runtime.telemetry.exit reason="context canceled"
+2026-04-15T02:23:29.01104059-04:00 INF waiting for runtime participant to exit event=runtime.participant.wait.begin participant="telemetry goroutine"
+2026-04-15T02:23:29.011058383-04:00 INF runtime participant exited event=runtime.participant.wait.done participant="telemetry goroutine"
+2026-04-15T02:23:29.011201895-04:00 INF telemetry goroutine exited event=runtime.telemetry.wait.done
+2026-04-15T02:23:29.011219186-04:00 INF runtime shutdown component summary event=runtime.shutdown.components recording_active=false recording_session_id=adaptive-preview-measure-current remaining_previews=0
+2026-04-15T02:23:29.010657817-04:00 INF detached shared preview consumer consumer_count=0 consumer_id=preview-type-display-display--0--1 event=capture.gst.shared.preview.detach signature=type=display|display=:0.0|device=|window=|size=|cursor=true|mirror=false source_id=desktop-1
+2026-04-15T02:23:29.011239793-04:00 INF server runtime exited cleanly event=runtime.shutdown.summary

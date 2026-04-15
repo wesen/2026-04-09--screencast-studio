@@ -243,3 +243,18 @@ That means the adaptive-preview profile rebalance did **not** reintroduce the ea
 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/freeze-check.stdout.log — targeted freeze-check output against the current adaptive-preview runtime
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/21-adaptive-preview-freeze-check/20260414-143226/frame-times.txt — saved `lastFrameAt` progression showing preview continued advancing during recording
+
+Added a new browser-side reproducibility bundle under `scripts/22-playwright-ui-repros/` so the live frontend actions used during debugging are now saved as ticket-local Playwright MCP `run_code`-compatible scripts instead of being trapped in chat history.
+
+The saved scripts cover camera add, preview verification, recording start, recording stop, and a combined add-camera-and-record smoke flow. I validated them live against the running `scs-web-ui` server. The camera-add script reproduced the UI path from `Sources (1)` to `Sources (2)`, and the camera preview reached a real loaded frontend image state with `naturalWidth=1280`, `naturalHeight=720`, and `complete=true`.
+
+I also added explicit tab-hygiene guidance because stale Playwright tabs can keep extra MJPEG preview listeners alive and distort later measurements.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/00-usage.txt — usage note for rerunning the saved Playwright snippets by filename, including tab cleanup guidance
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/01-add-camera-via-injected-js.js — saved browser repro for camera add through injected JS
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/02-start-recording-via-injected-js.js — saved browser repro for starting recording from the Studio page
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/03-stop-recording-via-injected-js.js — saved browser repro for stopping recording cleanly
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/04-verify-preview-streams.js — saved browser helper that reports loaded preview image state from the frontend
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/05-add-camera-and-start-recording-smoke.js — combined browser-side smoke repro for camera add plus recording start
