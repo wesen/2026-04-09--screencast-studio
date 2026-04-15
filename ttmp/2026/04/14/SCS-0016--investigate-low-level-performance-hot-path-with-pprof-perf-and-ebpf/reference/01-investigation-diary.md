@@ -25,7 +25,7 @@ RelatedFiles:
         Primary plan document for Step 1
 ExternalSources: []
 Summary: Chronological diary for the lower-level profiling investigation into the browser-connected hot path.
-LastUpdated: 2026-04-14T22:45:43-04:00
+LastUpdated: 2026-04-14T22:54:41-04:00
 WhatFor: Record the implementation and profiling workflow step by step, including failures, commands, and interpretation changes.
 WhenToUse: Read when continuing SCS-0016 and you need the exact reasoning and commands used so far.
 ---
@@ -445,3 +445,155 @@ perf_event_paranoid=1
 ```
 
 and `perf-check.txt` now includes a successful `perf stat` run instead of the earlier permission failure.
+
+## Step 5: Backfilled the Exact Repro Scripts, Captured the First Mixed-Stack perf Profile, and Resolved the Top Go Addresses
+
+Once `perf` availability was confirmed, the next practical job was to make the actual repro flow retraceable from inside the ticket. I had already been using a combination of browser helpers and ad hoc shell commands to reproduce the one-tab desktop preview + recording hot phase, but the user explicitly asked that all scripts I was running be stored in the ticket with increasing numeric prefixes so the analysis can be replayed later. I therefore backfilled the exact browser-driving helpers I used into SCS-0016 before treating the first `perf` result as a stable slice.
+
+The backfilled scripts for this step are:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/04-capture-perf-cpu-profile.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/05-open-studio-and-wait-desktop.js`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/06-start-recording.js`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/07-stop-recording.js`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/08-resolve-perf-go-addresses.sh`
+
+I then used that flow against the already-established high-signal repro:
+
+```text
+desktop preview + recording + one real browser tab
+```
+
+and saved the first mixed-stack capture under:
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952/`
+
+### Prompt Context
+
+**User prompt (verbatim):** "store all the scripts you are running with a numerical increasing prefix in the scripts/ folder of the ticket so that we can retrace your analysis. backfill."
+
+**Assistant interpretation:** Stop relying on scattered or cross-ticket helper locations, copy the exact scripts used for this profiling slice into SCS-0016 with ordered prefixes, and keep the capture/review flow reproducible from the ticket alone.
+
+**Inferred user intent:** The ticket itself should be a faithful replay surface for the analysis rather than a prose summary that still depends on hidden ad hoc commands.
+
+### What I did
+
+- Backfilled the exact browser-driving helpers into SCS-0016 with ordered numeric prefixes.
+- Added the ticket-local `perf` capture script and the ticket-local Go-address resolver helper.
+- Ran the browser repro in the live Studio page.
+- Captured the first `perf` profile while recording was active.
+- Resolved the top `screencast-studio` addresses from the `perf` report into a saved `go-addr2line.txt` artifact.
+
+### Commands
+
+Browser helpers used through the browser tool:
+
+- `scripts/05-open-studio-and-wait-desktop.js`
+- `scripts/06-start-recording.js`
+- `scripts/07-stop-recording.js`
+
+Shell commands used:
+
+```bash
+bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/04-capture-perf-cpu-profile.sh
+bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/08-resolve-perf-go-addresses.sh \
+  ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952
+```
+
+### Why
+
+This step was necessary for two reasons.
+
+First, the ticket needed honest replayability. The user specifically asked for the script surface to be backfilled into the ticket, and that request is correct: without that, the investigation would still depend on memory about which helpers lived in SCS-0015 and which commands were only one-off shell invocations.
+
+Second, the project needed the first real mixed-stack answer, not just another profiler setup step. pprof had already told us that the hot path was mostly external/native. `perf` was the first tool that could reasonably distinguish encoder work, GStreamer pad-push work, Go runtime callback work, and kernel/syscall traces in one view.
+
+### What worked
+
+- The browser repro could be re-established cleanly with the ticket-local scripts.
+- `perf record` succeeded against the live server PID with no lost samples.
+- The first report was immediately more specific than pprof.
+- The Go-address resolver helper worked and saved a reproducible address-to-symbol artifact instead of leaving the resolution as a one-off shell trick.
+
+### What didn't work
+
+One limitation remains: native libraries are symbolized much better than the main Go binary. The `perf` report can clearly show `libx264`, `libgstreamer`, `gst_pad_push`, `x264_encoder_encode`, libc, and kernel frames, but many top `screencast-studio` frames still show up as raw addresses in the `perf` report itself.
+
+I mitigated that limitation with `08-resolve-perf-go-addresses.sh`, but the result is still weaker than ideal because the live process came from a temporary `go run` executable under `/tmp/go-build.../exe/screencast-studio` rather than from a deliberately built and preserved binary path.
+
+### What I learned
+
+The first `perf` result moves the explanation forward in an important way.
+
+The strongest visible hot path in this capture is native encoder work:
+
+- `libx264.so.164 x264_8_trellis_coefn` accounts for about `45.63%` children / `44.49%` self.
+- Another `~27.84%` sits in unresolved `[unknown]` native frames that are very likely still part of the same native-heavy region.
+- GStreamer pad-push frames are visible in the call chain into `x264_encoder_encode`, including `gst_pad_push` and nearby `libgstreamer` / `libgstbase` frames.
+
+That means the current best explanation is no longer just “something native below Go.” It is more specific: during this browser-connected recording repro, a large fraction of the heat is in **native x264 encoder work plus the surrounding GStreamer push path**.
+
+The resolved Go-side addresses add a second, smaller insight. The top visible `screencast-studio` addresses map to things like:
+
+- `runtime.cgocallbackg1`
+- `runtime.cgoCheckArg`
+- `github.com/rs/zerolog.(*Event).Dict`
+- `github.com/rs/zerolog.ConsoleWriter.Write`
+- `encoding/json.(*Decoder).readValue`
+
+I do not yet want to over-interpret those names, because the address resolution is still somewhat brittle in this `go run` setup. But it does suggest that the visible Go-side slice is more about **CGO callback/runtime boundary plus some logging/JSON work** than about a clean, dominant application-level business function.
+
+### What was tricky to build
+
+The trickiest part here was not the `perf` command itself. It was keeping the whole repro chain honest and replayable:
+
+- live app on `:7777`
+- one real browser tab
+- preview active
+- recording active
+- `perf` attached to the right listening PID
+- top Go addresses resolved against the right executable path
+
+If any one of those pieces stays implicit, the next person has to reverse-engineer the analysis procedure from scratch.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/04-capture-perf-cpu-profile.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/08-resolve-perf-go-addresses.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952/perf-report.txt`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952/go-addr2line.txt`
+
+The main review questions are:
+
+- whether the current symbol quality is already good enough to start targeting code changes,
+- or whether the next best move is to rerun the same capture from a stable `go build` binary to improve Go symbolization before drawing tighter conclusions.
+
+### What should be done in the future
+
+- Keep the raw `perf.data` artifact locally saved, but avoid treating it as required source-control material.
+- Consider rerunning the same scenario from a stable built binary path instead of `go run` to improve Go-symbol resolution.
+- Compare the first mixed-stack result against the earlier pprof output and decide whether the next code-change target should be encoder settings, pipeline structure, or a smaller Go-side callback/logging reduction.
+
+### Code review instructions
+
+Review the capture and summary in this order:
+
+- `scripts/results/04-capture-perf-cpu-profile/20260414-224952/01-summary.md`
+- `scripts/results/04-capture-perf-cpu-profile/20260414-224952/perf-report.txt`
+- `scripts/results/04-capture-perf-cpu-profile/20260414-224952/perf-report-dso-symbol.txt`
+- `scripts/results/04-capture-perf-cpu-profile/20260414-224952/go-addr2line.txt`
+
+Then compare that mixed-stack result against the earlier pprof evidence in:
+
+- `scripts/results/02-capture-pprof-cpu-profile/20260414-204800/pprof-top.txt`
+
+### Technical details
+
+The saved `perf` run reported:
+
+```text
+[ perf record: Woken up 206800 times to write data ]
+[ perf record: Captured and wrote 101.983 MB ... (6429 samples) ]
+```
+
+The raw `perf.data` file is intentionally being kept as a local saved artifact and does not need to be committed.

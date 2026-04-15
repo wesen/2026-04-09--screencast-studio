@@ -25,7 +25,7 @@ RelatedFiles:
       Note: Upstream ticket that narrowed the problem enough to justify this lower-level profiling track
 ExternalSources: []
 Summary: Separate ticket for low-level CPU profiling of the real browser-connected recording hot path using Go pprof first, then perf and eBPF if needed.
-LastUpdated: 2026-04-14T22:45:43-04:00
+LastUpdated: 2026-04-14T22:54:41-04:00
 WhatFor: Keep low-level profiling work separate from SCS-0015's higher-level browser-path measurement and interpretation work.
 WhenToUse: Start here when working on pprof, perf, eBPF, flamegraphs, or lower-level runtime evidence for the browser-connected hot path.
 ---
@@ -62,6 +62,10 @@ Current deliverable status:
 - the first pprof result mostly points at external/native code (`runtime._ExternalCode`, `<unknown>`, `libgstvideo`, `libc`, `libjpeg`) rather than clear Go-userland hotspots
 - ticket-local profiler prereq checks are now recorded under `scripts/results/03-check-profiler-prereqs/20260414-211300/`
 - the latest prereq check found `perf_event_paranoid=1` and a working `perf stat` path for the current user, while `bpftrace` still requires root
+- a reproducible `perf` capture script now exists under `scripts/04-capture-perf-cpu-profile.sh`
+- the first mixed-stack `perf` capture is saved under `scripts/results/04-capture-perf-cpu-profile/20260414-224952/`
+- the first `perf` result points strongly at native recording work in `libx264` plus visible GStreamer push-path frames, while Go symbolization for the main binary is still weaker than ideal because the process is running from a temporary `go run` executable
+- the exact browser-driving helpers and the Go-address resolver used for this slice have now been backfilled into the ticket-local `scripts/` directory with numbered prefixes
 - two new project reports now exist: one on investigation approaches/tricks and one on the Prometheus-style metrics architecture
 
 ## Tasks

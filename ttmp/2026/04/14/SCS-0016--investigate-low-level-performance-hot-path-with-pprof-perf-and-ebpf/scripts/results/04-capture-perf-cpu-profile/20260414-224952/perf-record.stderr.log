@@ -1,0 +1,2 @@
+[ perf record: Woken up 206800 times to write data ]
+[ perf record: Captured and wrote 101.983 MB /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952/perf.data (6429 samples) ]

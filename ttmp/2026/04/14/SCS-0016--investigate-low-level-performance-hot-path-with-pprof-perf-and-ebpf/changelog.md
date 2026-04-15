@@ -95,6 +95,33 @@ This means the ticket is no longer waiting on hypothetical `perf` access. The ne
 
 I also fixed the pprof capture script bug where Bash’s special `SECONDS` variable had been used as the capture parameter name. The script now uses `PROFILE_SECONDS`, which keeps future summaries honest.
 
+With `perf` now usable, I added the first mixed-stack capture harness:
+
+- `scripts/04-capture-perf-cpu-profile.sh`
+
+For reproducibility, I also backfilled the exact browser-driving helpers and the Go-address resolver used during this slice into the ticket-local scripts directory:
+
+- `scripts/05-open-studio-and-wait-desktop.js`
+- `scripts/06-start-recording.js`
+- `scripts/07-stop-recording.js`
+- `scripts/08-resolve-perf-go-addresses.sh`
+
+I then used that flow against the same high-signal repro — desktop preview + recording + one real browser tab — and saved the first `perf` capture under:
+
+- `scripts/results/04-capture-perf-cpu-profile/20260414-224952/`
+
+The first `perf` result is more concrete than the earlier pprof output. It points strongly at native recording work in `libx264`, with visible GStreamer push-path frames leading into the encoder:
+
+- `libx264.so.164 x264_8_trellis_coefn` ≈ `45.63%` children / `44.49%` self
+- additional unresolved native frames under `[unknown]` ≈ `27.84%`, likely still part of the same native-heavy region
+- `libgstreamer-1.0.so.0.2402.0 gst_pad_push` and nearby pad-push frames are visible in the call paths into `x264_encoder_encode`
+
+That is already useful because it shifts the working explanation from a vague “external/native” bucket toward a more specific picture: the dominant hot path in this repro is heavily in **native encoder + pipeline push work**, not primarily in the final MJPEG HTTP write path or the previously measured Go-side web/event bookkeeping.
+
+The mixed-stack symbol quality is only partially solved, though. Native libraries are visible enough to be actionable, but the main Go binary still shows many address-only frames because the process is running from a temporary `go run` executable. I used the new resolver helper to map the top `screencast-studio` addresses anyway, and that backfilled evidence shows the visible Go-side frames cluster around runtime CGO callback machinery and some `zerolog` / `encoding/json` paths rather than a single clean application function.
+
+Per the current instruction, the raw `perf.data` artifact is being kept as a local saved result, but it does not need to be committed. The lighter text artifacts and ticket docs are the important continuation surface for source control.
+
 ### Additional Related Files
 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pprof.go — separate pprof mux for the optional debug server
@@ -106,5 +133,12 @@ I also fixed the pprof capture script bug where Bash’s special `SECONDS` varia
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/03-check-profiler-prereqs.sh — saves the current local availability and permission state for perf, bpftrace, and bpftool
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/02-capture-pprof-cpu-profile/20260414-204800/pprof-top.txt — first saved pprof top output showing the dominance of native/external code
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/03-check-profiler-prereqs/20260414-211300/01-summary.md — saved prereq result showing working perf access for the current user and root-only bpftrace
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/04-capture-perf-cpu-profile.sh — mixed-stack perf capture helper for the live server PID
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/05-open-studio-and-wait-desktop.js — ticket-local browser helper used to establish the desktop preview repro
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/06-start-recording.js — ticket-local browser helper used to enter the recording hot phase
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/07-stop-recording.js — ticket-local browser helper used to end the hot-phase repro cleanly
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/08-resolve-perf-go-addresses.sh — helper that extracts top Go-binary addresses from the perf report and resolves them with `go tool addr2line`
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952/01-summary.md — first mixed-stack perf capture summary for the browser one-tab recording repro
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952/go-addr2line.txt — first saved address-resolution artifact for the top `screencast-studio` frames in the perf report
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/02-performance-investigation-approaches-and-tricks-report.md — project report on the investigation playbook used so far
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/03-prometheus-metrics-architecture-and-field-guide.md — project report on the current metrics architecture
