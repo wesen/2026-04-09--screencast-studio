@@ -25,6 +25,10 @@ func TestMetricsEndpoint(t *testing.T) {
 	gauge.Set(map[string]string{"kind": "server_test"}, 2)
 	previewHTTPClients.Set(map[string]string{"source_type": "display"}, 1)
 	previewHTTPStreamsStarted.Inc(map[string]string{"source_type": "display"})
+	previewHTTPLoopIterations.Inc(map[string]string{"source_type": "display"})
+	previewHTTPIdleIterations.Inc(map[string]string{"source_type": "display"})
+	previewHTTPWriteNanoseconds.Add(map[string]string{"source_type": "display"}, 123)
+	previewHTTPFlushNanoseconds.Add(map[string]string{"source_type": "display"}, 45)
 	eventHubSubscribers.Set(nil, 1)
 	eventHubEventsPublished.Inc(map[string]string{"event_type": "test.event"})
 	websocketConnections.Set(nil, 1)
@@ -60,6 +64,18 @@ func TestMetricsEndpoint(t *testing.T) {
 	}
 	if !strings.Contains(body, `screencast_studio_preview_http_streams_started_total{source_type="display"} 1`) {
 		t.Fatalf("metrics body missing preview stream counter: %s", body)
+	}
+	if !strings.Contains(body, `screencast_studio_preview_http_loop_iterations_total{source_type="display"} 1`) {
+		t.Fatalf("metrics body missing preview loop counter: %s", body)
+	}
+	if !strings.Contains(body, `screencast_studio_preview_http_idle_iterations_total{source_type="display"} 1`) {
+		t.Fatalf("metrics body missing preview idle counter: %s", body)
+	}
+	if !strings.Contains(body, `screencast_studio_preview_http_write_nanoseconds_total{source_type="display"} 123`) {
+		t.Fatalf("metrics body missing preview write duration counter: %s", body)
+	}
+	if !strings.Contains(body, `screencast_studio_preview_http_flush_nanoseconds_total{source_type="display"} 45`) {
+		t.Fatalf("metrics body missing preview flush duration counter: %s", body)
 	}
 	if !strings.Contains(body, `screencast_studio_eventhub_subscribers 1`) {
 		t.Fatalf("metrics body missing event hub subscriber gauge: %s", body)

@@ -581,6 +581,26 @@ func TestPreviewMJPEGStream(t *testing.T) {
 	if !strings.Contains(string(streamBody), "--frame") {
 		t.Fatalf("expected mjpeg boundary in body, got %q", string(streamBody))
 	}
+
+	metricsResp, err := http.Get(ts.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("metrics request: %v", err)
+	}
+	defer metricsResp.Body.Close()
+	metricsBody, err := io.ReadAll(metricsResp.Body)
+	if err != nil {
+		t.Fatalf("read metrics response: %v", err)
+	}
+	metricsText := string(metricsBody)
+	if !strings.Contains(metricsText, `screencast_studio_preview_http_frames_served_total{source_type="display"} `) {
+		t.Fatalf("expected preview frames served metric in metrics body, got %s", metricsText)
+	}
+	if !strings.Contains(metricsText, `screencast_studio_preview_http_write_nanoseconds_total{source_type="display"} `) {
+		t.Fatalf("expected preview write timing metric in metrics body, got %s", metricsText)
+	}
+	if !strings.Contains(metricsText, `screencast_studio_preview_http_flush_nanoseconds_total{source_type="display"} `) {
+		t.Fatalf("expected preview flush timing metric in metrics body, got %s", metricsText)
+	}
 }
 
 func TestRecordingStartSuspendsAndRestoresPreviews(t *testing.T) {

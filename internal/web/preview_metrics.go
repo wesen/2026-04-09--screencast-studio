@@ -38,6 +38,26 @@ var (
 		"Total HTTP flush calls performed while serving MJPEG preview streams.",
 		"source_type",
 	)
+	previewHTTPLoopIterations = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_preview_http_loop_iterations_total",
+		"Total iterations of the HTTP MJPEG preview handler loop.",
+		"source_type",
+	)
+	previewHTTPIdleIterations = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_preview_http_idle_iterations_total",
+		"Total HTTP MJPEG preview handler loop iterations that did not serve a new frame.",
+		"source_type",
+	)
+	previewHTTPWriteNanoseconds = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_preview_http_write_nanoseconds_total",
+		"Total time spent writing MJPEG multipart headers and JPEG bytes to HTTP preview clients, in nanoseconds.",
+		"source_type",
+	)
+	previewHTTPFlushNanoseconds = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_preview_http_flush_nanoseconds_total",
+		"Total time spent in HTTP flush calls while serving MJPEG preview streams, in nanoseconds.",
+		"source_type",
+	)
 	previewFrameUpdates = appmetrics.MustRegisterCounterVec(
 		"screencast_studio_preview_frame_updates_total",
 		"Total preview frame updates stored by PreviewManager.",

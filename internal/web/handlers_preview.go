@@ -123,6 +123,7 @@ func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {
 
 	var lastSeq uint64
 	for {
+		previewHTTPLoopIterations.Inc(labels)
 		frame, seq, snapshot, ok := s.previews.LatestFrame(previewID)
 		if !ok {
 			finishReason = "preview_gone"
@@ -131,6 +132,7 @@ func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {
 		if len(frame) > 0 && seq != lastSeq {
 			lastSeq = seq
 			written := 0
+			writeStart := time.Now()
 			n, err := w.Write([]byte("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "))
 			written += n
 			if err != nil {
@@ -163,8 +165,13 @@ func (s *Server) handlePreviewMJPEG(w http.ResponseWriter, r *http.Request) {
 			}
 			previewHTTPFramesServed.Inc(labels)
 			previewHTTPBytesServed.Add(labels, uint64(written))
+			previewHTTPWriteNanoseconds.Add(labels, uint64(time.Since(writeStart)))
+			flushStart := time.Now()
 			previewHTTPFlushes.Inc(labels)
 			flusher.Flush()
+			previewHTTPFlushNanoseconds.Add(labels, uint64(time.Since(flushStart)))
+		} else {
+			previewHTTPIdleIterations.Inc(labels)
 		}
 		if (snapshot.State == "failed" || snapshot.State == "finished") && !snapshot.HasFrame {
 			finishReason = "preview_ended"
