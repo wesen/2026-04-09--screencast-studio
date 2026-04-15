@@ -28,7 +28,7 @@
 - [x] Add a reproducible `perf record` capture script for the same high-signal scenario
 - [x] Record and document the current `perf` permission blocker or required sysctl/capability setup on this machine
 - [x] Save `perf.data`, `perf report` text output, and any stack-collapse / flamegraph artifacts under the ticket-local `scripts/` tree
-- [ ] Verify symbol quality is good enough to separate Go, CGO, libc, GStreamer, and kernel stacks
+- [x] Verify symbol quality is good enough to separate Go, CGO, libc, GStreamer, and kernel stacks
 - [ ] Summarize whether the dominant hot path is in Go, CGO, GStreamer, libc, syscalls, or scheduler behavior
 
 ## Phase 3: eBPF only if still needed

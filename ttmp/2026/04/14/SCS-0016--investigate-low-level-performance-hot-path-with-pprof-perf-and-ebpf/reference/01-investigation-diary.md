@@ -25,7 +25,7 @@ RelatedFiles:
         Primary plan document for Step 1
 ExternalSources: []
 Summary: Chronological diary for the lower-level profiling investigation into the browser-connected hot path.
-LastUpdated: 2026-04-14T22:54:41-04:00
+LastUpdated: 2026-04-14T23:09:52-04:00
 WhatFor: Record the implementation and profiling workflow step by step, including failures, commands, and interpretation changes.
 WhenToUse: Read when continuing SCS-0016 and you need the exact reasoning and commands used so far.
 ---
@@ -597,3 +597,135 @@ The saved `perf` run reported:
 ```
 
 The raw `perf.data` file is intentionally being kept as a local saved artifact and does not need to be committed.
+
+## Step 6: Reran perf from a Stable Built Binary to Improve Go Symbolization
+
+The first `perf` slice was already useful, but it still had one annoying limitation: the process was running from a temporary `go run` executable under `/tmp/go-build...`, so the main binary showed too many address-only `screencast-studio` frames. That was enough to trust the native `libx264` / GStreamer story, but not enough to be fully satisfied about the Go-side slice.
+
+So the next step was not to broaden scenarios. It was to hold the same repro constant and improve the capture quality. I added a ticket-local restart helper that builds a stable `screencast-studio` binary under the SCS-0016 `scripts/bin/` directory, restarts the app from that binary path, and keeps pprof enabled on the same separate debug address. Then I reran the exact same browser one-tab recording repro and captured a second `perf` sample against the stable-binary server PID.
+
+### Prompt Context
+
+**Relevant prior context:** The first `perf` run showed strong native hot-path evidence, but the main-binary frames were still weaker than ideal because the server was running from `go run` rather than a preserved built binary.
+
+**Assistant interpretation:** Improve profiler evidence quality without changing the repro itself: build a stable binary, restart from that path, rerun the same perf capture, and compare symbolization quality.
+
+**Inferred user intent:** Keep the investigation incremental and evidence-driven; if the current profiler result is almost good enough, tighten the symbol story before deciding the next code-change target.
+
+### What I did
+
+- Added:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/09-restart-scs-web-ui-with-built-binary-and-pprof.sh`
+- Restarted the app from:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/bin/screencast-studio`
+- Reused the same browser helpers:
+  - `scripts/05-open-studio-and-wait-desktop.js`
+  - `scripts/06-start-recording.js`
+  - `scripts/07-stop-recording.js`
+- Captured a second perf run under:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415/`
+- Fixed two small script bugs uncovered along the way:
+  1. `scripts/04-capture-perf-cpu-profile.sh` summary generation had markdown backticks that accidentally triggered shell command substitution inside an unquoted heredoc.
+  2. `scripts/08-resolve-perf-go-addresses.sh` assumed address-only Go frames would always exist; it now emits a clear note when the perf report already contains direct symbols.
+
+### Commands
+
+```bash
+bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/09-restart-scs-web-ui-with-built-binary-and-pprof.sh
+bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/04-capture-perf-cpu-profile.sh
+bash ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/08-resolve-perf-go-addresses.sh \
+  ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415
+```
+
+### Why
+
+This step is a good example of “measure first, then improve the measurement surface.” The repro itself was already strong enough. What was weak was the symbol story for the main Go binary. Restarting from a stable built binary let the investigation answer a more refined question:
+
+> once Go symbolization is no longer the limiting factor, does the main conclusion change?
+
+### What worked
+
+- The built-binary restart succeeded cleanly and exposed the expected health and pprof endpoints.
+- The second `perf` capture succeeded with no lost samples.
+- Main-binary symbolization improved enough that the report now contains named `screencast-studio` runtime and websocket/server functions directly.
+- The main conclusion stayed stable instead of collapsing.
+
+### What didn't work
+
+Two small helper bugs surfaced during this step, but both were fixed immediately:
+
+- the heredoc/backtick bug in `04-capture-perf-cpu-profile.sh`
+- the empty-address newline bug in `08-resolve-perf-go-addresses.sh`
+
+Those were not investigation blockers, but they were exactly the kind of script quality issues worth documenting because the user explicitly wants the analysis flow to be replayable from the ticket.
+
+### What I learned
+
+The stable-binary rerun improved confidence in the interpretation substantially.
+
+The dominant hot path is still not ordinary Go web code. The second run shows:
+
+- `libx264.so.164 x264_8_trellis_coefn` ≈ `41.74%` children / `40.93%` self
+- `[unknown]` native frames ≈ `25.75%`
+- `libgstreamer-1.0.so.0.2402.0 gst_pad_push` ≈ `13.68%`
+- visible `gst_buffer_copy_into` and libc `__memcpy_evex_unaligned_erms` in the call path into `x264_encoder_encode`
+
+The newly visible `screencast-studio` frames are informative mostly because they are **small**. They include runtime scheduler/GC/CGO callback functions and websocket write paths such as:
+
+- `runtime.cgocallbackg1`
+- `runtime.asmcgocall.abi0`
+- `internal/web.(*Server).handleWebsocket.func2`
+- `internal/web.writeWebsocketServerEvent`
+- `github.com/gorilla/websocket.(*Conn).WriteMessage`
+
+Those names are useful because they confirm the Go-side browser/event path is present in the sample. But the percentages are tiny compared with the native encoder + pipeline region, so they do not overturn the earlier conclusion.
+
+A second interesting side observation is that the perf writer wakeup behavior changed a lot between the two runs:
+
+- first run: `206800` wakeups for about `101.983 MB` / `6429` samples
+- built-binary rerun: `669` wakeups for about `172.843 MB` / `10893` samples
+
+That does not by itself explain product CPU, but it does suggest the stable-binary capture path is a better-quality measurement surface and probably the right baseline for future perf reruns.
+
+### What was tricky to build
+
+The trickiest part here was preserving the exact same runtime behavior while only changing the executable path. If I had changed the repro, the new symbolization could have been confused with a workload shift. Keeping the same one-tab desktop preview + recording scenario made the comparison much more trustworthy.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/09-restart-scs-web-ui-with-built-binary-and-pprof.sh`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415/perf-report-dso-symbol.txt`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415/go-addr2line.txt`
+
+The main review question is whether the symbol quality is now good enough to move from profiling into a code-change hypothesis, or whether one more perf pass with slightly different call-graph settings is still worthwhile.
+
+### What should be done in the future
+
+- Keep using the stable built binary rather than `go run` for future mixed-stack perf captures.
+- Write a short lower-level findings report once the current perf interpretation is stable enough.
+- Decide whether the next code-change target should focus on native encoder cost, shared preview branch copy behavior, or a combination.
+
+### Code review instructions
+
+Compare these two directories directly:
+
+- `scripts/results/04-capture-perf-cpu-profile/20260414-224952/`
+- `scripts/results/04-capture-perf-cpu-profile/20260414-230415/`
+
+The main thing to look for is not whether the exact percentages match perfectly, but whether the better-symbolized rerun changes the diagnosis. Right now it does not; it mostly strengthens it.
+
+### Technical details
+
+The second run used:
+
+```text
+exe_path=/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/bin/screencast-studio
+perf_event_paranoid=1
+```
+
+and `perf-record.stderr.log` reports:
+
+```text
+[ perf record: Woken up 669 times to write data ]
+[ perf record: Captured and wrote 172.843 MB ... (10893 samples) ]
+```

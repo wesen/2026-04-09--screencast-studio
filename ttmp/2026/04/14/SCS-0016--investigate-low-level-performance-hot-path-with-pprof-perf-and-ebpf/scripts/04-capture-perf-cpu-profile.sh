@@ -129,8 +129,8 @@ WhenToUse: Read when comparing mixed-stack perf captures across the same high-si
 - perf-report.txt
 - perf-report-dso-symbol.txt
 - perf-script.txt
-- go-top-addresses.txt (generated later via `08-resolve-perf-go-addresses.sh`)
-- go-addr2line.txt (generated later via `08-resolve-perf-go-addresses.sh`)
+- go-top-addresses.txt (generated later via 08-resolve-perf-go-addresses.sh)
+- go-addr2line.txt (generated later via 08-resolve-perf-go-addresses.sh)
 EOF
 
 echo "$RUN_DIR"

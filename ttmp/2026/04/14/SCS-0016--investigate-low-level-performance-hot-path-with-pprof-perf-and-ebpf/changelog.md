@@ -122,6 +122,30 @@ The mixed-stack symbol quality is only partially solved, though. Native librarie
 
 Per the current instruction, the raw `perf.data` artifact is being kept as a local saved result, but it does not need to be committed. The lighter text artifacts and ticket docs are the important continuation surface for source control.
 
+I then improved the reproducibility and symbol-quality story one more step by adding:
+
+- `scripts/09-restart-scs-web-ui-with-built-binary-and-pprof.sh`
+
+This helper builds a stable `screencast-studio` binary under the ticket-local `scripts/bin/` directory and restarts the app from that path instead of `go run`. I used it to produce a second perf capture under:
+
+- `scripts/results/04-capture-perf-cpu-profile/20260414-230415/`
+
+That rerun improved the main-binary symbolization enough that `perf-report-dso-symbol.txt` now shows named Go/runtime and websocket/server functions directly instead of mostly address-only `screencast-studio` frames. The rerun also reduced perf writer wakeups dramatically:
+
+- first run (`go run`): `206800` wakeups, `6429` samples, about `101.983 MB`
+- built-binary rerun: `669` wakeups, `10893` samples, about `172.843 MB`
+
+The main interpretation did **not** change in the way that would rescue the old Go-side hypothesis. The stable-binary rerun still points primarily at native media work:
+
+- `libx264.so.164 x264_8_trellis_coefn` ≈ `41.74%` children / `40.93%` self
+- `[unknown]` native frames ≈ `25.75%`
+- `libgstreamer-1.0.so.0.2402.0 gst_pad_push` ≈ `13.68%`
+- `libgstreamer` / `gst_buffer_copy_into` and libc `__memcpy_evex_unaligned_erms` are visible in the hot path into `x264_encoder_encode`
+
+The newly visible `screencast-studio` symbols are real but small by comparison. They include runtime scheduling/CGO callback paths and websocket write paths, which is useful for confidence, but they do not overturn the main conclusion that the dominant cost is still overwhelmingly in the native encoder/pipeline region rather than ordinary Go web code.
+
+I also fixed a small helper bug uncovered by this rerun: `scripts/08-resolve-perf-go-addresses.sh` originally assumed the report would contain address-only `screencast-studio` frames. With better symbolization that assumption breaks, so the helper now emits a clear note when addr2line fallback is unnecessary because the perf report already contains direct symbols.
+
 ### Additional Related Files
 
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/pprof.go — separate pprof mux for the optional debug server
@@ -137,8 +161,12 @@ Per the current instruction, the raw `perf.data` artifact is being kept as a loc
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/05-open-studio-and-wait-desktop.js — ticket-local browser helper used to establish the desktop preview repro
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/06-start-recording.js — ticket-local browser helper used to enter the recording hot phase
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/07-stop-recording.js — ticket-local browser helper used to end the hot-phase repro cleanly
-- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/08-resolve-perf-go-addresses.sh — helper that extracts top Go-binary addresses from the perf report and resolves them with `go tool addr2line`
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/08-resolve-perf-go-addresses.sh — helper that extracts top Go-binary addresses from the perf report and resolves them with `go tool addr2line`, now also handling the already-symbolized case cleanly
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/09-restart-scs-web-ui-with-built-binary-and-pprof.sh — stable-binary restart helper used to improve main-binary symbolization for the second perf rerun
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952/01-summary.md — first mixed-stack perf capture summary for the browser one-tab recording repro
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-224952/go-addr2line.txt — first saved address-resolution artifact for the top `screencast-studio` frames in the perf report
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415/01-summary.md — second perf summary from the stable built binary rerun
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415/perf-report-dso-symbol.txt — second perf report with much better direct `screencast-studio` symbolization
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415/go-addr2line.txt — fallback note artifact showing direct perf symbolization made addr2line unnecessary in the stable-binary rerun
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/02-performance-investigation-approaches-and-tricks-report.md — project report on the investigation playbook used so far
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/reference/03-prometheus-metrics-architecture-and-field-guide.md — project report on the current metrics architecture

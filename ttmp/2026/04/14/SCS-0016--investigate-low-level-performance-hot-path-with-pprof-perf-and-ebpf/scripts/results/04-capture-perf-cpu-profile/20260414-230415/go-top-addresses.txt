@@ -1,0 +1,4 @@
+No address-only screencast-studio frames were extracted from:
+ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/04-capture-perf-cpu-profile/20260414-230415/perf-report-dso-symbol.txt
+
+This usually means perf already symbolized the main Go binary directly in perf-report-dso-symbol.txt.

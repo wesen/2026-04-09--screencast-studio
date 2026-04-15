@@ -1,0 +1,12 @@
+label=desktop-preview-recording-one-browser-tab
+server_url=http://127.0.0.1:7777
+port=7777
+server_pid=933374
+exe_path=/home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/bin/screencast-studio
+perf_bin=/usr/bin/perf
+perf_seconds=20
+perf_freq=99
+call_graph=dwarf,16384
+perf_event_paranoid=1
+uname=Linux f 6.8.0-107-generic #107-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar 13 19:51:50 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+started_at=2026-04-14T23:04:15-04:00

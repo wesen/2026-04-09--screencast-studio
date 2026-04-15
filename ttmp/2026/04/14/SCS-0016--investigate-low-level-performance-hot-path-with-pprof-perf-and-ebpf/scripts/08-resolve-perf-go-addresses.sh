@@ -57,12 +57,26 @@ for line in report.read_text().splitlines():
             break
     if len(addrs) >= limit:
         break
-print('\n'.join(addrs))
+import sys
+sys.stdout.write('\n'.join(addrs))
 PY
 
 if [[ ! -s "$ADDRS_OUT" ]]; then
-  echo "no screencast-studio addresses extracted from $REPORT" >&2
-  exit 1
+  cat > "$ADDRS_OUT" <<EOF
+No address-only screencast-studio frames were extracted from:
+$REPORT
+
+This usually means perf already symbolized the main Go binary directly in perf-report-dso-symbol.txt.
+EOF
+  cat > "$RESOLVED_OUT" <<EOF
+No address-only screencast-studio frames were extracted from:
+$REPORT
+
+This usually means perf already symbolized the main Go binary directly in perf-report-dso-symbol.txt.
+Review that report first instead of addr2line fallback output.
+EOF
+  echo "$RESOLVED_OUT"
+  exit 0
 fi
 
 go tool addr2line "$EXE_PATH" < "$ADDRS_OUT" > "$RESOLVED_OUT"
