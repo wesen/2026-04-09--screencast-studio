@@ -340,3 +340,44 @@ So the browser-path spike is still real, but the evidence now says websocket fan
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/ws_client/main.go — synthetic websocket consumer used by the ablation harness
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/12-desktop-preview-recording-mjpeg-ws-ablation-matrix/results/20260414-173541/01-summary.md — trusted ablation rerun summary
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/13-mjpeg-websocket-ablation-summary.md — short human-readable summary of the ablation result
+
+Implemented the next SCS-0015 instrumentation slice in commit `9fd8754ab4db6aab3ce0bd174c2ac006d957b1dd` (`Add MJPEG handler timing metrics`).
+
+This slice deliberately followed the websocket ablation with **measurement before behavior change**. The goal was to instrument the browser-facing MJPEG handler so the next high-signal real-browser rerun can answer whether the browser-path spike is dominated by MJPEG write/flush cost or whether the missing heat still mostly lives elsewhere.
+
+The new metric families are:
+
+- `screencast_studio_preview_http_loop_iterations_total`
+- `screencast_studio_preview_http_idle_iterations_total`
+- `screencast_studio_preview_http_write_nanoseconds_total`
+- `screencast_studio_preview_http_flush_nanoseconds_total`
+
+The implementation adds low-cardinality timing counters around the existing `handlePreviewMJPEG(...)` loop in `internal/web/handlers_preview.go`:
+
+- every handler loop increments a loop counter,
+- iterations that do not serve a new frame increment an idle counter,
+- successful multipart writes accumulate write nanoseconds,
+- successful flushes accumulate flush nanoseconds.
+
+I also extended tests so the timing metrics are visible at `/metrics` and so an end-to-end preview request proves the new MJPEG timing families appear after a real stream is served.
+
+Validation for this slice was:
+
+```bash
+gofmt -w internal/web/preview_metrics.go internal/web/handlers_preview.go internal/web/metrics_test.go internal/web/server_test.go
+go test ./internal/web ./pkg/metrics -count=1
+go test ./... -count=1
+```
+
+This slice does **not** claim a new performance conclusion yet. It is preparation for the next rerun of the highest-value scenario:
+
+- desktop preview + recording + one real browser tab
+
+That rerun should now let us compare write/flush/loop timing deltas directly instead of guessing whether the browser’s extra heat is coming from the MJPEG handler itself.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_metrics.go — preview metric-family definitions now include loop/idle/write/flush timing counters
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go — MJPEG handler now accumulates loop, idle, write-duration, and flush-duration metrics
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/metrics_test.go — `/metrics` endpoint test now asserts the new timing metric families
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go — preview MJPEG endpoint test now checks that the timing metrics appear after serving a real stream

@@ -13,6 +13,8 @@ DocType: design-doc
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: internal/web/handlers_preview.go
+      Note: New MJPEG timing metrics now support the next high-signal rerun
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/05-desktop-preview-http-client-recording-matrix/run.sh
       Note: Fresh-server preview and recording MJPEG-client matrix harness
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/07-live-server-browser-scenario-sample.sh
@@ -23,10 +25,11 @@ RelatedFiles:
       Note: Focused websocket ablation summary that refined the browser-path hypothesis
 ExternalSources: []
 Summary: First substantive report draft for the browser preview streaming investigation, based on the fresh-server HTTP-client matrix and the first live browser-backed measurement pass.
-LastUpdated: 2026-04-14T17:46:00-04:00
+LastUpdated: 2026-04-14T18:08:00-04:00
 WhatFor: Hold the matrix results and engineering conclusions for SCS-0015 as the browser-connected preview investigation progresses.
 WhenToUse: Read after the first measurement pass to understand what is already proven, what remains pending, and what optimization directions are now justified.
 ---
+
 
 
 
@@ -197,6 +200,12 @@ The most helpful current metrics are:
 - `screencast_studio_preview_http_frames_served_total`
 - `screencast_studio_preview_http_bytes_served_total`
 - `screencast_studio_preview_http_flushes_total`
+- `screencast_studio_preview_http_loop_iterations_total`
+- `screencast_studio_preview_http_idle_iterations_total`
+- `screencast_studio_preview_http_write_nanoseconds_total`
+- `screencast_studio_preview_http_flush_nanoseconds_total`
+
+These newer timing metrics were added after the websocket-ablation pass so the next real browser rerun can answer a narrower question: is the browser-specific hot slice spending its extra time inside the MJPEG write/flush loop, or is the real browser gap still mostly elsewhere?
 
 ## Likely bottlenecks
 
@@ -214,12 +223,14 @@ That points away from a simplistic “just lower JPEG quality” answer and towa
 
 Ranked by current confidence and likely value:
 
-1. **Add deeper handler/path instrumentation**
-   - preview write-loop timing,
+1. **Use the newly added MJPEG timing metrics in a real browser rerun**
+   - compare write/flush/loop deltas in the high-signal one-tab desktop preview+recording scenario,
+   - then decide whether deeper handler instrumentation is still necessary.
+2. **If needed, add even deeper handler/path instrumentation**
    - per-stream skip/drop reasons,
    - blocked write/flush timing,
    - maybe frame-age or stale-frame counters.
-2. **Rerun the real browser-tab desktop preview+recording case with the new event/websocket metrics enabled**
+3. **Rerun the real browser-tab desktop preview+recording case with the new event/websocket metrics enabled**
    - this is now higher priority than broadening the scenario matrix.
 3. **Compare visible browser tabs with a more minimal/headless browser consumer**
    - to separate UI-rendering effects from server-side streaming behavior.

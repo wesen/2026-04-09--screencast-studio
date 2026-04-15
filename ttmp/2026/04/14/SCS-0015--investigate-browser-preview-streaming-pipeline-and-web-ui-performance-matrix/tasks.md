@@ -20,6 +20,8 @@
 - [x] Add metrics for preview frames served and preview bytes served
 - [x] Add metrics for preview flushes and/or write attempts
 - [x] Add metrics for preview ensure/release events in the server path if needed
+- [x] Add MJPEG handler loop/idle counters for real-browser timing analysis
+- [x] Add cumulative MJPEG handler write/flush timing metrics for real-browser timing analysis
 - [x] Keep label cardinality under control and document the chosen label set
 - [x] Validate `/metrics` output and add focused tests for the new metric families
 
@@ -53,4 +55,5 @@
 - [x] Summarize the raw result directories and matrix outcomes in a human-readable report note
 - [x] Decide whether the dominant web-UI-specific cost is upstream preview generation, MJPEG serving fan-out, frontend lifecycle behavior, or a combination
 - [x] Propose concrete optimization options ranked by impact and implementation risk
-- [ ] Validate the ticket with `docmgr doctor --ticket SCS-0015 --stale-after 30`
+- [x] Validate the ticket with `docmgr doctor --ticket SCS-0015 --stale-after 30`
+- [ ] Rerun the high-signal desktop preview + recording + one real browser tab scenario with the new MJPEG timing metrics enabled

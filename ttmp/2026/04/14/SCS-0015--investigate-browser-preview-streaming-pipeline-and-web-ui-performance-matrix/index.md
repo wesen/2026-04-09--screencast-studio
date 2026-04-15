@@ -27,7 +27,7 @@ RelatedFiles:
       Note: New metrics registry will be extended for browser-preview observability
 ExternalSources: []
 Summary: Ticket for investigating the browser-connected preview streaming path and measuring why the real Studio page can drive the server much hotter than earlier backend/API-only performance matrices suggested.
-LastUpdated: 2026-04-14T17:48:00-04:00
+LastUpdated: 2026-04-14T18:08:00-04:00
 WhatFor: Track the browser preview streaming investigation, its measurement plan, and the final report.
 WhenToUse: Start here when working on browser-preview serving overhead, frontend preview lifecycle performance, or MJPEG/metrics measurement work.
 ---
@@ -67,6 +67,7 @@ Current deliverable status:
 - current browser preview transport and frontend lifecycle mapped from code
 - browser-specific measurement matrix defined
 - preview-serving metrics have been added for active MJPEG clients, stream starts/finishes, frames, bytes, flushes, frame updates, and preview ensure/release events
+- MJPEG handler timing metrics have now also been added for loop iterations, idle iterations, cumulative write time, and cumulative flush time
 - focused metrics tests and `/metrics` validation are complete
 - initial runtime helper scripts now exist for local server restart and `/metrics` sampling, with the first saved smoke result under `scripts/results/20260414-160358/`
 - a first desktop preview HTTP-client baseline matrix was added and run under `scripts/03-desktop-preview-http-client-matrix/results/20260414-161024/`
@@ -80,6 +81,7 @@ Current deliverable status:
 - a focused ablation summary note now exists at `scripts/13-mjpeg-websocket-ablation-summary.md`
 - an ongoing detailed lab report now exists at `reference/02-browser-preview-streaming-lab-report.md` and backfills the current experiments in detail
 - camera-only browser-tab scenarios are still pending, but the current priority is the desktop preview+recording one-tab repro rather than scenario expansion
+- next highest-value run: rerun desktop preview + recording + one real browser tab with the new MJPEG timing metrics enabled
 
 ## Tasks
 

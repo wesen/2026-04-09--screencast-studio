@@ -19,11 +19,15 @@ RelatedFiles:
     - Path: internal/web/event_metrics.go
       Note: EventHub and websocket metric families added during the focused ablation slice
     - Path: internal/web/handlers_preview.go
-      Note: MJPEG serving loop under investigation in the lab report
+      Note: |-
+        MJPEG serving loop under investigation in the lab report, now including loop/write/flush timing metrics
+        MJPEG loop under investigation now exports timing counters for the next rerun
     - Path: internal/web/handlers_ws.go
       Note: Real browser path includes websocket event delivery beyond plain MJPEG serving
     - Path: internal/web/preview_manager.go
       Note: Preview frame caching and per-frame preview.state publication are central to the current hypothesis
+    - Path: internal/web/preview_metrics.go
+      Note: New loop/idle/write/flush timing metric families support INST-01
     - Path: internal/web/session_manager.go
       Note: Recording-time websocket event publication is part of the current working explanation
     - Path: pkg/media/gst/shared_video.go
@@ -40,10 +44,11 @@ RelatedFiles:
       Note: Short human-readable summary of the focused ablation result
 ExternalSources: []
 Summary: Ongoing lab report for the browser preview streaming investigation, with backfilled experiments, exact result directories, scenario definitions, outcomes, caveats, and the current working explanation for the desktop preview-plus-recording CPU spike.
-LastUpdated: 2026-04-14T17:46:00-04:00
+LastUpdated: 2026-04-14T18:08:00-04:00
 WhatFor: Keep a continuation-friendly experimental record for SCS-0015 that can be updated as new browser-path measurements and instrumentation land.
 WhenToUse: Read this when continuing the browser preview investigation and you need the exact experiments already run, the result locations, and the current evidence-backed interpretation.
 ---
+
 
 
 
@@ -53,7 +58,7 @@ WhenToUse: Read this when continuing the browser preview investigation and you n
 
 This is the **ongoing lab report** for SCS-0015. It is intentionally more experiment-log-oriented than the design doc and less final-polish than the main performance report. The purpose is to preserve the actual runs, scenario definitions, commands, directories, caveats, and current working interpretation in one place as the investigation continues.
 
-This version backfills the current experiment set through the first browser-backed matrix pass.
+This version backfills the current experiment set through the first browser-backed matrix pass and the next timing-instrumentation slice.
 
 ## Core question
 
@@ -93,6 +98,14 @@ The browser-connected recording spike appears to be **real and not explained by 
    - Playwright state captures
    - browser-tool network summaries
    - per-scenario ffprobe output when recordings are produced
+
+4. **New handler timing metrics for the next rerun**
+   - `screencast_studio_preview_http_loop_iterations_total`
+   - `screencast_studio_preview_http_idle_iterations_total`
+   - `screencast_studio_preview_http_write_nanoseconds_total`
+   - `screencast_studio_preview_http_flush_nanoseconds_total`
+
+These timing metrics were added after the websocket-ablation slice so the next real-browser rerun can distinguish “browser makes MJPEG write/flush much hotter” from “the missing cost is mostly elsewhere.”
 
 ### Important caveat about comparability
 
@@ -466,6 +479,45 @@ Interpretation:
 - but adding a plain `/ws` consumer on top of one MJPEG client only increased average CPU by about `3.92` percentage points in this focused fresh-server ablation (`166.56%` → `170.48%`)
 - that is far too small to explain the jump from `~158–166%` fresh-server MJPEG cases to `~410%` real one-tab browser recording
 - this materially lowers confidence that websocket fanout by itself is the dominant explanation for the browser-path spike
+
+### INST-01: Added MJPEG handler timing metrics
+
+Purpose:
+- instrument the browser-facing MJPEG handler before changing behavior again
+- prepare the next one-tab real-browser rerun so it can answer whether the hot path is dominated by MJPEG write/flush time or by something else
+
+Code commit:
+- `9fd8754ab4db6aab3ce0bd174c2ac006d957b1dd` — `Add MJPEG handler timing metrics`
+
+Files changed:
+- `internal/web/preview_metrics.go`
+- `internal/web/handlers_preview.go`
+- `internal/web/metrics_test.go`
+- `internal/web/server_test.go`
+
+New metrics added:
+- `screencast_studio_preview_http_loop_iterations_total`
+- `screencast_studio_preview_http_idle_iterations_total`
+- `screencast_studio_preview_http_write_nanoseconds_total`
+- `screencast_studio_preview_http_flush_nanoseconds_total`
+
+Validation:
+
+```bash
+gofmt -w internal/web/preview_metrics.go internal/web/handlers_preview.go internal/web/metrics_test.go internal/web/server_test.go
+go test ./internal/web ./pkg/metrics -count=1
+go test ./... -count=1
+```
+
+Interpretation:
+- this is an instrumentation-only step, not a new runtime result yet
+- it is the correct next move after the websocket ablation because it measures before it perturbs
+- the next real-browser desktop preview+recording rerun should now make it possible to compare:
+  - total write nanoseconds,
+  - total flush nanoseconds,
+  - total loop iterations,
+  - total idle iterations,
+  against the earlier browser and synthetic-client cases
 
 ## Aggregated result tables
 

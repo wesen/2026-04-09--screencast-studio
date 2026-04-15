@@ -17,12 +17,17 @@ RelatedFiles:
       Note: |-
         Browser-facing MJPEG streaming handler is the main backend boundary for this ticket
         Main backend boundary for the new browser streaming investigation
+        MJPEG handler timing metrics added in Step 8 (commit 9fd8754ab4db6aab3ce0bd174c2ac006d957b1dd)
     - Path: internal/web/preview_manager.go
       Note: |-
         Preview lifecycle, reuse, and cached-frame fan-out behavior shape the browser streaming path
         Preview cache and fan-out behavior shaped the first-step reasoning
     - Path: internal/web/preview_metrics.go
-      Note: Metric-family definitions were added in the first code slice
+      Note: |-
+        Metric-family definitions were added in the first code slice
+        Preview timing metric families added in Step 8 (commit 9fd8754ab4db6aab3ce0bd174c2ac006d957b1dd)
+    - Path: internal/web/server_test.go
+      Note: End-to-end MJPEG metrics visibility coverage extended in Step 8
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/reference/02-browser-preview-streaming-lab-report.md
       Note: New ongoing lab report created and backfilled in Step 6
     - Path: ttmp/2026/04/14/SCS-0015--investigate-browser-preview-streaming-pipeline-and-web-ui-performance-matrix/scripts/01-restart-scs-web-ui.sh
@@ -53,10 +58,11 @@ RelatedFiles:
         Frontend preview lifecycle likely explains differences between browser-driven and API-only runs
 ExternalSources: []
 Summary: Diary for the browser preview streaming and web-UI performance investigation ticket.
-LastUpdated: 2026-04-14T17:48:00-04:00
+LastUpdated: 2026-04-14T18:08:00-04:00
 WhatFor: Record the chronology of how the browser preview streaming performance investigation was set up and how its conclusions are derived.
 WhenToUse: Read when continuing SCS-0015 and you need the exact reasoning, commands, and file boundaries used to define the new browser-streaming research track.
 ---
+
 
 
 
@@ -958,3 +964,117 @@ Key result:
 mjpeg-only    -> 166.56% avg CPU
 mjpeg-plus-ws -> 170.48% avg CPU
 ```
+
+## Step 8: Added MJPEG Handler Timing Metrics Before Changing Behavior Again
+
+After the websocket ablation, the most important thing was to stop guessing. We had already learned that websocket/event fanout was too small by itself to explain the browser-path spike, but that still left an open question: is the real browser spending much more time in the MJPEG write/flush loop than the synthetic clients, or is most of the missing heat still elsewhere? The right next move was to instrument first and only perturb behavior later.
+
+So this step is intentionally a measurement-only slice. I added low-cardinality timing counters to the browser-facing MJPEG handler for loop iterations, idle iterations, cumulative write time, and cumulative flush time. This does not answer the performance question by itself yet, but it prepares the next real one-tab browser rerun to answer it much more directly.
+
+### Prompt Context
+
+**User prompt (verbatim):** "ok, go ahead. continue committing and keeping a diary as you go"
+
+**Assistant interpretation:** Implement the next instrumentation slice now, keep the work split into commits, and update the SCS-0015 diary and ticket docs as the code lands.
+
+**Inferred user intent:** Continue the investigation in disciplined, reviewable steps, preferring measurement before speculative optimization and preserving the reasoning trail in the ticket.
+
+**Commit (code):** `9fd8754ab4db6aab3ce0bd174c2ac006d957b1dd` — `Add MJPEG handler timing metrics`
+
+### What I did
+
+- Added new preview HTTP timing metric families in:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_metrics.go`
+- Instrumented the MJPEG handler in:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+- Extended focused metric visibility checks in:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/metrics_test.go`
+- Extended preview-endpoint coverage in:
+  - `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`
+
+The new metric families are:
+
+```text
+screencast_studio_preview_http_loop_iterations_total
+screencast_studio_preview_http_idle_iterations_total
+screencast_studio_preview_http_write_nanoseconds_total
+screencast_studio_preview_http_flush_nanoseconds_total
+```
+
+Validation commands used:
+
+```bash
+gofmt -w internal/web/preview_metrics.go internal/web/handlers_preview.go internal/web/metrics_test.go internal/web/server_test.go
+go test ./internal/web ./pkg/metrics -count=1
+go test ./... -count=1
+```
+
+### Why
+
+The websocket ablation reduced confidence in the websocket hypothesis, but it did not tell us whether the browser-specific heat is concentrated inside the MJPEG handler itself. Adding timing counters to the existing MJPEG loop is the cleanest next diagnostic step because it gives the next rerun a way to distinguish:
+
+- many iterations but little write/flush cost,
+- or genuinely expensive write/flush behavior under the real browser.
+
+### What worked
+
+- The timing instrumentation fit cleanly into the existing low-cardinality metrics model using only `source_type` labels.
+- Focused tests and the full repo test suite both passed.
+- The preview endpoint test now proves that the new timing metric families appear after a real MJPEG stream has been served.
+
+### What didn't work
+
+No new runtime failure happened in this slice. The only practical limitation is that I have not yet rerun the real one-tab browser scenario with these metrics enabled, so this step is infrastructure, not a new performance result.
+
+### What I learned
+
+The handler is easy to instrument incrementally without changing runtime behavior. That means we can keep the investigation honest: first measure write/flush/loop behavior, then decide whether a behavior change like preview-state throttling is actually justified.
+
+### What was tricky to build
+
+The tricky part was choosing metrics that are useful without becoming noisy or misleading. I avoided per-preview IDs and avoided adding a larger metrics primitive just for this slice. Instead, I stuck to cumulative counters for loop count, idle count, write nanoseconds, and flush nanoseconds. That keeps the metrics cheap and easy to compare across the kind of short-lived fresh-server reruns we are already doing in this ticket.
+
+### What warrants a second pair of eyes
+
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/handlers_preview.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/preview_metrics.go`
+- `/home/manuel/code/wesen/2026-04-09--screencast-studio/internal/web/server_test.go`
+
+The main review question is whether these timing counters are sufficient to answer the current fork in the investigation, or whether the next rerun will still need even more detailed handler instrumentation such as blocked-write reasons or stale-frame counters.
+
+### What should be done in the future
+
+- Rerun the high-signal desktop preview + recording + one real browser tab scenario with the new timing metrics enabled.
+- Compare the MJPEG timing deltas against the earlier synthetic-client and websocket-ablation runs.
+- Only after that decide whether to try a behavior change like throttling `preview.state`.
+
+### Code review instructions
+
+Start in:
+
+- `internal/web/preview_metrics.go`
+- `internal/web/handlers_preview.go`
+
+Then validate through:
+
+- `internal/web/metrics_test.go`
+- `internal/web/server_test.go`
+
+Commands used:
+
+```bash
+gofmt -w internal/web/preview_metrics.go internal/web/handlers_preview.go internal/web/metrics_test.go internal/web/server_test.go
+go test ./internal/web ./pkg/metrics -count=1
+go test ./... -count=1
+```
+
+### Technical details
+
+The instrumentation points are deliberately simple:
+
+- one counter increment per handler loop iteration,
+- one counter increment for idle iterations that do not serve a new frame,
+- one cumulative nanosecond counter around multipart write work,
+- one cumulative nanosecond counter around `flusher.Flush()`.
+
+This should make the next real-browser rerun much more informative without changing preview behavior yet.
