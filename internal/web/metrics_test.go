@@ -29,8 +29,12 @@ func TestMetricsEndpoint(t *testing.T) {
 	previewHTTPIdleIterations.Inc(map[string]string{"source_type": "display"})
 	previewHTTPWriteNanoseconds.Add(map[string]string{"source_type": "display"}, 123)
 	previewHTTPFlushNanoseconds.Add(map[string]string{"source_type": "display"}, 45)
+	previewFrameStoreNanoseconds.Add(map[string]string{"source_type": "display"}, 222)
+	previewLatestFrameCopyNanoseconds.Add(map[string]string{"source_type": "display"}, 333)
+	previewStatePublishNanoseconds.Add(map[string]string{"source_type": "display"}, 444)
 	eventHubSubscribers.Set(nil, 1)
 	eventHubEventsPublished.Inc(map[string]string{"event_type": "test.event"})
+	eventHubPublishNanoseconds.Add(map[string]string{"event_type": "test.event"}, 555)
 	websocketConnections.Set(nil, 1)
 	websocketEventsWritten.Inc(map[string]string{"event_type": "test.event"})
 
@@ -77,11 +81,23 @@ func TestMetricsEndpoint(t *testing.T) {
 	if !strings.Contains(body, `screencast_studio_preview_http_flush_nanoseconds_total{source_type="display"} 45`) {
 		t.Fatalf("metrics body missing preview flush duration counter: %s", body)
 	}
+	if !strings.Contains(body, `screencast_studio_preview_frame_store_nanoseconds_total{source_type="display"} 222`) {
+		t.Fatalf("metrics body missing preview frame-store duration counter: %s", body)
+	}
+	if !strings.Contains(body, `screencast_studio_preview_latest_frame_copy_nanoseconds_total{source_type="display"} 333`) {
+		t.Fatalf("metrics body missing preview latest-frame copy duration counter: %s", body)
+	}
+	if !strings.Contains(body, `screencast_studio_preview_state_publish_nanoseconds_total{source_type="display"} 444`) {
+		t.Fatalf("metrics body missing preview state publish duration counter: %s", body)
+	}
 	if !strings.Contains(body, `screencast_studio_eventhub_subscribers 1`) {
 		t.Fatalf("metrics body missing event hub subscriber gauge: %s", body)
 	}
 	if !strings.Contains(body, `screencast_studio_eventhub_events_published_total{event_type="test.event"} 1`) {
 		t.Fatalf("metrics body missing event hub published counter: %s", body)
+	}
+	if !strings.Contains(body, `screencast_studio_eventhub_publish_nanoseconds_total{event_type="test.event"} 555`) {
+		t.Fatalf("metrics body missing event hub publish duration counter: %s", body)
 	}
 	if !strings.Contains(body, `screencast_studio_websocket_connections 1`) {
 		t.Fatalf("metrics body missing websocket connections gauge: %s", body)

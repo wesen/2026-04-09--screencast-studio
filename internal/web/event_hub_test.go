@@ -35,4 +35,7 @@ func TestEventHubPublishesDeliveryAndDropMetrics(t *testing.T) {
 	if !strings.Contains(body, `screencast_studio_eventhub_events_dropped_total{event_type="test.event.hub"} 1`) {
 		t.Fatalf("metrics body missing dropped count: %s", body)
 	}
+	if !strings.Contains(body, `screencast_studio_eventhub_publish_nanoseconds_total{event_type="test.event.hub"} `) {
+		t.Fatalf("metrics body missing publish duration count: %s", body)
+	}
 }

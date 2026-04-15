@@ -26,6 +26,11 @@ var (
 		"Total server events dropped by the EventHub because a subscriber channel was full.",
 		"event_type",
 	)
+	eventHubPublishNanoseconds = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_eventhub_publish_nanoseconds_total",
+		"Total time spent inside EventHub.Publish while iterating subscribers and attempting deliveries, in nanoseconds.",
+		"event_type",
+	)
 	websocketConnections = appmetrics.MustRegisterGaugeVec(
 		"screencast_studio_websocket_connections",
 		"Current number of active websocket connections to the server.",

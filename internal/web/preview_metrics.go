@@ -63,6 +63,21 @@ var (
 		"Total preview frame updates stored by PreviewManager.",
 		"source_type",
 	)
+	previewFrameStoreNanoseconds = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_preview_frame_store_nanoseconds_total",
+		"Total time spent storing preview frames in PreviewManager, including cached-frame copy and preview.state publication, in nanoseconds.",
+		"source_type",
+	)
+	previewLatestFrameCopyNanoseconds = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_preview_latest_frame_copy_nanoseconds_total",
+		"Total time spent copying cached preview frames out of PreviewManager.LatestFrame, in nanoseconds.",
+		"source_type",
+	)
+	previewStatePublishNanoseconds = appmetrics.MustRegisterCounterVec(
+		"screencast_studio_preview_state_publish_nanoseconds_total",
+		"Total time spent publishing preview.state events from PreviewManager, in nanoseconds.",
+		"source_type",
+	)
 	previewEnsures = appmetrics.MustRegisterCounterVec(
 		"screencast_studio_preview_ensures_total",
 		"Total preview ensure attempts handled by PreviewManager.",

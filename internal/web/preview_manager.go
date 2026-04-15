@@ -390,7 +390,9 @@ func (m *PreviewManager) LatestFrame(previewID string) ([]byte, uint64, previewS
 	if !ok {
 		return nil, 0, previewSnapshot{}, false
 	}
+	copyStart := time.Now()
 	frame := append([]byte(nil), preview.latestFrame...)
+	previewLatestFrameCopyNanoseconds.Add(previewMetricLabels(preview.source.Type), uint64(time.Since(copyStart)))
 	return frame, preview.frameSeq, snapshotPreview(preview), true
 }
 
@@ -418,6 +420,7 @@ func (m *PreviewManager) TakeScreenshot(ctx context.Context, previewID string) (
 }
 
 func (m *PreviewManager) storePreviewFrame(previewID string, frame []byte) {
+	storeStart := time.Now()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -425,15 +428,20 @@ func (m *PreviewManager) storePreviewFrame(previewID string, frame []byte) {
 	if !ok {
 		return
 	}
+	labels := previewMetricLabels(preview.source.Type)
 	preview.latestFrame = append([]byte(nil), frame...)
 	preview.lastFrameAt = time.Now()
 	preview.frameSeq++
-	previewFrameUpdates.Inc(previewMetricLabels(preview.source.Type))
+	previewFrameUpdates.Inc(labels)
 	if preview.state == "starting" {
 		preview.state = "running"
 		preview.reason = ""
 	}
-	m.publishPreviewState(snapshotPreview(preview))
+	snapshot := snapshotPreview(preview)
+	publishStart := time.Now()
+	m.publishPreviewState(snapshot)
+	previewStatePublishNanoseconds.Add(labels, uint64(time.Since(publishStart)))
+	previewFrameStoreNanoseconds.Add(labels, uint64(time.Since(storeStart)))
 }
 
 func (m *PreviewManager) finishPreview(previewID string, runErr error) {

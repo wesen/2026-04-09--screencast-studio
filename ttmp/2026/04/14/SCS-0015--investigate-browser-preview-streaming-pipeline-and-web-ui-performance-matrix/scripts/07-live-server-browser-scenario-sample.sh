@@ -68,6 +68,9 @@ lines = []
 prefixes = (
     'screencast_studio_preview_http_',
     'screencast_studio_preview_frame_updates_total',
+    'screencast_studio_preview_frame_store_nanoseconds_total',
+    'screencast_studio_preview_latest_frame_copy_nanoseconds_total',
+    'screencast_studio_preview_state_publish_nanoseconds_total',
     'screencast_studio_eventhub_',
     'screencast_studio_websocket_',
 )

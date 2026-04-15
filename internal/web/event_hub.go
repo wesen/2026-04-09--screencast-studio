@@ -24,11 +24,15 @@ func NewEventHub() *EventHub {
 }
 
 func (h *EventHub) Publish(event ServerEvent) {
+	start := time.Now()
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now()
 	}
 	labels := eventMetricLabels(event.Type)
 	eventHubEventsPublished.Inc(labels)
+	defer func() {
+		eventHubPublishNanoseconds.Add(labels, uint64(time.Since(start)))
+	}()
 
 	h.mu.RLock()
 	defer h.mu.RUnlock()
