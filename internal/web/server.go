@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -21,6 +19,7 @@ type Config struct {
 	InitialDSL      string
 	InitialDSLPath  string
 	Addr            string
+	PprofAddr       string
 	StaticDir       string
 	PreviewLimit    int
 	ShutdownTimeout time.Duration
@@ -99,10 +98,22 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	var pprofServer *http.Server
+	if strings.TrimSpace(s.config.PprofAddr) != "" {
+		pprofServer = &http.Server{
+			Addr:              s.config.PprofAddr,
+			Handler:           newPprofMux(),
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	httpDone := make(chan struct{})
+	pprofDone := make(chan struct{})
 	telemetryDone := make(chan struct{})
+	if pprofServer == nil {
+		close(pprofDone)
+	}
 
 	log.Info().
 		Str("event", "runtime.context.bind").
@@ -119,8 +130,6 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			Dur("shutdown_timeout", s.config.ShutdownTimeout).
 			Msg("web server starting")
 
-		go s.openBrowser()
-
 		err := httpServer.ListenAndServe()
 		if err == nil || errors.Is(err, http.ErrServerClosed) {
 			log.Info().
@@ -136,6 +145,29 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			Msg("http server exited with error")
 		return errors.Wrap(err, "listen and serve")
 	})
+	if pprofServer != nil {
+		group.Go(func() error {
+			defer close(pprofDone)
+			log.Info().
+				Str("event", "runtime.pprof.start").
+				Str("addr", pprofServer.Addr).
+				Msg("pprof server starting")
+			err := pprofServer.ListenAndServe()
+			if err == nil || errors.Is(err, http.ErrServerClosed) {
+				log.Info().
+					Str("event", "runtime.pprof.exit").
+					Str("addr", pprofServer.Addr).
+					Msg("pprof server exited cleanly")
+				return nil
+			}
+			log.Error().
+				Str("event", "runtime.pprof.exit").
+				Str("addr", pprofServer.Addr).
+				Err(err).
+				Msg("pprof server exited with error")
+			return errors.Wrap(err, "listen and serve pprof")
+		})
+	}
 	group.Go(func() error {
 		defer close(telemetryDone)
 		// Telemetry remains context-driven for now: Run(ctx) exits when the
@@ -198,6 +230,25 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 				Msg("http server shutdown finished")
 		}
 
+		if pprofServer != nil {
+			log.Info().
+				Str("event", "runtime.pprof.shutdown.begin").
+				Str("addr", pprofServer.Addr).
+				Msg("pprof server shutdown starting")
+			if err := pprofServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error().
+					Str("event", "runtime.pprof.shutdown.error").
+					Err(err).
+					Msg("pprof server shutdown failed")
+				shutdownErrs = append(shutdownErrs, errors.Wrap(err, "shutdown pprof server").Error())
+			} else {
+				log.Info().
+					Str("event", "runtime.pprof.shutdown.done").
+					Str("addr", pprofServer.Addr).
+					Msg("pprof server shutdown finished")
+			}
+		}
+
 		log.Info().
 			Str("event", "runtime.recordings.shutdown.begin").
 			Msg("recording manager shutdown starting")
@@ -230,6 +281,11 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 		if err := waitForRuntimeParticipant(shutdownCtx, httpDone, "http server goroutine"); err != nil {
 			shutdownErrs = append(shutdownErrs, err.Error())
+		}
+		if pprofServer != nil {
+			if err := waitForRuntimeParticipant(shutdownCtx, pprofDone, "pprof server goroutine"); err != nil {
+				shutdownErrs = append(shutdownErrs, err.Error())
+			}
 		}
 		log.Info().
 			Str("event", "runtime.telemetry.wait.begin").
@@ -268,51 +324,6 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		Str("event", "runtime.shutdown.summary").
 		Msg("server runtime exited cleanly")
 	return nil
-}
-
-func (s *Server) openBrowser() {
-	log.Info().
-		Str("event", "runtime.browser.open.begin").
-		Dur("delay", 500*time.Millisecond).
-		Msg("browser open scheduled")
-
-	// Small delay to ensure server is ready
-	time.Sleep(500 * time.Millisecond)
-
-	addr := s.config.Addr
-	if !strings.HasPrefix(addr, "http") {
-		if strings.HasPrefix(addr, ":") {
-			addr = "http://localhost" + addr
-		} else {
-			addr = "http://" + addr
-		}
-	}
-
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", addr)
-	case "linux":
-		cmd = exec.Command("xdg-open", addr)
-	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", addr)
-	default:
-		return
-	}
-
-	if err := cmd.Start(); err != nil {
-		log.Warn().
-			Str("event", "runtime.browser.open.error").
-			Str("url", addr).
-			Err(err).
-			Msg("failed to open browser")
-	} else {
-		log.Info().
-			Str("event", "runtime.browser.open.done").
-			Str("url", addr).
-			Int("pid", cmd.Process.Pid).
-			Msg("opened browser")
-	}
 }
 
 func contextReason(ctx context.Context) string {

@@ -21,6 +21,7 @@ import (
 
 type serveSettings struct {
 	Addr            string `glazed:"addr"`
+	PprofAddr       string `glazed:"pprof-addr"`
 	File            string `glazed:"file"`
 	StaticDir       string `glazed:"static-dir"`
 	PreviewLimit    int    `glazed:"preview-limit"`
@@ -44,6 +45,7 @@ func newServeCommand(application *app.Application) (*serveCommand, error) {
 			cmds.WithShort("Run the local web API and control server"),
 			cmds.WithFlags(
 				fields.New("addr", fields.TypeString, fields.WithDefault(":7777"), fields.WithHelp("Bind address for the HTTP server")),
+				fields.New("pprof-addr", fields.TypeString, fields.WithDefault(""), fields.WithHelp("Optional bind address for a separate local pprof debug server (disabled when empty)")),
 				fields.New("file", fields.TypeString, fields.WithDefault(""), fields.WithHelp("Optional path to a setup DSL file to preload into the web UI")),
 				fields.New("static-dir", fields.TypeString, fields.WithDefault(""), fields.WithHelp("Optional directory to serve at / during development")),
 				fields.New("preview-limit", fields.TypeInteger, fields.WithDefault(4), fields.WithHelp("Maximum number of preview workers allowed at once")),
@@ -81,6 +83,7 @@ func (c *serveCommand) RunIntoGlazeProcessor(ctx context.Context, vals *values.V
 		InitialDSL:      initialDSL,
 		InitialDSLPath:  initialDSLPath,
 		Addr:            settings.Addr,
+		PprofAddr:       strings.TrimSpace(settings.PprofAddr),
 		StaticDir:       settings.StaticDir,
 		PreviewLimit:    settings.PreviewLimit,
 		ShutdownTimeout: durationSeconds(settings.ShutdownTimeout),
