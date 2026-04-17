@@ -1,0 +1,22 @@
+These files are saved as Playwright MCP run_code-compatible snippets.
+
+Use them with the Playwright MCP tool's filename mode, for example:
+
+  playwright_browser_run_code({
+    filename: "ttmp/2026/04/13/SCS-0014--fix-preview-regressions-in-screencast-studio-web-ui/scripts/22-playwright-ui-repros/01-add-camera-via-injected-js.js"
+  })
+
+Expected setup:
+- the screencast-studio server is already running locally on http://127.0.0.1:7777
+- the Studio page is reachable from Playwright
+
+Tab hygiene:
+- close older Playwright tabs before running a repro script so old MJPEG preview listeners do not stay attached
+- close the tab after the repro run if you are done measuring, for the same reason
+
+Files:
+- 01-add-camera-via-injected-js.js
+- 02-start-recording-via-injected-js.js
+- 03-stop-recording-via-injected-js.js
+- 04-verify-preview-streams.js
+- 05-add-camera-and-start-recording-smoke.js

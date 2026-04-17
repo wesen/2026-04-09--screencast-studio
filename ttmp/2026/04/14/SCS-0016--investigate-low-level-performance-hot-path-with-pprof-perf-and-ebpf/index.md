@@ -83,6 +83,11 @@ Current deliverable status:
 - a focused encode-stage encoder-contrast matrix is now saved under `scripts/results/33-encode-stage-encoder-contrast-matrix/20260415-035541/`
 - the new contrast result shows the Go anomaly is **not generic to all encoders**: it reproduces strongly with `x264enc`, but largely disappears with `openh264enc`
 - an initial `vaapih264enc` attempt did not complete cleanly and is currently treated as a separate hardware/driver/runtime caveat rather than part of the main software-encoder comparison
+- a focused Go-only `x264enc` CGO build-flag matrix is now saved under `scripts/results/34-go-x264-cgo-flag-matrix/20260415-040159/`
+- that first build-flag control does **not** support a simple “unoptimized cgo wrapper build” explanation: `CGO_CFLAGS=-O2` and `-O3` did not reduce the `x264enc` anomaly in the first pass
+- a focused `x264enc` property ablation matrix is now saved under `scripts/results/35-x264-property-ablation-matrix/20260415-042332/`
+- that ablation makes the negative result even stronger: cheaper/faster `x264enc` settings (`no_tune`, `no_trellis`, `ultrafast`) lower or stabilize Python/`gst-launch`, but do **not** rescue the Go path
+- the current best explanation is therefore no longer “Go is just doing more expensive x264 work”; it now looks more like a Go-hosted interaction with the `x264enc` path that persists even when the encoder configuration is made simpler
 
 ## Tasks
 

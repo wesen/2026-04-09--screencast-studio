@@ -307,3 +307,98 @@ So the next useful target is no longer just “encoder boundary” in general. I
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/33-encode-stage-encoder-contrast-matrix.sh — Focused encode-stage contrast runner for software encoder swaps
 - /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/33-encode-stage-encoder-contrast-matrix/20260415-035541/02-summary.md — Main software-encoder comparison showing the anomaly persists for `x264enc` but not `openh264enc`
 
+Added a focused Go-only `x264enc` build-flag control to test the narrower “thin cgo wrapper compilation is unoptimized” suspicion.
+
+New script:
+
+- `scripts/34-go-x264-cgo-flag-matrix.sh`
+
+Saved result:
+
+- `scripts/results/34-go-x264-cgo-flag-matrix/20260415-040159/02-summary.md`
+
+This first pass compared the same Go manual encode-stage `x264enc` harness under three build conditions:
+
+- default `CGO_CFLAGS`
+- `CGO_CFLAGS=-O2`
+- `CGO_CFLAGS=-O3`
+
+The result does **not** support a simple “the cgo wrapper was unoptimized, so that explains the anomaly” story. In this single run set:
+
+- default: `254.33%` avg CPU, `284806` page faults
+- `-O2`: `349.47%`, `262226` page faults
+- `-O3`: `272.02%`, `283258` page faults
+
+The exact CPU values are noisy enough that this should not be oversold as a precise ranking, but the important negative result is still clear: neither `-O2` nor `-O3` made the `x264enc` anomaly go away. If anything, the `-O2` run was worse in this pass.
+
+So the current best interpretation remains:
+
+- the issue is unlikely to be explained primarily by optimization level of the thin cgo glue itself,
+- and the stronger explanations are still around the Go-hosted `x264enc` / `libx264` interaction, buffer allocation, memory behavior, or some other host-process effect that is not rescued by simple cgo C optimization flags.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/34-go-x264-cgo-flag-matrix.sh — Focused Go-only build-flag control for the encode-stage `x264enc` path
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/34-go-x264-cgo-flag-matrix/20260415-040159/02-summary.md — First build-flag result showing no rescue from `-O2` or `-O3`
+
+Added a focused `x264enc` property-ablation slice to test whether the Go anomaly is really just tied to expensive x264 algorithm settings such as `zerolatency`, `trellis`, or the `veryfast` preset.
+
+New script:
+
+- `scripts/35-x264-property-ablation-matrix.sh`
+
+Saved result:
+
+- `scripts/results/35-x264-property-ablation-matrix/20260415-042332/02-summary.md`
+
+The matrix compared four `x264enc` variants at the encode stage across Go, Python, and `gst-launch`:
+
+- `baseline` — `speed-preset=3`, `tune=4`, `bframes=0`, `trellis=true`
+- `no_tune` — `speed-preset=3`, `tune=0`, `bframes=0`, `trellis=true`
+- `no_trellis` — `speed-preset=3`, `tune=4`, `bframes=0`, `trellis=false`
+- `ultrafast` — `speed-preset=1`, `tune=4`, `bframes=0`, `trellis=false`
+
+This result is another strong **negative** control against the easy explanations.
+
+Baseline still shows the familiar pattern:
+
+- Go: `165.88%` avg CPU, `233962` page faults
+- Python: `145.50%`, `63` page faults
+- `gst-launch`: `144.11%`, `2` page faults
+
+But the more important finding is what happens when the x264 settings are simplified.
+
+For Python and `gst-launch`, the `ultrafast` variant behaves the way you would expect a cheaper encoder setting to behave:
+
+- Python drops to `83.17%`
+- `gst-launch` drops to `79.33%`
+
+The Go path does **not** follow that pattern:
+
+- Go `ultrafast` is still `332.00%` with `136321` page faults
+
+Likewise, disabling `trellis` did **not** rescue the Go path even though the earlier perf symbol `x264_8_trellis_coefn` had made trellis look suspicious:
+
+- Go `no_trellis`: `343.56%`, `179717` page faults
+- Python `no_trellis`: `139.33%`, `62` page faults
+- `gst-launch` `no_trellis`: `137.44%`, `0` page faults
+
+And removing `zerolatency` did not help either:
+
+- Go `no_tune`: `301.67%`, `187211` page faults
+- Python `no_tune`: `146.50%`, `10607` page faults
+- `gst-launch` `no_tune`: `128.11%`, `3534` page faults
+
+So the new conclusion is sharper than before. The issue is not just “Go happens to pick an expensive x264 setting.” Even when the `x264enc` configuration is simplified, the Go-hosted path remains abnormally hot while the other host families behave much more reasonably.
+
+That shifts the next suspicion away from individual `x264enc` quality knobs and more toward:
+
+- Go-hosted interaction with the `x264enc` element lifecycle or buffer handling,
+- `x264enc` / `libx264` buffer-pool or memory-behavior differences under the Go-hosted process,
+- or some other host-process interaction that survives across x264 property changes.
+
+### Additional Related Files
+
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/35-x264-property-ablation-matrix.sh — Focused x264-property comparison across Go, Python, and gst-launch hosts
+- /home/manuel/code/wesen/2026-04-09--screencast-studio/ttmp/2026/04/14/SCS-0016--investigate-low-level-performance-hot-path-with-pprof-perf-and-ebpf/scripts/results/35-x264-property-ablation-matrix/20260415-042332/02-summary.md — Main x264-property ablation result showing no rescue for the Go path from cheaper/faster x264 settings
+
